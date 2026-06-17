@@ -19,6 +19,11 @@ function inferDefaults() {
     if (port === "8051") defaults.crm = origin;
     if (port === "8052") defaults.auth = origin;
     if (port === "8053") defaults.loyalty = origin;
+    if (!["8051", "8052", "8053"].includes(port)) {
+        defaults.crm = `${origin}/crm-api`;
+        defaults.auth = origin;
+        defaults.loyalty = `${origin}/loyalty-api`;
+    }
 
     return defaults;
 }
