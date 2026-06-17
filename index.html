@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система лояльности</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/fronted/styles.css">
+    <script defer src="/fronted/app.js"></script>
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+
+
+        <nav class="sidebar-nav">
+            <button class="nav-link active" data-tab="dashboard">Обзор</button>
+            <button class="nav-link" data-tab="crm">Клиенты CRM</button>
+            <button class="nav-link" data-tab="loyalty">Система лояльности</button>
+            <button class="nav-link" data-tab="orgs">Оргструктура и доступы</button>
+            <button class="nav-link" data-tab="audit">События и аудит</button>
+        </nav>
+
+
+    </aside>
+
+    <main class="main-content">
+        <header class="hero">
+            <div>
+                <h1>Панель управления системой лояльности</h1>
+                <p class="hero-text">
+                    Один интерфейс для CRM клиентов, программ лояльности, оргструктуры, событий и аудита.
+                </p>
+            </div>
+            <button class="primary-btn" id="refresh-all-btn" type="button">Обновить данные</button>
+        </header>
+
+        <section class="tab-panel active" id="tab-dashboard">
+            <div class="stats-grid" id="service-health-grid"></div>
+
+            <div class="dashboard-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Сводка MVP</h2>
+                            <p>Быстрый срез по основным доменным зонам.</p>
+                        </div>
+                    </div>
+                    <div class="metrics-grid" id="summary-metrics"></div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Последние события</h2>
+                            <p>Из сервиса `auth_and_logging`.</p>
+                        </div>
+                    </div>
+                    <div id="dashboard-events"></div>
+                </section>
+            </div>
+        </section>
+
+        <section class="tab-panel" id="tab-crm">
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Новый клиент CRM</h2>
+                            <p>Создание карточки клиента без технических полей.</p>
+                        </div>
+                    </div>
+                    <form id="crm-client-form" class="grid-form grid-form--double">
+                        <label><span>Организация</span><input name="organization_id" type="number" min="1" required></label>
+                        <label class="checkbox-row"><input name="is_active" type="checkbox" checked><span>Клиент активен</span></label>
+                        <label><span>Имя</span><input name="first_name" type="text"></label>
+                        <label><span>Фамилия</span><input name="last_name" type="text"></label>
+                        <label><span>Отчество</span><input name="middle_name" type="text"></label>
+                        <label><span>MAX ID</span><input name="max_id" type="number" min="1"></label>
+                        <label><span>Основной телефон</span><input name="primary_phone" type="text"></label>
+                        <label><span>Дополнительный телефон</span><input name="secondary_phone" type="text"></label>
+                        <label><span>Email</span><input name="email" type="email"></label>
+                        <label><span>Telegram ID</span><input name="telegram_id" type="number"></label>
+                        <label><span>Дата рождения</span><input name="birth_date" type="date"></label>
+                        <label>
+                            <span>Пол</span>
+                            <select name="gender">
+                                <option value="">Не указан</option>
+                                <option value="male">Мужской</option>
+                                <option value="female">Женский</option>
+                            </select>
+                        </label>
+                        <label class="field-span-2"><span>Комментарий</span><textarea name="comment" rows="3"></textarea></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Создать клиента</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Поиск клиентов</h2>
+                            <p>По имени, телефону, email, telegram id или внешним идентификаторам.</p>
+                        </div>
+                    </div>
+                    <form id="crm-search-form" class="toolbar-form">
+                        <input id="crm-search-query" type="text" placeholder="Например: +7999..., Ivan, email@example.com" required>
+                        <input id="crm-search-organization" type="number" min="1" placeholder="ID организации">
+                        <button class="primary-btn" type="submit">Найти</button>
+                        <button class="ghost-btn" id="crm-load-all-btn" type="button">Показать список</button>
+                    </form>
+                    <div id="crm-clients-table"></div>
+                </section>
+            </div>
+
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Профиль клиента</h2>
+                            <p>Собранные данные по выбранному клиенту.</p>
+                        </div>
+                    </div>
+                    <div id="crm-client-profile" class="empty-state">Выберите клиента из списка, чтобы увидеть профиль.</div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Файлы клиента</h2>
+                            <p>Бизнес-представление документов и вложений.</p>
+                        </div>
+                    </div>
+                    <div id="crm-client-files" class="empty-state">Здесь появятся файлы выбранного клиента.</div>
+                </section>
+            </div>
+
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>История клиента</h2>
+                            <p>Визиты, статусы, суммы и комментарии по посещениям.</p>
+                        </div>
+                    </div>
+                    <form id="client-visit-form" class="grid-form grid-form--double">
+                        <label><span>ID организации</span><input name="organization_id" type="number" min="1" required></label>
+                        <label><span>Дата и время визита</span><input name="visit_at" type="datetime-local" required></label>
+                        <label><span>Статус визита</span><input name="visit_status" type="text" value="completed" required></label>
+                        <label><span>ID филиала</span><input name="branch_id" type="number" min="1"></label>
+                        <label><span>Сумма продажи</span><input name="total_cost" type="number" min="0" step="0.01" value="0"></label>
+                        <label><span>Оплачено</span><input name="paid_amount" type="number" min="0" step="0.01" value="0"></label>
+                        <label><span>Скидка</span><input name="discount_amount" type="number" min="0" step="0.01" value="0"></label>
+                        <label><span>Долг</span><input name="debt_amount" type="number" min="0" step="0.01" value="0"></label>
+                        <label class="field-span-2"><span>Комментарий</span><textarea name="comment" rows="3"></textarea></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Добавить визит</button>
+                        </div>
+                    </form>
+                    <div id="client-history-metrics" class="metric-strip"></div>
+                    <div id="client-history-list" class="empty-state">Выберите клиента, чтобы посмотреть историю визитов.</div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Сегменты клиента</h2>
+                            <p>Сегментация и ручное включение клиента в нужные группы.</p>
+                        </div>
+                    </div>
+                    <form id="segment-create-form" class="grid-form grid-form--double">
+                        <label><span>ID организации</span><input name="organization_id" type="number" min="1" required></label>
+                        <label><span>Название сегмента</span><input name="name" type="text" required></label>
+                        <label><span>Статус</span><input name="status" type="text" value="active" required></label>
+                        <label class="checkbox-row"><input name="is_dynamic" type="checkbox"><span>Динамический сегмент</span></label>
+                        <label class="field-span-2"><span>Описание</span><textarea name="description" rows="3"></textarea></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Создать сегмент</button>
+                        </div>
+                    </form>
+                    <form id="segment-member-form" class="toolbar-form">
+                        <input name="segment_id" type="number" min="1" placeholder="ID сегмента" required>
+                        <button class="ghost-btn" type="submit">Добавить выбранного клиента в сегмент</button>
+                    </form>
+                    <div id="segments-list" class="empty-state">Здесь появятся сегменты организации и участие клиента в них.</div>
+                </section>
+            </div>
+
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Загрузка файлов клиента</h2>
+                            <p>Реальная отправка файла в `client_files` через multipart API.</p>
+                        </div>
+                    </div>
+                    <form id="client-file-upload-form" class="grid-form grid-form--double" enctype="multipart/form-data">
+                        <label><span>ID организации</span><input name="organization_id" type="number" min="1" required></label>
+                        <label><span>Категория файла</span><select name="file_category" id="file-category-select" required></select></label>
+                        <label><span>ID загрузившего пользователя</span><input name="uploaded_by" type="number" min="1"></label>
+                        <label><span>Файл</span><input name="file" type="file" required></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Загрузить файл</button>
+                        </div>
+                    </form>
+                    <div id="client-file-upload-result" class="empty-state">После загрузки здесь появится результат и файл обновится в списке выше.</div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Файлы по категориям</h2>
+                            <p>Быстрый фильтр по вложениям выбранного клиента.</p>
+                        </div>
+                    </div>
+                    <form id="client-file-filter-form" class="toolbar-form">
+                        <select name="file_category" id="file-category-filter"></select>
+                        <button class="ghost-btn" type="submit">Отфильтровать</button>
+                        <button class="primary-btn" id="client-files-reset-btn" type="button">Показать все</button>
+                    </form>
+                    <div id="crm-client-files-filtered" class="empty-state">Выберите клиента, чтобы фильтровать его файлы.</div>
+                </section>
+            </div>
+        </section>
+
+        <section class="tab-panel" id="tab-loyalty">
+            <section class="card">
+                <div class="section-head">
+                    <div>
+                        <h2>Поиск клиента</h2>
+                    </div>
+                </div>
+                <form id="loyalty-client-search-form" class="toolbar-form">
+                    <input id="loyalty-client-search-query" type="text" placeholder="Имя, телефон, email, telegram id" required>
+                    <button class="primary-btn" type="submit">Найти клиента</button>
+                </form>
+                <div id="loyalty-client-search-results"></div>
+            </section>
+
+            <section class="card accent-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Выбранный клиент</h2>
+                        <p>Контекст для всех операций по бонусам, сертификатам, абонементам, акциям и рефералам.</p>
+                    </div>
+                    <div id="selected-client-badge" class="badge">Клиент не выбран</div>
+                </div>
+                <div id="selected-client-summary" class="empty-state">Сначала выберите клиента через поиск выше.</div>
+            </section>
+
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Бонусы</h2>
+                            <p>Начисление, списание и история бонусов клиента.</p>
+                        </div>
+                    </div>
+                    <form id="bonus-accrual-form" class="grid-form grid-form--double">
+                        <label><span>Тип бонусов</span><input name="bonus_type" type="text" value="cashback" required></label>
+                        <label><span>Сумма</span><input name="amount" type="number" min="1" required></label>
+                        <label class="field-span-2"><span>Причина</span><input name="reason" type="text" required></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Начислить</button>
+                        </div>
+                    </form>
+                    <form id="bonus-writeoff-form" class="grid-form grid-form--double compact-form">
+                        <label><span>Тип бонусов</span><input name="bonus_type" type="text" value="cashback" required></label>
+                        <label><span>Сумма</span><input name="amount" type="number" min="1" required></label>
+                        <label class="field-span-2"><span>Причина списания</span><input name="reason" type="text" required></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="danger-btn" type="submit">Списать</button>
+                        </div>
+                    </form>
+                    <form id="bonus-level-form" class="grid-form grid-form--double compact-form">
+                        <label><span>Уровень клиента</span><input name="name" type="text" required></label>
+                        <label class="field-span-2"><span>Параметры JSON</span><textarea name="params" rows="2" placeholder='{"min_spent": 10000}'></textarea></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="ghost-btn" type="submit">Создать уровень</button>
+                        </div>
+                    </form>
+                    <form id="bonus-rule-form" class="grid-form grid-form--double compact-form">
+                        <label><span>Название правила</span><input name="name" type="text" required></label>
+                        <label><span>Тип правила</span><select name="rule_type" required><option value="service">service</option><option value="product">product</option><option value="welcome">welcome</option><option value="birthday">birthday</option><option value="referral">referral</option></select></label>
+                        <label><span>Тип бонусов</span><input name="bonus_type" type="text" value="cashback" required></label>
+                        <label><span>Сумма</span><input name="amount" type="number" min="1" required></label>
+                        <label><span>Уровень клиента</span><input name="client_level" type="text" placeholder="необязательно"></label>
+                        <label><span>Срок в днях</span><input name="expires_in_days" type="number" min="1" placeholder="необязательно"></label>
+                        <label class="field-span-2"><span>Ограничения JSON</span><textarea name="usage_restrictions" rows="2" placeholder='{"allowed_target_types":["service"]}'></textarea></label>
+                        <label class="field-span-2"><span>Параметры уровня JSON</span><textarea name="level_params" rows="2" placeholder='{"min_spent": 10000}'></textarea></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="ghost-btn" type="submit">Создать правило</button>
+                        </div>
+                    </form>
+                    <form id="bonus-rule-apply-form" class="toolbar-form">
+                        <input name="rule_id" type="number" min="1" placeholder="ID правила" required>
+                        <button class="ghost-btn" type="submit">Применить правило к выбранному клиенту</button>
+                    </form>
+                    <div id="bonus-balance" class="metric-strip"></div>
+                    <div id="bonus-history"></div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Сертификаты</h2>
+                            <p>Выпуск и погашение сертификатов клиента.</p>
+                        </div>
+                    </div>
+                    <form id="certificate-create-form" class="grid-form grid-form--double">
+                        <label><span>Тип</span><select name="certificate_type" required><option value="digital" selected>digital</option><option value="paper">paper</option></select></label>
+                        <label><span>Код</span><input name="certificate_code" type="text" required></label>
+                        <label><span>Номинал</span><input name="nominal_amount" type="number" min="0" step="0.01" required></label>
+                        <label><span>Дата выдачи</span><input name="issued_at" type="datetime-local" required></label>
+                        <label><span>Истекает</span><input name="expires_at" type="datetime-local"></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Выпустить сертификат</button>
+                        </div>
+                    </form>
+                    <form id="certificate-use-form" class="grid-form grid-form--double compact-form">
+                        <label><span>ID сертификата</span><input name="certificate_id" type="number" min="1" required></label>
+                        <label><span>Сумма списания</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
+                        <label class="checkbox-row field-span-2"><input name="convert_rest_to_deposit" type="checkbox"><span>Остаток перевести в депозит</span></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="ghost-btn" type="submit">Погасить сертификат</button>
+                        </div>
+                    </form>
+                    <div id="certificates-list"></div>
+                </section>
+            </div>
+
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Абонементы</h2>
+                            <p>Создание и контроль остатков по визитам и депозиту.</p>
+                        </div>
+                    </div>
+                    <form id="subscription-create-form" class="grid-form grid-form--double">
+                        <label><span>Название</span><input name="subscription_name" type="text" required></label>
+                        <label><span>Дата старта</span><input name="started_at" type="datetime-local" required></label>
+                        <label><span>Визитов всего</span><input name="visits_total" type="number" min="0" value="0" required></label>
+                        <label><span>Депозит</span><input name="deposit_amount" type="number" min="0" step="0.01" value="0" required></label>
+                        <label><span>Истекает</span><input name="expires_at" type="datetime-local"></label>
+                        <label class="checkbox-row"><input name="auto_renewal_enabled" type="checkbox"><span>Автопродление</span></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Создать абонемент</button>
+                        </div>
+                    </form>
+                    <form id="subscription-writeoff-form" class="grid-form grid-form--double compact-form">
+                        <label><span>ID абонемента</span><input name="subscription_id" type="number" min="1" required></label>
+                        <label><span>ID визита</span><input name="visit_id" type="number" min="1" required></label>
+                        <label><span>Списать визитов</span><input name="visits_count" type="number" min="0" value="1" required></label>
+                        <label><span>Списать депозит</span><input name="deposit_amount" type="number" min="0" step="0.01" value="0" required></label>
+                        <label><span>ID члена семьи</span><input name="consumer_client_id" type="number" min="1" placeholder="необязательно"></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="ghost-btn" type="submit">Списать после визита</button>
+                        </div>
+                    </form>
+                    <form id="subscription-transfer-form" class="toolbar-form">
+                        <input name="subscription_id" type="number" min="1" placeholder="ID абонемента" required>
+                        <input name="to_client_id" type="number" min="1" placeholder="ID нового клиента" required>
+                        <button class="ghost-btn" type="submit">Передать абонемент</button>
+                    </form>
+                    <form id="subscription-family-form" class="toolbar-form">
+                        <input name="subscription_id" type="number" min="1" placeholder="ID абонемента" required>
+                        <input name="family_client_id" type="number" min="1" placeholder="ID члена семьи" required>
+                        <button class="ghost-btn" type="submit">Добавить члена семьи</button>
+                    </form>
+                    <div id="subscriptions-list"></div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Акции и рефералы</h2>
+                            <p>Персональные промо-механики и реферальные ссылки.</p>
+                        </div>
+                    </div>
+                    <form id="promotion-create-form" class="grid-form grid-form--double">
+                        <label><span>Название акции</span><input name="promotion_name" type="text" required></label>
+                        <label><span>Тип акции</span><select name="promotion_type" required><option value="discount" selected>discount</option><option value="promo_code">promo_code</option><option value="gift">gift</option><option value="package">package</option><option value="weak_hours">weak_hours</option></select></label>
+                        <label><span>Тип скидки</span><select name="discount_type"><option value="percent" selected>percent</option><option value="fixed">fixed</option></select></label>
+                        <label><span>Значение скидки</span><input name="discount_value" type="number" min="0" step="0.01" value="0"></label>
+                        <label><span>Промокод</span><input name="promo_code" type="text"></label>
+                        <label><span>Минимальная сумма</span><input name="min_amount" type="number" min="0" step="0.01" value="0"></label>
+                        <label><span>Подарок</span><input name="gift" type="text" placeholder="необязательно"></label>
+                        <label><span>Сегмент клиента</span><input name="client_segment" type="text" placeholder="необязательно"></label>
+                        <label><span>Действует с</span><input name="valid_from" type="datetime-local"></label>
+                        <label><span>Действует до</span><input name="valid_until" type="datetime-local"></label>
+                        <label><span>Лимит использований</span><input name="usage_limit" type="number" min="1" placeholder="необязательно"></label>
+                        <label class="field-span-2"><span>Пакетное предложение JSON</span><textarea name="package_offer" rows="2" placeholder='{"services":[1,2],"bundle_price":1500}'></textarea></label>
+                        <label class="field-span-2"><span>Слабые часы JSON</span><textarea name="weak_hours" rows="2" placeholder='{"weekdays":[1,2,3],"time_from":"10:00","time_to":"15:00"}'></textarea></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Создать акцию</button>
+                        </div>
+                    </form>
+                    <form id="referral-source-form" class="grid-form grid-form--double compact-form">
+                        <label><span>Реферальный код</span><input name="referral_code" type="text" required></label>
+                        <label><span>Реферальная ссылка</span><input name="referral_link" type="url" required></label>
+                        <label><span>Тип награды</span><input name="reward_type" type="text" value="bonus"></label>
+                        <label><span>Сумма награды</span><input name="reward_amount" type="number" min="0" step="0.01" value="0"></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="ghost-btn" type="submit">Создать реферальную ссылку</button>
+                        </div>
+                    </form>
+                    <div id="promotions-list"></div>
+                    <div id="referrals-list"></div>
+                </section>
+            </div>
+        </section>
+
+        <section class="tab-panel" id="tab-orgs">
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Организации</h2>
+                            <p>Создание и управление структурой компаний.</p>
+                        </div>
+                    </div>
+                    <form id="organization-form" class="grid-form grid-form--double">
+                        <label><span>Название</span><input name="name" type="text" required></label>
+                        <label><span>ID владельца</span><input name="owner_user_id" type="number" min="1" required></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Создать организацию</button>
+                        </div>
+                    </form>
+                    <div id="organizations-list"></div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Пользователи и роли</h2>
+                            <p>Минимальные формы для управления доступами.</p>
+                        </div>
+                    </div>
+                    <form id="user-form" class="grid-form grid-form--double">
+                        <label><span>Имя</span><input name="first_name" type="text"></label>
+                        <label><span>Фамилия</span><input name="last_name" type="text"></label>
+                        <label><span>Email</span><input name="email" type="email"></label>
+                        <label><span>Телефон</span><input name="phone" type="text"></label>
+                        <label><span>Telegram ID</span><input name="telegram_id" type="number"></label>
+                        <label><span>Пароль/хэш</span><input name="password_hash" type="text"></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="primary-btn" type="submit">Создать пользователя</button>
+                        </div>
+                    </form>
+
+                    <form id="role-form" class="grid-form grid-form--double compact-form">
+                        <label><span>ID организации</span><input name="organization_id" type="number" min="1" required></label>
+                        <label><span>Название роли</span><input name="name" type="text" required></label>
+                        <div class="form-actions form-actions--full">
+                            <button class="ghost-btn" type="submit">Создать роль</button>
+                        </div>
+                    </form>
+
+                    <div id="users-list"></div>
+                    <div id="roles-list"></div>
+                    <div id="permissions-list"></div>
+                </section>
+            </div>
+        </section>
+
+        <section class="tab-panel" id="tab-audit">
+            <div class="section-grid">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>События</h2>
+                            <p>Журнал событий по фильтрам.</p>
+                        </div>
+                    </div>
+                    <form id="events-filter-form" class="toolbar-form">
+                        <input name="event_name" type="text" placeholder="Тип события">
+                        <input name="source_service" type="text" placeholder="Сервис-источник">
+                        <input name="entity_type" type="text" placeholder="Тип сущности">
+                        <button class="primary-btn" type="submit">Применить</button>
+                    </form>
+                    <div id="events-list"></div>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <h2>Аудит</h2>
+                            <p>Действия пользователей и интеграций.</p>
+                        </div>
+                    </div>
+                    <form id="audit-filter-form" class="toolbar-form">
+                        <input name="action" type="text" placeholder="Действие">
+                        <input name="entity_type" type="text" placeholder="Тип сущности">
+                        <input name="user_id" type="number" min="1" placeholder="ID пользователя">
+                        <button class="primary-btn" type="submit">Применить</button>
+                    </form>
+                    <div id="audit-list"></div>
+                </section>
+            </div>
+        </section>
+    </main>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+</body>
+</html>
