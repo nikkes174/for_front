@@ -63,7 +63,7 @@ const PERMISSION_TREE = [
         { code: "settings.brands.view", name: "Просмотр" },
         { code: "settings.brands.create", name: "Создание" },
       ] },
-      { name: "Аудит и события", actions: [
+      { name: "Аудит", actions: [
         { code: "settings.audit.view", name: "Аудит" },
         { code: "settings.events.view", name: "События" },
       ] },
@@ -86,6 +86,62 @@ function permissionByCode(code) {
 
 function nameById(items, id) {
   return items.find((item) => item.id === id)?.name || id || no;
+}
+
+function humanizeCode(value) {
+  const text = String(value || "").trim();
+  if (!text) return no;
+  const dictionary = {
+    create: "Создание",
+    created: "Создание",
+    update: "Изменение",
+    updated: "Изменение",
+    edit: "Редактирование",
+    delete: "Удаление",
+    deleted: "Удаление",
+    login: "Вход",
+    logout: "Выход",
+    renew: "Продление",
+    transfer: "Перенос",
+    client: "Клиент",
+    subscription: "Абонемент",
+    promotion: "Акция",
+    subscription_create: "Создание абонемента",
+    subscription_renew: "Продление абонемента",
+    subscription_transfer: "Перенос абонемента",
+    promotion_create: "Создание акции",
+    legal: "Юридическое лицо",
+    legal_entity: "Юридическое лицо",
+    client_subscription: "Абонемент клиента",
+    client_promotion: "Акция клиента",
+    branch: "Филиал",
+    department: "Подразделение",
+    workplace: "Рабочее место",
+    role: "Роль",
+    permission: "Право доступа",
+    user: "Пользователь",
+    membership: "Доступ пользователя",
+    event: "Событие",
+  };
+  const phraseKey = text.toLowerCase().replace(/\s+/g, "_");
+  if (dictionary[phraseKey]) return dictionary[phraseKey];
+  return dictionary[text] || dictionary[text.toLowerCase()] || text
+    .split(/[\s._-]+/)
+    .map((part) => dictionary[part.toLowerCase()] || part)
+    .join(" ");
+}
+
+function formatDateTime(value) {
+  if (!value) return no;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function jsonOrNull(value) {
@@ -111,20 +167,36 @@ function bankDetails(data) {
   };
 }
 
-function section(title, body) {
-  return `<div class="subpanel"><h3>${escapeHtml(title)}</h3>${body}</div>`;
+function section(title, body, hint = "") {
+  const hintMarkup = hint
+    ? `<span class="title-hint" tabindex="0" aria-label="${escapeHtml(hint)}" data-tooltip="${escapeHtml(hint)}">?</span>`
+    : "";
+  return `<div class="subpanel"><h3 class="subpanel-title">${escapeHtml(title)}${hintMarkup}</h3>${body}</div>`;
 }
 
-function entityList(items, empty, type, title, subtitle = () => "") {
+function entityList(items, empty, type, title, subtitle = () => "", actions = {}) {
   if (!items.length) return `<p class="empty">${escapeHtml(empty)}</p>`;
+  const deleteType = actions.deleteType || type;
+  const deleteId = actions.deleteId || ((item) => item.id);
+  const deleteLabel = actions.deleteLabel || "Удалить";
   return `
     <div class="entity-list">
-      ${items.map((item) => `
-        <button type="button" class="entity-card" data-edit-entity="${escapeHtml(type)}" data-id="${item.id}">
-          <b>${escapeHtml(title(item))}</b>
-          <span>${escapeHtml(subtitle(item))}</span>
-        </button>
-      `).join("")}
+      ${items.map((item) => {
+        const subtitleText = subtitle(item);
+        const itemDeleteId = deleteId(item);
+        return `
+          <div style="display:flex; gap:8px; align-items:stretch;">
+            <button type="button" class="entity-card" data-edit-entity="${escapeHtml(type)}" data-id="${item.id}" style="flex:1; min-width:0;">
+              <b>${escapeHtml(title(item))}</b>
+              ${subtitleText ? `<span>${escapeHtml(subtitleText)}</span>` : ""}
+            </button>
+            ${itemDeleteId !== undefined && itemDeleteId !== null && itemDeleteId !== ""
+              ? `<button type="button" class="ghost" data-delete-entity="${escapeHtml(deleteType)}" data-id="${escapeHtml(itemDeleteId)}">${escapeHtml(deleteLabel)}</button>`
+              : ""
+            }
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
 }
@@ -199,8 +271,8 @@ function modalFields(type, item) {
     </select></label>
   `;
   if (type === "role") return `
-    <label><span>Название роли</span><input name="name" value="${escapeHtml(item.name)}" required></label>
-    <div class="permission-matrix modal-permission-matrix">
+    <label class="modal-full"><span>Название роли</span><input name="name" value="${escapeHtml(item.name)}" required></label>
+    <div class="permission-matrix modal-permission-matrix modal-full">
       ${PERMISSION_TREE.map((service) => `
         <div class="permission-service">
           <h5>${escapeHtml(service.service)}</h5>
@@ -344,6 +416,18 @@ async function saveEntity(type, id, data) {
   });
 }
 
+async function deleteEntity(type, id) {
+  if (type === "legal") return api.deleteLegalEntity(id);
+  if (type === "branch") return api.deleteBranch(id);
+  if (type === "department") return api.deleteDepartment(id);
+  if (type === "workplace") return api.deleteWorkplace(id);
+  if (type === "role") return api.deleteRole(id);
+  if (type === "permission") return api.deletePermission(id);
+  if (type === "userAccess") return api.deleteMembership(cache.organizationId, id);
+  if (type === "branchMembership") return api.deleteBranchMembership(id);
+  throw new Error("Неизвестная сущность");
+}
+
 export async function settings(ctx) {
   const [
     branches,
@@ -401,8 +485,10 @@ export async function settings(ctx) {
             <button class="primary">Добавить Юридическое лицо</button>
             <p data-message></p>
           </form>
-          ${entityList(legalEntities, "Юридических лиц пока нет", "legal", (item) => item.name, (item) => `${item.legal_type || no} · ИНН ${item.requisites?.inn || no}`)}
-        `)}
+          ${entityList(legalEntities, "Юридических лиц пока нет", "legal", (item) => item.name, (item) => `${item.legal_type || no} · ИНН ${item.requisites?.inn || no}`, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Юридические лица — это функциональная зона или отдел внутри бизнеса.")}
       </div>
 
       <div id="branches" data-permission="settings.branches.view">
@@ -417,8 +503,10 @@ export async function settings(ctx) {
             <button class="primary">Добавить филиал</button>
             <p data-message></p>
           </form>
-          ${entityList(branches, "Филиалов пока нет", "branch", (branch) => branch.name, (branch) => `${branch.address || no} · ${branch.phone || no}`)}
-        `)}
+          ${entityList(branches, "Филиалов пока нет", "branch", (branch) => branch.name, (branch) => `${branch.address || no} · ${branch.phone || no}`, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Филиалы — это отдельные точки или локации организации.")}
       </div>
 
       <div id="departments" data-permission="settings.departments.view">
@@ -429,8 +517,10 @@ export async function settings(ctx) {
             <button class="primary">Добавить Подразделение</button>
             <p data-message></p>
           </form>
-          ${entityList(departments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${nameById(branches, item.branch_id)}`)}
-        `)}
+          ${entityList(departments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${nameById(branches, item.branch_id)}`, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Подразделения — это отделы внутри филиала, например администрация или мастера.")}
       </div>
 
       <div id="workplaces" data-permission="settings.workplaces.view">
@@ -442,8 +532,10 @@ export async function settings(ctx) {
             <button class="primary">Добавить рабочее место</button>
             <p data-message></p>
           </form>
-          ${entityList(workplaces, "Рабочих мест пока нет", "workplace", (item) => item.name, (item) => `${nameById(branches, item.branch_id)} · ${nameById(departments, item.department_id)}`)}
-        `)}
+          ${entityList(workplaces, "Рабочих мест пока нет", "workplace", (item) => item.name, (item) => `${nameById(branches, item.branch_id)} · ${nameById(departments, item.department_id)}`, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Рабочие места — это конкретные места оказания услуг внутри подразделений.")}
       </div>
 
       <div id="roles-rights" data-permission="settings.roles.manage">
@@ -454,9 +546,11 @@ export async function settings(ctx) {
             <p data-message></p>
           </form>
           ${section("Список ролей", `
-            ${entityList(roles, "Ролей пока нет", "role", (role) => role.name, () => "")}
-          `)}
-        `)}
+            ${entityList(roles, "Ролей пока нет", "role", (role) => role.name, () => "", {
+              deleteLabel: "Удалить",
+            })}
+          `, "Список ролей показывает созданные роли и их права доступа.")}
+        `, "Роли и права определяют, что пользователи могут видеть и изменять.")}
       </div>
 
       <div id="users" data-permission="settings.users.view">
@@ -499,38 +593,40 @@ export async function settings(ctx) {
               const membership = memberships.find((item) => item.user_id === user.id);
               const status = user.is_blocked ? "заблокирован" : user.is_active ? "активен" : "неактивен";
               return `${[user.phone, user.email].filter(Boolean).join(" / ") || no} · ${nameById(roles, membership?.role_id)} · ${status}`;
+            }, {
+              deleteType: "userAccess",
+              deleteId: (user) => user.id,
+              deleteLabel: "Удалить",
             })}
-        `)}
+        `, "Пользователи и доступ — это сотрудники и их роли в организации или филиалах.")}
       </div>
 
       <div id="audit" data-permission="settings.audit.view">
         ${section("Аудит и события", `
-          <table><thead><tr><th>ID</th><th>Действие</th><th>Сущность</th><th>Дата</th></tr></thead><tbody>
+          <table><thead><tr><th>Действие</th><th>Сущность</th><th>Дата и время</th></tr></thead><tbody>
             ${rows(auditLogs, "Записей аудита пока нет", (item) => `
               <tr>
-                <td>${escapeHtml(item.id)}</td>
-                <td>${escapeHtml(item.action || no)}</td>
-                <td>${escapeHtml(item.entity_type || item.entity || no)}</td>
-                <td>${escapeHtml(item.created_at || no)}</td>
+                <td>${escapeHtml(humanizeCode(item.action))}</td>
+                <td>${escapeHtml(humanizeCode(item.entity_type || item.entity))}</td>
+                <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
             `)}
           </tbody></table>
-        `)}
+        `, "Аудит и события показывает важные действия и изменения в системе.")}
       </div>
 
       <div id="events" data-permission="settings.events.view">
         ${section("События", `
-          <table><thead><tr><th>ID</th><th>Событие</th><th>Сущность</th><th>Дата</th></tr></thead><tbody>
+          <table><thead><tr><th>Событие</th><th>Сущность</th><th>Дата и время</th></tr></thead><tbody>
             ${rows(events, "Событий пока нет", (item) => `
               <tr>
-                <td>${escapeHtml(item.id)}</td>
-                <td>${escapeHtml(item.event_name || item.name || no)}</td>
-                <td>${escapeHtml(item.entity_type || no)}</td>
-                <td>${escapeHtml(item.created_at || no)}</td>
+                <td>${escapeHtml(humanizeCode(item.event_name || item.name))}</td>
+                <td>${escapeHtml(humanizeCode(item.entity_type))}</td>
+                <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
             `)}
           </tbody></table>
-        `)}
+        `, "События — это системные записи о произошедших действиях.")}
       </div>
     </section>
   `;
@@ -632,11 +728,26 @@ export function bindSettings(root, ctx) {
       return;
     }
 
-    const button = event.target.closest("[data-delete-branch]");
-    if (!button) return;
-    if (!confirm("Удалить филиал?")) return;
-    await api.deleteBranch(button.dataset.deleteBranch);
-    ctx.reload();
+    const deleteButton = event.target.closest("[data-delete-entity]");
+    if (!deleteButton) return;
+    const type = deleteButton.dataset.deleteEntity;
+    const labels = {
+      legal: "Удалить юридическое лицо?",
+      branch: "Удалить филиал?",
+      department: "Удалить подразделение?",
+      workplace: "Удалить рабочее место?",
+      role: "Удалить роль?",
+      permission: "Удалить право доступа?",
+      userAccess: "Удалить доступ пользователя к организации?",
+      branchMembership: "Удалить доступ пользователя к филиалу?",
+    };
+    if (!confirm(labels[type] || "Удалить запись?")) return;
+    try {
+      await deleteEntity(type, deleteButton.dataset.id);
+      ctx.reload();
+    } catch (error) {
+      alert(error.message);
+    }
   });
 
   document.addEventListener("click", (event) => {

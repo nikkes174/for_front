@@ -1,15 +1,134 @@
 import { api } from "../api.js";
-import { escapeHtml, rows } from "../dom.js";
+import { escapeHtml, formData, rows, setMessage } from "../dom.js";
 
-const loaders = {
-  rules: api.rules,
-  levels: api.bonusLevels,
-  transactions: api.transactions,
-  promotions: api.promotions,
-  certificates: api.certificates,
-  subscriptions: api.subscriptions,
-  referrals: api.referrals,
+const loyaltyState = {
+  clientQuery: "",
+  selectedClientId: null,
+  levelParams: "",
+  bonusTransactionType: "accrual",
+  ruleExtras: {
+    target_type: "",
+    target_id: "",
+    client_level: "",
+    level_params: "",
+    usage_restrictions: "",
+  },
+  subscriptionExtras: {
+    service_ids: "",
+    category_ids: "",
+    family_client_ids: "",
+  },
+  promotionExtras: {
+    package_offer: "",
+    weak_days: "",
+    weak_from: "",
+    valid_from: "",
+    valid_until: "",
+    client_segment: "",
+  },
+  actionResult: "",
 };
+
+let loyaltyModalCloseBound = false;
+
+
+const L = {
+  delete: "\u0423\u0434\u0430\u043b\u0438\u0442\u044c",
+  close: "\u0417\u0430\u043a\u0440\u044b\u0442\u044c",
+  save: "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c",
+  name: "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435",
+  type: "\u0422\u0438\u043f",
+  bonusType: "\u0422\u0438\u043f \u0431\u043e\u043d\u0443\u0441\u043e\u0432",
+  amount: "\u0420\u0430\u0437\u043c\u0435\u0440",
+  sum: "\u0421\u0443\u043c\u043c\u0430",
+  termDays: "\u0421\u0440\u043e\u043a, \u0434\u043d\u0435\u0439",
+  targetType: "\u0422\u0438\u043f \u0446\u0435\u043b\u0438",
+  clientLevel: "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u043a\u043b\u0438\u0435\u043d\u0442\u0430",
+  levelCashback: "\u041a\u0435\u0448\u0431\u044d\u043a \u0443\u0440\u043e\u0432\u043d\u044f",
+  levelParams: "\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b \u0443\u0440\u043e\u0432\u043d\u044f",
+  restrictions: "\u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f",
+  active: "\u0410\u043a\u0442\u0438\u0432\u043d\u043e",
+  activeShort: "\u0410\u043a\u0442\u0438\u0432\u0435\u043d",
+  disabled: "\u0412\u044b\u043a\u043b\u044e\u0447\u0435\u043d",
+  rulesTitle: "\u041f\u0440\u0430\u0432\u0438\u043b\u0430 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u044f",
+  createRule: "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u0430\u0432\u0438\u043b\u043e",
+  rulesEmpty: "\u041f\u0440\u0430\u0432\u0438\u043b \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
+  rule: "\u041f\u0440\u0430\u0432\u0438\u043b\u043e",
+  bonusKind: "\u0422\u0438\u043f \u0431\u043e\u043d\u0443\u0441\u0430",
+  size: "\u0420\u0430\u0437\u043c\u0435\u0440",
+  term: "\u0421\u0440\u043e\u043a",
+  status: "\u0421\u0442\u0430\u0442\u0443\u0441",
+  days: "\u0434\u043d\u0435\u0439",
+  noTerm: "\u0411\u0435\u0437 \u0441\u0440\u043e\u043a\u0430",
+  apply: "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c",
+  levelsTitle: "\u0423\u0440\u043e\u0432\u043d\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432",
+  cashback: "\u041a\u0435\u0448\u0431\u044d\u043a %",
+  createLevel: "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0443\u0440\u043e\u0432\u0435\u043d\u044c",
+  levelsEmpty: "\u0423\u0440\u043e\u0432\u043d\u0435\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
+  params: "\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b",
+  created: "\u0421\u043e\u0437\u0434\u0430\u043d",
+  notSet: "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e",
+  bonusOps: "\u0411\u043e\u043d\u0443\u0441\u043d\u044b\u0435 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438",
+  client: "\u041a\u043b\u0438\u0435\u043d\u0442",
+  notSelected: "\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d",
+  bonusBalance: "\u0411\u0430\u043b\u0430\u043d\u0441 \u0431\u043e\u043d\u0443\u0441\u043e\u0432",
+  operation: "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f",
+  reason: "\u041f\u0440\u0438\u0447\u0438\u043d\u0430",
+  run: "\u0412\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c",
+  date: "\u0414\u0430\u0442\u0430",
+  bonusHistoryEmpty: "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0431\u043e\u043d\u0443\u0441\u043e\u0432 \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442\u0430.",
+  expiresAt: "\u0421\u0440\u043e\u043a \u0434\u043e",
+  referralProgram: "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u0430",
+  invites: "\u041f\u0440\u0438\u0433\u043b\u0430\u0448\u0435\u043d\u0438\u0439",
+  successful: "\u0423\u0441\u043f\u0435\u0448\u043d\u044b\u0445",
+  code: "\u041a\u043e\u0434",
+  link: "\u0421\u0441\u044b\u043b\u043a\u0430",
+  reward: "\u041d\u0430\u0433\u0440\u0430\u0434\u0430",
+  bonus: "\u0411\u043e\u043d\u0443\u0441\u044b",
+  money: "\u0414\u0435\u043d\u044c\u0433\u0438",
+  createSource: "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a",
+  detectByCode: "\u041e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u043f\u043e \u043a\u043e\u0434\u0443",
+  detectByLink: "\u041e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u043f\u043e \u0441\u0441\u044b\u043b\u043a\u0435",
+  referralsEmpty: "\u041f\u0440\u0438\u0433\u043b\u0430\u0448\u0435\u043d\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
+  sourcesEmpty: "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u044b\u0445 \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
+  invited: "\u041f\u0440\u0438\u0433\u043b\u0430\u0448\u0451\u043d",
+  firstVisit: "\u041f\u0435\u0440\u0432\u044b\u0439 \u0432\u0438\u0437\u0438\u0442",
+  cancel: "\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c",
+  promotionsTitle: "\u0410\u043a\u0446\u0438\u0438 \u0438 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434\u044b",
+  promoCode: "\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434",
+  discount: "\u0421\u043a\u0438\u0434\u043a\u0430",
+  gift: "\u041f\u043e\u0434\u0430\u0440\u043e\u043a",
+  package: "\u041f\u0430\u043a\u0435\u0442",
+  weakHours: "\u041d\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0447\u0430\u0441\u044b",
+  fixed: "\u0424\u0438\u043a\u0441",
+  minAmount: "\u041c\u0438\u043d. \u0441\u0443\u043c\u043c\u0430",
+  limit: "\u041b\u0438\u043c\u0438\u0442",
+  segment: "\u0421\u0435\u0433\u043c\u0435\u043d\u0442",
+  from: "\u0421",
+  to: "\u0414\u043e",
+  packageServices: "\u041f\u0430\u043a\u0435\u0442: \u0443\u0441\u043b\u0443\u0433\u0438 ID",
+  weakDays: "\u041d\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0447\u0430\u0441\u044b: \u0434\u043d\u0438",
+  weakFrom: "\u041d\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0447\u0430\u0441\u044b: c",
+  create: "\u0421\u043e\u0437\u0434\u0430\u0442\u044c",
+  promotion: "\u0410\u043a\u0446\u0438\u044f",
+  promotionsEmpty: "\u0410\u043a\u0446\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
+  noCode: "\u0411\u0435\u0437 \u043a\u043e\u0434\u0430",
+  anySegment: "\u043b\u044e\u0431\u043e\u0439 \u0441\u0435\u0433\u043c\u0435\u043d\u0442",
+  conditions: "\u0423\u0441\u043b\u043e\u0432\u0438\u044f",
+  profit: "\u041f\u0440\u0438\u0431\u044b\u043b\u044c",
+  byCode: "\u041f\u043e \u043a\u043e\u0434\u0443",
+  confirmDelete: "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0437\u0430\u043f\u0438\u0441\u044c?",
+};
+
+const loyaltyTabs = [
+  ["rules", "Правила"],
+  ["levels", "Уровни"],
+  ["transactions", "Бонусы"],
+  ["subscriptions", "Абонементы"],
+  ["certificates", "Сертификаты"],
+  ["referrals", "Рефералы"],
+  ["promotions", "Акции"],
+];
 
 const permissions = {
   rules: "loyalty.rules.view",
@@ -21,42 +140,741 @@ const permissions = {
   referrals: "loyalty.referrals.view",
 };
 
-const titles = {
-  rules: "Правила начисления",
-  levels: "Уровни клиентов",
-  transactions: "Транзакции",
-  promotions: "Акции",
-  certificates: "Сертификаты",
-  subscriptions: "Абонементы",
-  referrals: "Реферальная программа",
+const ruleTypes = {
+  welcome: "Приветственные бонусы",
+  birthday: "День рождения",
+  referral: "Реферальная программа",
+  service: "Услуга",
+  product: "Товар",
 };
 
+const bonusTransactionTypes = {
+  accrual: "Начисление",
+  write_off: "Списание",
+  expiration: "Сгорание",
+};
+
+function optional(value) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function date(value) {
+  return value ? new Date(value).toLocaleDateString("ru-RU") : "Без срока";
+}
+
+function dateTime(value) {
+  return value ? new Date(value).toLocaleString("ru-RU") : "";
+}
+
+function money(value) {
+  return Number(value ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+}
+
+function json(value) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed ? JSON.parse(trimmed) : undefined;
+}
+
+function ids(value) {
+  const items = String(value ?? "").split(",").map((item) => Number(item.trim())).filter(Boolean);
+  return items.length ? items : undefined;
+}
+
+function askString(label) {
+  return window.prompt(label)?.trim() || "";
+}
+
+function askDate(label) {
+  const value = askString(`${label} (YYYY-MM-DDTHH:mm)`);
+  return value || undefined;
+}
+
+function askNumber(label) {
+  const value = Number(askString(label));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function certificateTypeLabel(type) {
+  if (type === "digital") return "Электронный";
+  if (type === "paper") return "Бумажный";
+  return "Тип не указан";
+}
+
+function certificateStatusLabel(status) {
+  if (status === "active") return "Активен";
+  if (status === "partially_used") return "Частично использован";
+  if (status === "used") return "Использован";
+  if (status === "expired") return "Завершен";
+  if (status === "transferred") return "Передан";
+  if (status === "refunded") return "Возвращен";
+  return "Статус не указан";
+}
+
+function clientName(client) {
+  return client?.full_name || [client?.last_name, client?.first_name, client?.middle_name].filter(Boolean).join(" ") || `#${client?.id ?? ""}`;
+}
+
+function field(label, name, value = "", attrs = "") {
+  return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}" ${attrs}></label>`;
+}
+
+function select(label, name, options, selected = "") {
+  return `
+    <label>
+      <span>${escapeHtml(label)}</span>
+      <select name="${escapeHtml(name)}">
+        ${options.map((item) => `<option value="${escapeHtml(item.value)}" ${String(selected) === String(item.value) ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+
+
+function editButton(kind, item, label) {
+  return `<button type="button" class="link-button" data-loyalty-edit-kind="${escapeHtml(kind)}" data-loyalty-edit="${escapeHtml(encodeURIComponent(JSON.stringify(item)))}">${escapeHtml(label)}</button>`;
+}
+
+function deleteButton(kind, id) {
+  return `<button type="button" class="danger" data-loyalty-delete-kind="${escapeHtml(kind)}" data-loyalty-delete="${escapeHtml(id)}">${L.delete}</button>`;
+}
+
+function actionButton(label, attr, id, className = "ghost") {
+  return `<button type="button" class="${className}" ${attr}="${escapeHtml(id)}">${label}</button>`;
+}
+
+function loyaltyModal(kind, item) {
+  const title = item.name || item.subscription_name || item.certificate_code || item.promotion_name || item.referral_code || item.bonus_type || `#${item.id}`;
+  const typeOptions = Object.entries(ruleTypes).map(([value, label]) => ({ value, label }));
+  const promotionTypes = [{ value: "promo_code", label: L.promoCode }, { value: "discount", label: L.discount }, { value: "gift", label: L.gift }, { value: "package", label: L.package }, { value: "weak_hours", label: L.weakHours }];
+  const rewardTypes = [{ value: "bonus", label: L.bonus }, { value: "money", label: L.money }];
+  const discountTypes = [{ value: "percent", label: "%" }, { value: "fixed", label: L.fixed }];
+  let fields = "";
+  if (kind === "rule") fields = `${field(L.name, "name", item.name)}${select(L.type, "rule_type", typeOptions, item.rule_type)}${field(L.bonusType, "bonus_type", item.bonus_type)}${field(L.amount, "amount", item.amount, 'type="number"')}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${field(L.targetType, "target_type", item.target_type || "")}${field(L.clientLevel, "client_level", item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}${field(L.restrictions, "usage_restrictions", item.usage_restrictions?.allowed_target_types?.join(",") || "", 'placeholder="service,product"')}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`;
+  if (kind === "level") fields = `${field(L.name, "name", item.name)}${field(L.cashback, "params", item.params?.cashback || "", 'type="number" step="0.01"')}`;
+  if (kind === "bonus") fields = `<div class="readonly-field"><span>ID</span><b>${escapeHtml(item.id)}</b></div><div class="readonly-field"><span>${L.type}</span><b>${escapeHtml(item.bonus_type || "-")}</b></div>${field(L.reason, "reason", item.reason || "")}${field(L.clientLevel, "client_level", item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}${field(L.restrictions, "usage_restrictions", item.usage_restrictions?.allowed_target_types?.join(",") || "", 'placeholder="service,product"')}${field(L.expiresAt, "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
+  if (kind === "subscription") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${field("\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "subscription_name", item.subscription_name || "")}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u0432\u0441\u0435\u0433\u043e", "visits_total", item.visits_total ?? 0, 'type="number"')}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043e\u0441\u0442\u0430\u043b\u043e\u0441\u044c", "visits_left", item.visits_left ?? 0, 'type="number"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u0432\u0441\u0435\u0433\u043e", "deposit_amount", item.deposit_amount ?? 0, 'type="number" step="0.01"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u043e\u0441\u0442\u0430\u0442\u043e\u043a", "deposit_left", item.deposit_left ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}<label class="checkbox modal-full"><input name="auto_renewal_enabled" type="checkbox" ${item.auto_renewal_enabled ? "checked" : ""}> \u0410\u0432\u0442\u043e\u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435</label><label class="checkbox modal-full"><input name="is_frozen" type="checkbox" ${item.is_frozen ? "checked" : ""}> \u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d</label>`;
+  if (kind === "certificate") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${select("\u0422\u0438\u043f", "certificate_type", [{ value: "digital", label: "\u042d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0439" }, { value: "paper", label: "\u0411\u0443\u043c\u0430\u0436\u043d\u044b\u0439" }], item.certificate_type || "digital")}${field("\u041a\u043e\u0434", "certificate_code", item.certificate_code || "")}${field("\u041d\u043e\u043c\u0438\u043d\u0430\u043b", "nominal_amount", item.nominal_amount ?? 0, 'type="number" step="0.01"')}${field("\u0411\u0430\u043b\u0430\u043d\u0441", "balance_amount", item.balance_amount ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
+  if (kind === "referral") fields = `${select(L.client, "referrer_client_id", clientOptions(loyaltyState.clients || [], null), item.referrer_client_id || "")}${field(L.code, "referral_code", item.referral_code || "")}${field(L.link, "referral_link", item.referral_link || "")}${select(L.reward, "reward_type", rewardTypes, item.reward_type || "bonus")}${field(L.bonusKind, "reward_bonus_type", item.reward_bonus_type || "cashback")}${field(L.sum, "reward_amount", item.reward_amount || 0, 'type="number" step="0.01"')}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.activeShort}</label>`;
+  if (kind === "promotion") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${field(L.name, "promotion_name", item.promotion_name || "")}${field(L.code, "promo_code", item.promo_code || "")}${select(L.type, "promotion_type", promotionTypes, item.promotion_type || "promo_code")}${select(L.discount, "discount_type", discountTypes, item.discount_type || "percent")}${field(L.amount, "discount_value", item.discount_value || 0, 'type="number" step="0.01"')}${field(L.minAmount, "min_amount", item.min_amount || 0, 'type="number" step="0.01"')}${field(L.gift, "gift", item.gift || "")}${field(L.limit, "usage_limit", item.usage_limit || "", 'type="number"')}${field(L.segment, "client_segment", item.client_segment || "")}${field(L.from, "valid_from", item.valid_from ? item.valid_from.slice(0, 16) : "", 'type="datetime-local"')}${field(L.to, "valid_until", item.valid_until ? item.valid_until.slice(0, 16) : "", 'type="datetime-local"')}`;
+  return `<div class="modal-backdrop" data-loyalty-modal><div class="modal-card" onclick="event.stopPropagation()"><div class="modal-head"><h3>${escapeHtml(title)}</h3><button type="button" class="ghost" data-close-loyalty-modal>${L.close}</button></div><form class="modal-grid" data-loyalty-edit-form data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(item.id)}">${fields}<button class="primary modal-full">${L.save}</button><p class="modal-full" data-message></p></form></div></div>`;
+}
+
+function editPayload(kind, data) {
+  if (kind === "rule") return {
+    name: data.name,
+    rule_type: data.rule_type,
+    bonus_type: data.bonus_type,
+    amount: Number(data.amount || 0),
+    expires_in_days: data.expires_in_days ? Number(data.expires_in_days) : null,
+    target_type: optional(data.target_type),
+    client_level: optional(data.client_level),
+    level_params: optional(data.level_params) ? { cashback: Number(data.level_params) } : null,
+    usage_restrictions: optional(data.usage_restrictions) ? { allowed_target_types: data.usage_restrictions.split(",").map((item) => item.trim()).filter(Boolean) } : null,
+    is_active: data.is_active === "on",
+  };
+  if (kind === "level") return { name: data.name, params: optional(data.params) ? { cashback: Number(data.params) } : null };
+  if (kind === "bonus") return {
+    reason: optional(data.reason),
+    client_level: optional(data.client_level),
+    level_params: optional(data.level_params) ? { cashback: Number(data.level_params) } : null,
+    usage_restrictions: optional(data.usage_restrictions) ? { allowed_target_types: data.usage_restrictions.split(",").map((item) => item.trim()).filter(Boolean) } : null,
+    expires_at: optional(data.expires_at) ? new Date(data.expires_at).toISOString() : null,
+  };
+  if (kind === "subscription") return {
+    client_id: Number(data.client_id) || null,
+    subscription_name: data.subscription_name,
+    visits_total: Number(data.visits_total || 0),
+    visits_left: Number(data.visits_left || 0),
+    deposit_amount: Number(data.deposit_amount || 0),
+    deposit_left: Number(data.deposit_left || 0),
+    expires_at: optional(data.expires_at) ? new Date(data.expires_at).toISOString() : null,
+    auto_renewal_enabled: data.auto_renewal_enabled === "on",
+    is_frozen: data.is_frozen === "on",
+  };
+  if (kind === "certificate") return {
+    client_id: Number(data.client_id) || null,
+    certificate_type: data.certificate_type,
+    certificate_code: data.certificate_code,
+    nominal_amount: Number(data.nominal_amount || 0),
+    balance_amount: Number(data.balance_amount || 0),
+    expires_at: optional(data.expires_at) ? new Date(data.expires_at).toISOString() : null,
+  };
+  if (kind === "referral") return {
+    referrer_client_id: Number(data.referrer_client_id) || null,
+    referral_code: data.referral_code,
+    referral_link: optional(data.referral_link),
+    reward_type: data.reward_type,
+    reward_bonus_type: optional(data.reward_bonus_type),
+    reward_amount: Number(data.reward_amount || 0),
+    is_active: data.is_active === "on",
+  };
+  if (kind === "promotion") return {
+    client_id: Number(data.client_id) || null,
+    promotion_name: data.promotion_name,
+    promotion_type: data.promotion_type,
+    promo_code: optional(data.promo_code),
+    discount_type: optional(data.discount_type),
+    discount_value: Number(data.discount_value || 0),
+    min_amount: Number(data.min_amount || 0),
+    gift: optional(data.gift),
+    usage_limit: data.usage_limit ? Number(data.usage_limit) : null,
+    client_segment: optional(data.client_segment),
+    valid_from: optional(data.valid_from) ? new Date(data.valid_from).toISOString() : null,
+    valid_until: optional(data.valid_until) ? new Date(data.valid_until).toISOString() : null,
+  };
+  return {};
+}
+
+function clientOptions(clients, selectedClient) {
+  return [
+    { value: "", label: "Выберите клиента" },
+    ...clients.map((client) => ({
+      value: String(client.id),
+      label: clientName(client),
+    })),
+  ];
+}
+
+async function loadClientContext(orgId) {
+  const clients = await api.clients(orgId, loyaltyState.clientQuery).catch(() => []);
+  const selectedClient = clients.find((item) => String(item.id) === String(loyaltyState.selectedClientId)) || null;
+  const rules = await api.rules(orgId).catch(() => []);
+  const levels = await api.bonusLevels(orgId).catch(() => []);
+  const result = { clients, selectedClient, rules, levels };
+
+  if (!selectedClient) {
+    const [history, subscriptions, certificates, referralSources, promotions] = await Promise.all([
+      api.bonusHistoryAll().catch(() => []),
+      api.subscriptionsAll().catch(() => []),
+      api.certificatesAll().catch(() => []),
+      api.referralSources().catch(() => []),
+      api.promotionsAll().catch(() => []),
+    ]);
+    return {
+      ...result,
+      balance: null,
+      history,
+      subscriptions,
+      certificates,
+      referralStats: null,
+      referrals: referralSources,
+      promotions,
+    };
+  }
+
+  const [balance, history, subscriptions, certificates, referralStats, referrals, promotions] = await Promise.all([
+    api.bonusBalance(selectedClient.id).catch(() => null),
+    api.bonusHistory(selectedClient.id).catch(() => []),
+    api.subscriptions(selectedClient.id).catch(() => []),
+    api.certificates(selectedClient.id).catch(() => []),
+    api.referralStats(selectedClient.id).catch(() => null),
+    api.referralSources().catch(() => []),
+    api.promotions(selectedClient.id).catch(() => []),
+  ]);
+
+  return { ...result, balance, history, subscriptions, certificates, referralStats, referrals, promotions };
+}
+
+function clientSelector(clients, selectedClient) {
+  return `
+    <div class="subpanel">
+      <h3>Клиент для программы лояльности</h3>
+      <form data-loyalty-client-search>
+        <input class="search" name="q" value="${escapeHtml(loyaltyState.clientQuery)}" placeholder="Поиск клиента по имени, телефону или email">
+      </form>
+      <div class="entity-list">
+        ${clients.length ? clients.map((client) => `
+          <button type="button" class="entity-card ${selectedClient?.id === client.id ? "selected" : ""}" data-loyalty-client="${escapeHtml(client.id)}">
+            <b>${escapeHtml(clientName(client))}</b>
+            <span>${escapeHtml(client.primary_phone || client.email || "Без контакта")}</span>
+          </button>
+        `).join("") : `<p class="empty">Клиенты не найдены.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+function rulesSection(ctx, rules, selectedClient) {
+  return `
+    <div class="subpanel"><h3>${L.rulesTitle}</h3>
+      <form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${select(L.type, "rule_type", Object.entries(ruleTypes).map(([value, label]) => ({ value, label })), "service")}${field(L.bonusType, "bonus_type", "cashback")}${field(L.amount, "amount", "0", 'type="number"')}${field(L.termDays, "expires_in_days", "", 'type="number"')}${field(L.targetType, "target_type", loyaltyState.ruleExtras.target_type)}${field(L.clientLevel, "client_level", loyaltyState.ruleExtras.client_level)}${field(L.levelParams, "level_params", loyaltyState.ruleExtras.level_params, 'placeholder="10"')}${field(L.restrictions, "usage_restrictions", loyaltyState.ruleExtras.usage_restrictions, 'placeholder="service,product"')}<button class="primary">${L.createRule}</button><p data-message></p></form>
+      <table><tbody>${rows(rules, L.rulesEmpty, (item) => `<tr><td>${editButton("rule", item, item.name)}</td><td class="actions">${deleteButton("rule", item.id)}</td></tr>`)}</tbody></table>
+    </div>`;
+}
+
+function levelsSection(levels) {
+  return `<div class="subpanel"><h3>${L.levelsTitle}</h3><form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}${field(L.cashback, "params", loyaltyState.levelParams, 'placeholder="10"')}<button class="primary">${L.createLevel}</button><p data-message></p></form><table><tbody>${rows(levels, L.levelsEmpty, (item) => `<tr><td>${editButton("level", item, item.name)}</td><td class="actions">${deleteButton("level", item.id)}</td></tr>`)}</tbody></table></div>`;
+}
+
+function transactionsSection(clients, selectedClient, balance, history) {
+  return `<div class="subpanel"><h3>${L.bonusOps}</h3><div class="modal-grid"><div class="readonly-field"><span>${L.client}</span><b>${escapeHtml(selectedClient ? clientName(selectedClient) : L.notSelected)}</b></div><div class="readonly-field"><span>${L.bonusBalance}</span><b>${escapeHtml(balance ? String(balance.balance) : "0")}</b></div></div><form class="inline-form compact" data-loyalty-bonus-op>${select(L.client, "client_id", clientOptions(clients, selectedClient), selectedClient?.id || "")}${select(L.operation, "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), loyaltyState.bonusTransactionType)}${field(L.bonusType, "bonus_type", "cashback")}${field(L.sum, "amount", "0", 'type="number"')}${field(L.reason, "reason")}<button class="primary">${L.run}</button><p data-message></p></form><table><tbody>${rows(history, L.bonusHistoryEmpty, (item) => `<tr><td>${editButton("bonus", item, item.reason || `${item.bonus_type} #${item.id}`)}</td><td class="actions">${deleteButton("bonus", item.id)}</td></tr>`)}</tbody></table></div>`;
+}
+
+function subscriptionsSection(clients, selectedClient, subscriptions) {
+  return `
+    <div class="subpanel">
+      <h3>\u0410\u0431\u043e\u043d\u0435\u043c\u0435\u043d\u0442\u044b</h3>
+      <form class="inline-form compact" data-loyalty-subscription-create>
+        ${select("\u041a\u043b\u0438\u0435\u043d\u0442", "client_id", clientOptions(clients, selectedClient), selectedClient?.id || "")}
+        ${field("\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "subscription_name")}
+        ${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432", "visits_total", "0", 'type="number"')}
+        ${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442", "deposit_amount", "0", 'type="number" step="0.01"')}
+        ${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", "", 'type="datetime-local"')}
+        <label class="checkbox"><input name="auto_renewal_enabled" type="checkbox"> \u0410\u0432\u0442\u043e\u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435</label>
+        ${field("\u0423\u0441\u043b\u0443\u0433\u0438 ID", "service_ids", loyaltyState.subscriptionExtras.service_ids, 'placeholder="1,2"')}
+        ${field("\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438 ID", "category_ids", loyaltyState.subscriptionExtras.category_ids, 'placeholder="1,2"')}
+        ${field("\u0421\u0435\u043c\u0435\u0439\u043d\u044b\u0435 ID", "family_client_ids", loyaltyState.subscriptionExtras.family_client_ids, 'placeholder="1,2"')}
+        <button class="primary" >\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u0431\u043e\u043d\u0435\u043c\u0435\u043d\u0442</button>
+        <p data-message></p>
+      </form>
+      <table><tbody>${rows(subscriptions, "\u0410\u0431\u043e\u043d\u0435\u043c\u0435\u043d\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.", (item) => `<tr><td>${editButton("subscription", item, item.subscription_name)}</td><td class="actions">${actionButton("\u0421\u043f\u0438\u0441\u0430\u0442\u044c", "data-subscription-visit", item.id)}${actionButton("\u041f\u0440\u043e\u0434\u043b\u0438\u0442\u044c", "data-subscription-renew", item.id)}${actionButton("\u041f\u0435\u0440\u0435\u0434\u0430\u0442\u044c", "data-subscription-transfer", item.id)}${actionButton(item.is_frozen ? "\u0420\u0430\u0437\u043c\u043e\u0440\u043e\u0437\u0438\u0442\u044c" : "\u0417\u0430\u043c\u043e\u0440\u043e\u0437\u0438\u0442\u044c", "data-subscription-freeze", item.id)}${actionButton(L.delete, "data-subscription-expire", item.id, "danger")}</td></tr>`)}</tbody></table>
+    </div>
+  `;
+}
+
+function certificatesSection(clients, selectedClient, certificates) {
+  return `
+    <div class="subpanel">
+      <h3>\u0421\u0435\u0440\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u044b</h3>
+      <form class="inline-form compact" data-loyalty-certificate-create>
+        ${select("\u041a\u043b\u0438\u0435\u043d\u0442", "client_id", clientOptions(clients, selectedClient), selectedClient?.id || "")}
+        ${select("\u0422\u0438\u043f", "certificate_type", [{ value: "digital", label: "\u042d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0439" }, { value: "paper", label: "\u0411\u0443\u043c\u0430\u0436\u043d\u044b\u0439" }], "digital")}
+        ${field("\u041a\u043e\u0434", "certificate_code")}
+        ${field("\u041d\u043e\u043c\u0438\u043d\u0430\u043b", "nominal_amount", "0", 'type="number" step="0.01"')}
+        ${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", "", 'type="datetime-local"')}
+        <button class="primary" >\u0412\u044b\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u0441\u0435\u0440\u0442\u0438\u0444\u0438\u043a\u0430\u0442</button>
+        <p data-message></p>
+      </form>
+      <table><tbody>${rows(certificates, "\u0421\u0435\u0440\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.", (item) => `<tr><td>${editButton("certificate", item, item.certificate_code)}</td><td class="actions">${actionButton("\u0421\u043f\u0438\u0441\u0430\u0442\u044c", "data-certificate-use", item.id)}${actionButton("\u041f\u0435\u0440\u0435\u0434\u0430\u0442\u044c", "data-certificate-transfer", item.id)}${actionButton("\u0412\u043e\u0437\u0432\u0440\u0430\u0442", "data-certificate-refund", item.id)}${actionButton("\u0412 \u0434\u0435\u043f\u043e\u0437\u0438\u0442", "data-certificate-deposit", item.id)}${actionButton(L.delete, "data-certificate-expire", item.id, "danger")}</td></tr>`)}</tbody></table>
+    </div>
+  `;
+}
+
+function referralsSection(clients, selectedClient, referralStats, referrals) {
+  const referralTable = rows(referrals, L.sourcesEmpty, (item) => `<tr><td>${editButton("referral", item, item.referral_code || `#${item.id}`)}</td><td class="actions">${actionButton("\u041f\u0435\u0440\u0432\u044b\u0439 \u0432\u0438\u0437\u0438\u0442", "data-referral-first-visit", item.id)}${actionButton("\u041d\u0430\u0447\u0438\u0441\u043b\u0438\u0442\u044c", "data-referral-reward", item.id)}${actionButton("\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c", "data-referral-cancel", item.id)}${deleteButton("referral", item.id)}</td></tr>`);
+  return `<div class="subpanel"><h3>${L.referralProgram}</h3><div class="modal-grid"><div class="readonly-field"><span>${L.invites}</span><b>${escapeHtml(referralStats ? String(referralStats.invites_count) : "0")}</b></div><div class="readonly-field"><span>${L.successful}</span><b>${escapeHtml(referralStats ? String(referralStats.successful_invites_count) : "0")}</b></div></div><form class="inline-form compact" data-loyalty-referral-create>${select(L.client, "client_id", clientOptions(clients, selectedClient), selectedClient?.id || "")}${field(L.code, "referral_code")}${field(L.link, "referral_link")}${select(L.reward, "reward_type", [{ value: "bonus", label: L.bonus }, { value: "money", label: L.money }], "bonus")}${field(L.bonusKind, "reward_bonus_type", "cashback")}${field(L.sum, "reward_amount", "0", 'type="number" step="0.01"')}<button class="primary">${L.createSource}</button><p data-message></p></form><div class="inline-form compact"><button type="button" class="ghost" data-referral-register="code">${L.detectByCode}</button><button type="button" class="ghost" data-referral-register="link">${L.detectByLink}</button></div><table><tbody>${referralTable}</tbody></table></div>`;
+}
+
+function promotionsSection(clients, selectedClient, promotions) {
+  return `<div class="subpanel"><h3>${L.promotionsTitle}</h3><form class="inline-form compact" data-loyalty-promotion-create>${select(L.client, "client_id", clientOptions(clients, selectedClient), selectedClient?.id || "")}${field(L.name, "promotion_name")}${field(L.code, "promo_code")}${select(L.type, "promotion_type", [{ value: "promo_code", label: L.promoCode }, { value: "discount", label: L.discount }, { value: "gift", label: L.gift }, { value: "package", label: L.package }, { value: "weak_hours", label: L.weakHours }], "promo_code")}${select(L.discount, "discount_type", [{ value: "percent", label: "%" }, { value: "fixed", label: L.fixed }], "percent")}${field(L.amount, "discount_value", "0", 'type="number" step="0.01"')}${field(L.minAmount, "min_amount", "0", 'type="number" step="0.01"')}${field(L.gift, "gift")}${field(L.limit, "usage_limit", "", 'type="number"')}${field(L.segment, "client_segment", loyaltyState.promotionExtras.client_segment)}${field(L.from, "valid_from", loyaltyState.promotionExtras.valid_from, 'type="datetime-local"')}${field(L.to, "valid_until", loyaltyState.promotionExtras.valid_until, 'type="datetime-local"')}${field(L.packageServices, "package_offer", loyaltyState.promotionExtras.package_offer, 'placeholder="1,2"')}${field(L.weakDays, "weak_days", loyaltyState.promotionExtras.weak_days, 'placeholder="mon,tue"')}${field(L.weakFrom, "weak_from", loyaltyState.promotionExtras.weak_from, 'type="time"')}<button class="primary">${L.create}</button><p data-message></p></form>${loyaltyState.actionResult ? `<p class="empty">${escapeHtml(loyaltyState.actionResult)}</p>` : ""}<table><tbody>${rows(promotions, L.promotionsEmpty, (item) => `<tr><td>${editButton("promotion", item, item.promotion_name)}</td><td class="actions">${deleteButton("promotion", item.id)}</td></tr>`)}</tbody></table></div>`;
+}
+
+function selectedClientBanner(selectedClient) {
+  return `
+    <div class="subpanel">
+      <h3>Текущий клиент</h3>
+      <div class="readonly-field"><span>Клиент</span><b>${escapeHtml(selectedClient ? clientName(selectedClient) : "Не выбран")}</b></div>
+    </div>
+  `;
+}
+
 export async function loyalty(ctx, tab = "rules") {
-  const visibleTabs = Object.keys(loaders).filter((key) => !ctx.can || ctx.can(permissions[key]));
-  const activeTab = visibleTabs.includes(tab) ? tab : visibleTabs[0] || "rules";
-  const items = await loaders[activeTab](ctx.org.id).catch(() => []);
+  const visibleTabs = loyaltyTabs.filter(([key]) => !ctx.can || ctx.can(permissions[key]));
+  const activeTab = visibleTabs.some(([key]) => key === tab) ? tab : (visibleTabs[0]?.[0] || "rules");
+  const data = await loadClientContext(ctx.org.id);
+  const { clients, selectedClient, rules, levels, balance, history, subscriptions, certificates, referralStats, referrals, promotions } = data;
+  loyaltyState.clients = clients;
+
+  let body = "";
+  if (activeTab === "rules") body = rulesSection(ctx, rules, selectedClient);
+  if (activeTab === "levels") body = levelsSection(levels);
+  if (activeTab === "transactions") body = transactionsSection(clients, selectedClient, balance, history);
+  if (activeTab === "subscriptions") body = subscriptionsSection(clients, selectedClient, subscriptions);
+  if (activeTab === "certificates") body = certificatesSection(clients, selectedClient, certificates);
+  if (activeTab === "referrals") body = referralsSection(clients, selectedClient, referralStats, referrals);
+  if (activeTab === "promotions") body = promotionsSection(clients, selectedClient, promotions);
 
   return `
-    <section class="panel">
+    <section class="panel" data-loyalty data-tab="${escapeHtml(activeTab)}">
       <h2>Лояльность</h2>
       <nav class="tabs">
-        ${Object.entries(titles).map(([key, title]) => `
-          <a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}" data-permission="${escapeHtml(permissions[key])}">${escapeHtml(title)}</a>
-        `).join("")}
+        ${visibleTabs.map(([key, title]) => `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
       </nav>
-      <div class="subpanel">
-        <h3>${escapeHtml(titles[activeTab])}</h3>
-        <table>
-          <thead><tr><th>ID</th><th>Название</th><th>Статус</th></tr></thead>
-          <tbody>${rows(items, "Записей пока нет", (item) => `
-            <tr>
-              <td>${escapeHtml(item.id)}</td>
-              <td>${escapeHtml(item.name || item.promotion_name || item.subscription_name || item.certificate_code || item.referral_code || "Без названия")}</td>
-              <td>${escapeHtml(item.status || (item.is_active ? "active" : "inactive"))}</td>
-            </tr>
-          `)}</tbody>
-        </table>
-      </div>
+      ${clientSelector(clients, selectedClient)}
+      ${selectedClientBanner(selectedClient)}
+      ${body}
     </section>
   `;
+}
+
+function actionBody(labelA, labelB) {
+  const original_amount = askNumber(labelA);
+  const cost_amount = askNumber(labelB);
+  if (original_amount === null || cost_amount === null) return null;
+  return { original_amount, cost_amount, client_segment: askString("Сегмент клиента") || undefined };
+}
+
+export function bindLoyalty(root, ctx) {
+  if (!loyaltyModalCloseBound) {
+    loyaltyModalCloseBound = true;
+    document.addEventListener("click", (event) => {
+      const closeButton = event.target.closest("[data-close-loyalty-modal]");
+      if (closeButton) {
+        closeButton.closest("[data-loyalty-modal]")?.remove();
+        return;
+      }
+      if (event.target.matches("[data-loyalty-modal]")) {
+        event.target.remove();
+      }
+    });
+  }
+
+  root.addEventListener("submit", async (event) => {
+    const form = event.target.closest("[data-loyalty] form");
+    if (!form) return;
+    event.preventDefault();
+    setMessage(form, "");
+    const data = formData(form);
+
+    try {
+      if (form.matches("[data-loyalty-client-search]")) {
+        loyaltyState.clientQuery = data.q || "";
+        ctx.reload();
+        return;
+      }
+
+      if (form.matches("[data-loyalty-edit-form]")) {
+        const kind = form.dataset.kind;
+        const id = Number(form.dataset.id);
+        const payload = editPayload(kind, data);
+        if (kind === "rule") await api.updateRule(id, payload);
+        else if (kind === "level") await api.updateBonusLevel(id, payload);
+        else if (kind === "bonus") await api.updateBonus(id, payload);
+        else if (kind === "subscription") await api.updateSubscription(id, payload);
+        else if (kind === "certificate") await api.updateCertificate(id, payload);
+        else if (kind === "referral") await api.updateReferralSource(id, payload);
+        else if (kind === "promotion") await api.updatePromotion(id, payload);
+        form.closest("[data-loyalty-modal]")?.remove();
+        ctx.reload();
+        return;
+      }
+
+      if (form.matches("[data-loyalty-rule-create]")) {
+        const rule = await api.createRule({
+          organization_id: ctx.org.id,
+          name: data.name,
+          rule_type: data.rule_type,
+          bonus_type: data.bonus_type,
+          amount: Number(data.amount),
+          expires_in_days: data.expires_in_days ? Number(data.expires_in_days) : undefined,
+          is_active: true,
+          target_type: optional(data.target_type),
+          client_level: optional(data.client_level),
+          level_params: optional(data.level_params) ? { cashback: Number(data.level_params) } : undefined,
+          usage_restrictions: optional(data.usage_restrictions) ? { allowed_target_types: data.usage_restrictions.split(",").map((item) => item.trim()).filter(Boolean) } : undefined,
+        });
+        if (loyaltyState.selectedClientId) {
+          await api.applyRule(rule.id, loyaltyState.selectedClientId, ctx.org.id);
+        }
+      } else if (form.matches("[data-loyalty-level-create]")) {
+        await api.createBonusLevel({
+          organization_id: ctx.org.id,
+          name: data.name,
+          params: optional(data.params) ? { cashback: Number(data.params) } : undefined,
+        });
+      } else if (form.matches("[data-loyalty-bonus-op]")) {
+        const clientId = Number(data.client_id || loyaltyState.selectedClientId) || null;
+        if (!clientId && data.transaction_type !== "accrual") throw new Error("Client is required for this operation");
+        const body = {
+          client_id: clientId,
+          bonus_type: data.bonus_type,
+          amount: Number(data.amount),
+          reason: data.reason,
+        };
+        if (data.transaction_type === "write_off") await api.writeOffBonus(body);
+        else if (data.transaction_type === "expiration") await api.expireBonus(body);
+        else await api.accrueBonus(body);
+      } else if (form.matches("[data-loyalty-subscription-create]")) {
+        const clientId = Number(data.client_id || loyaltyState.selectedClientId) || null;
+        if (clientId) await api.syncLoyaltyClient({ id: clientId, full_name: "" }).catch(() => null);
+
+        await api.createSubscription({
+          client_id: clientId,
+          subscription_name: data.subscription_name,
+          visits_total: Number(data.visits_total || 0),
+          visits_left: Number(data.visits_total || 0),
+          deposit_amount: Number(data.deposit_amount || 0),
+          deposit_left: Number(data.deposit_amount || 0),
+          started_at: new Date().toISOString(),
+          expires_at: optional(data.expires_at) ? new Date(data.expires_at).toISOString() : undefined,
+          auto_renewal_enabled: data.auto_renewal_enabled === "on",
+          service_restrictions: ids(data.service_ids) || ids(data.category_ids) ? {
+            service_ids: ids(data.service_ids),
+            category_ids: ids(data.category_ids),
+          } : undefined,
+          family_client_ids: ids(data.family_client_ids),
+        });
+      } else if (form.matches("[data-loyalty-certificate-create]")) {
+        const clientId = Number(data.client_id || loyaltyState.selectedClientId) || null;
+
+        await api.createCertificate({
+          client_id: clientId,
+          certificate_type: data.certificate_type,
+          certificate_code: data.certificate_code,
+          nominal_amount: Number(data.nominal_amount || 0),
+          balance_amount: Number(data.nominal_amount || 0),
+          issued_at: new Date().toISOString(),
+          expires_at: optional(data.expires_at) ? new Date(data.expires_at).toISOString() : undefined,
+        });
+      } else if (form.matches("[data-loyalty-referral-create]")) {
+        const clientId = Number(data.client_id || loyaltyState.selectedClientId) || null;
+
+        await api.createReferralSource({
+          referrer_client_id: clientId,
+          referral_code: data.referral_code,
+          referral_link: data.referral_link,
+          reward_type: data.reward_type,
+          reward_bonus_type: optional(data.reward_bonus_type),
+          reward_amount: Number(data.reward_amount || 0),
+          is_active: true,
+        });
+      } else if (form.matches("[data-loyalty-promotion-create]")) {
+        const clientId = Number(data.client_id || loyaltyState.selectedClientId) || null;
+
+        await api.createPromotion({
+          client_id: clientId,
+          promotion_name: data.promotion_name,
+          promotion_type: data.promotion_type,
+          promo_code: optional(data.promo_code),
+          discount_type: optional(data.discount_type),
+          discount_value: Number(data.discount_value || 0),
+          gift: optional(data.gift),
+          package_offer: ids(data.package_offer) ? { services: ids(data.package_offer) } : undefined,
+          valid_from: optional(data.valid_from) ? new Date(data.valid_from).toISOString() : undefined,
+          valid_until: optional(data.valid_until) ? new Date(data.valid_until).toISOString() : undefined,
+          client_segment: optional(data.client_segment),
+          min_amount: Number(data.min_amount || 0),
+          usage_limit: data.usage_limit ? Number(data.usage_limit) : undefined,
+          weak_hours: optional(data.weak_days) || optional(data.weak_from) ? {
+            days: String(data.weak_days || "").split(",").map((item) => item.trim()).filter(Boolean),
+            from: optional(data.weak_from),
+          } : undefined,
+        });
+      } else {
+        return;
+      }
+      loyaltyState.actionResult = "";
+      ctx.reload();
+    } catch (error) {
+      setMessage(form, error.message);
+    }
+  });
+
+  root.addEventListener("click", async (event) => {
+    const clientButton = event.target.closest("[data-loyalty-client]");
+    if (clientButton) {
+      loyaltyState.selectedClientId = Number(clientButton.dataset.loyaltyClient);
+      loyaltyState.actionResult = "";
+      ctx.reload();
+      return;
+    }
+
+    try {
+      const editButton = event.target.closest("[data-loyalty-edit]");
+      if (editButton) {
+        const item = JSON.parse(decodeURIComponent(editButton.dataset.loyaltyEdit));
+        root.insertAdjacentHTML("beforeend", loyaltyModal(editButton.dataset.loyaltyEditKind, item));
+        return;
+      }
+
+      const deleteButton = event.target.closest("[data-loyalty-delete]");
+      if (deleteButton) {
+        if (!window.confirm(L.confirmDelete)) return;
+        const id = Number(deleteButton.dataset.loyaltyDelete);
+        const kind = deleteButton.dataset.loyaltyDeleteKind;
+        if (kind === "rule") await api.deleteRule(id);
+        else if (kind === "level") await api.deleteBonusLevel(id);
+        else if (kind === "bonus") await api.deleteBonus(id);
+        else if (kind === "referral") await api.deleteReferralSource(id);
+        else if (kind === "promotion") await api.deletePromotion(id);
+        ctx.reload();
+        return;
+      }
+
+      const applyRuleButton = event.target.closest("[data-apply-rule]");
+      if (applyRuleButton && loyaltyState.selectedClientId) {
+        await api.applyRule(Number(applyRuleButton.dataset.applyRule), loyaltyState.selectedClientId, ctx.org.id);
+        ctx.reload();
+        return;
+      }
+
+      const subscriptionVisitButton = event.target.closest("[data-subscription-visit]");
+      if (subscriptionVisitButton) {
+        const visit_id = askNumber("ID визита");
+        if (visit_id !== null) {
+          await api.writeOffSubscriptionVisit(Number(subscriptionVisitButton.dataset.subscriptionVisit), {
+            visit_id,
+            visits_count: askNumber("Списать визитов") ?? 0,
+            deposit_amount: askNumber("Списать депозит") ?? 0,
+          });
+          ctx.reload();
+        }
+        return;
+      }
+
+      const subscriptionRenewButton = event.target.closest("[data-subscription-renew]");
+      if (subscriptionRenewButton) {
+        await api.renewSubscription(Number(subscriptionRenewButton.dataset.subscriptionRenew), {
+          visits_total: askNumber("Новые визиты") ?? 0,
+          deposit_amount: askNumber("Новый депозит") ?? 0,
+          started_at: new Date().toISOString(),
+          expires_at: askDate("Продлить до") ? new Date(askDate("Продлить до")).toISOString() : undefined,
+        });
+        ctx.reload();
+        return;
+      }
+
+      const subscriptionTransferButton = event.target.closest("[data-subscription-transfer]");
+      if (subscriptionTransferButton) {
+        const toClientId = askNumber("ID клиента, которому передать");
+        if (toClientId !== null) {
+          await api.transferSubscription(Number(subscriptionTransferButton.dataset.subscriptionTransfer), toClientId);
+          ctx.reload();
+        }
+        return;
+      }
+
+      const subscriptionFreezeButton = event.target.closest("[data-subscription-freeze]");
+      if (subscriptionFreezeButton) {
+        const id = Number(subscriptionFreezeButton.dataset.subscriptionFreeze);
+        if (subscriptionFreezeButton.textContent?.includes("Разморозить")) await api.unfreezeSubscription(id);
+        else await api.freezeSubscription(id, { frozen_from: new Date().toISOString(), frozen_until: askDate("Заморозить до") ? new Date(askDate("Заморозить до")).toISOString() : undefined });
+        ctx.reload();
+        return;
+      }
+
+      const subscriptionExpireButton = event.target.closest("[data-subscription-expire]");
+      if (subscriptionExpireButton) {
+        await api.expireSubscription(Number(subscriptionExpireButton.dataset.subscriptionExpire));
+        ctx.reload();
+        return;
+      }
+
+      const certificateUseButton = event.target.closest("[data-certificate-use]");
+      if (certificateUseButton) {
+        const amount = askNumber("Сумма списания");
+        if (amount !== null) {
+          await api.useCertificate(Number(certificateUseButton.dataset.certificateUse), {
+            amount,
+            convert_rest_to_deposit: window.confirm("Остаток перевести в депозит?"),
+          });
+          ctx.reload();
+        }
+        return;
+      }
+
+      const certificateTransferButton = event.target.closest("[data-certificate-transfer]");
+      if (certificateTransferButton) {
+        const toClientId = askNumber("ID клиента, которому передать");
+        if (toClientId !== null) {
+          await api.transferCertificate(Number(certificateTransferButton.dataset.certificateTransfer), toClientId);
+          ctx.reload();
+        }
+        return;
+      }
+
+      const certificateRefundButton = event.target.closest("[data-certificate-refund]");
+      if (certificateRefundButton) {
+        await api.refundCertificate(Number(certificateRefundButton.dataset.certificateRefund));
+        ctx.reload();
+        return;
+      }
+
+      const certificateDepositButton = event.target.closest("[data-certificate-deposit]");
+      if (certificateDepositButton) {
+        await api.convertCertificateToDeposit(Number(certificateDepositButton.dataset.certificateDeposit));
+        ctx.reload();
+        return;
+      }
+
+      const certificateExpireButton = event.target.closest("[data-certificate-expire]");
+      if (certificateExpireButton) {
+        await api.expireCertificate(Number(certificateExpireButton.dataset.certificateExpire));
+        ctx.reload();
+        return;
+      }
+
+      const referralRegisterButton = event.target.closest("[data-referral-register]");
+      if (referralRegisterButton) {
+        const invited_client_id = askNumber("ID приглашённого клиента");
+        const value = askString(referralRegisterButton.dataset.referralRegister === "code" ? "Реферальный код" : "Реферальная ссылка");
+        if (invited_client_id !== null && value) {
+          if (referralRegisterButton.dataset.referralRegister === "code") {
+            await api.registerReferralByCode({ referral_code: value, invited_client_id });
+          } else {
+            await api.registerReferralByLink({ referral_link: value, invited_client_id });
+          }
+          ctx.reload();
+        }
+        return;
+      }
+
+      const referralFirstVisitButton = event.target.closest("[data-referral-first-visit]");
+      if (referralFirstVisitButton) {
+        const value = askString("ID первого визита");
+        if (value) {
+          await api.markReferralFirstVisit(Number(referralFirstVisitButton.dataset.referralFirstVisit), value);
+          ctx.reload();
+        }
+        return;
+      }
+
+      const referralRewardButton = event.target.closest("[data-referral-reward]");
+      if (referralRewardButton) {
+        await api.accrueReferralReward(Number(referralRewardButton.dataset.referralReward));
+        ctx.reload();
+        return;
+      }
+
+      const referralCancelButton = event.target.closest("[data-referral-cancel]");
+      if (referralCancelButton) {
+        await api.cancelReferralReward(Number(referralCancelButton.dataset.referralCancel), askString("Причина отмены") || undefined);
+        ctx.reload();
+        return;
+      }
+
+      const promotionApplyButton = event.target.closest("[data-promotion-apply]");
+      if (promotionApplyButton) {
+        const body = actionBody("Сумма продажи", "Себестоимость");
+        if (body) {
+          await api.applyPromotion(Number(promotionApplyButton.dataset.promotionApply), body);
+          loyaltyState.actionResult = "";
+          ctx.reload();
+        }
+        return;
+      }
+
+      const promotionProfitButton = event.target.closest("[data-promotion-profit]");
+      if (promotionProfitButton) {
+        const body = actionBody("Сумма продажи", "Себестоимость");
+        if (body) {
+          const result = await api.promotionProfitability(Number(promotionProfitButton.dataset.promotionProfit), {
+            original_amount: body.original_amount,
+            cost_amount: body.cost_amount,
+          });
+          loyaltyState.actionResult = `Прибыль: ${money(result.profit_amount)}`;
+          ctx.reload();
+        }
+        return;
+      }
+
+      const promotionByCodeButton = event.target.closest("[data-promotion-by-code]");
+      if (promotionByCodeButton && loyaltyState.selectedClientId) {
+        const body = actionBody("Сумма продажи", "Себестоимость");
+        if (body) {
+          await api.applyPromotionByCode({
+            ...body,
+            promo_code: promotionByCodeButton.dataset.promotionByCode,
+            client_id: loyaltyState.selectedClientId,
+          });
+          loyaltyState.actionResult = "";
+          ctx.reload();
+        }
+      }
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
 }

@@ -3,14 +3,14 @@ import { ensureCss, escapeHtml, render, root } from "./dom.js";
 import { dashboard } from "./modules/dashboard.js";
 import { onboarding, bindOnboarding } from "./modules/onboarding.js";
 import { clients, bindClients } from "./modules/clients.js";
-import { loyalty } from "./modules/loyalty.js";
+import { loyalty, bindLoyalty } from "./modules/loyalty.js";
 import { settings, bindSettings } from "./modules/settings.js";
 
 const LAST_ORG_KEY = "loyalty.lastOrganizationId";
 
 ensureCss();
 
-let state = { me: null, orgs: [], org: null, permissionsConfigured: false, allowedPermissions: new Set() };
+let state = { me: null, orgs: [], org: null, permissionsConfigured: false, allowedPermissions: new Set(), hasOrganizationRole: false };
 
 const SETTINGS_PERMISSIONS = [
   "settings.legal.view",
@@ -112,7 +112,17 @@ async function ensureSession() {
     return false;
   }
   state.orgs = await api.organizations();
+  state.hasOrganizationRole = await userHasOrganizationRole();
   return true;
+}
+
+async function userHasOrganizationRole() {
+  const membershipsByOrg = await Promise.all(
+    state.orgs.map((org) => api.memberships(org.id).catch(() => [])),
+  );
+  return membershipsByOrg.some((memberships) =>
+    memberships.some((membership) => membership.user_id === state.me.id),
+  );
 }
 
 function chooseOrg(routeInfo) {
@@ -145,6 +155,12 @@ async function draw() {
   if (!(await ensureSession())) return;
 
   if (routeInfo.page === "onboarding") {
+    if (state.hasOrganizationRole && state.orgs.length) {
+      const org = chooseOrg(routeInfo);
+      history.replaceState(null, "", `/organizations/${org.id}`);
+      draw();
+      return;
+    }
     render(root, onboarding());
     return;
   }
@@ -168,6 +184,9 @@ async function draw() {
   const ctx = { me: state.me, orgs: state.orgs, org: state.org, navigate, reload, can };
   const [title, content] = await pageContent(routeInfo, ctx);
   render(root, shell(content, title));
+  if (state.hasOrganizationRole) {
+    root.querySelector("[data-open-onboarding]")?.remove();
+  }
   root.querySelectorAll("[data-permission]").forEach((node) => {
     if (!can(node.dataset.permission)) node.remove();
   });
@@ -182,6 +201,7 @@ root.addEventListener("click", async (event) => {
   }
 
   if (event.target.closest("[data-open-onboarding]")) {
+    if (state.hasOrganizationRole) return;
     navigate("/onboarding");
     return;
   }
@@ -203,6 +223,7 @@ window.addEventListener("popstate", draw);
 
 bindOnboarding(root);
 bindClients(root, { get org() { return state.org; }, navigate, reload });
+bindLoyalty(root, { get org() { return state.org; }, reload });
 bindSettings(root, { get org() { return state.org; }, reload });
 
 draw();

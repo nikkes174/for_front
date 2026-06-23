@@ -14,10 +14,7 @@ export async function dashboard(ctx) {
       <div class="stat"><span>Филиалов</span><strong>${branches.length}</strong></div>
       <div class="stat"><span>Клиентов</span><strong>${clients.length}</strong></div>
       <div class="stat"><span>Активных правил</span><strong>${activeRules}</strong></div>
-      <div class="panel span">
-        <h2>${escapeHtml(ctx.org.name)}</h2>
-        <p>Ванильный фронт уже работает: роутинг, сессия и базовая навигация без React.</p>
-      </div>
+      
     </section>
   `;
 }
