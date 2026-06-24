@@ -8,7 +8,6 @@ export function onboarding() {
         <h1>Создание организации</h1>
         <p>После создания откроются филиалы, клиенты и программа лояльности.</p>
         <label><span>Название организации</span><input name="name" required></label>
-        <label><span>Настройки JSON</span><input name="settings" placeholder='{"modules":["loyalty"]}'></label>
         <p data-message></p>
         <button class="primary">Создать организацию</button>
       </form>
@@ -25,8 +24,7 @@ export function bindOnboarding(root) {
 
     const data = formData(form);
     try {
-      const settings = data.settings ? JSON.parse(data.settings) : {};
-      const org = await api.createOrganization({ name: data.name, settings });
+      const org = await api.createOrganization({ name: data.name, settings: {} });
       localStorage.setItem("loyalty.lastOrganizationId", String(org.id));
       location.href = `/organizations/${org.id}`;
     } catch (error) {

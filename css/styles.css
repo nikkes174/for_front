@@ -51,6 +51,85 @@ body { margin: 0; }
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; }
 
+.ajax-indicator {
+  position: fixed;
+  top: 0;
+  left: 260px;
+  right: 0;
+  z-index: 50;
+  height: 3px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+
+.ajax-indicator span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #2563eb, #f59e0b);
+  box-shadow: 0 0 18px rgb(37 99 235 / 45%);
+  animation: ajax-slide .9s ease-in-out infinite;
+}
+
+.ajax-active .ajax-indicator {
+  opacity: 1;
+}
+
+[data-page-content].is-live-refreshing {
+  opacity: .72;
+  transform: scale(.995);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+[data-page-content].live-updated .panel,
+[data-page-content].live-updated .modal-card,
+[data-page-content].live-updated .entity-card,
+[data-page-content].live-updated .metric,
+[data-page-content].live-updated .stat {
+  animation: live-pop .45s ease both;
+}
+
+.live-splash {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgb(37 99 235 / 90%), rgb(34 197 94 / 90%)),
+    #fff;
+  box-shadow: 0 18px 44px rgb(37 99 235 / 22%);
+  animation: live-splash 1s ease-in-out infinite alternate;
+}
+
+@keyframes ajax-slide {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(280%); }
+}
+
+@keyframes live-pop {
+  from {
+    opacity: .45;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes live-splash {
+  from {
+    transform: scale(.86) rotate(-8deg);
+    filter: saturate(.85);
+  }
+  to {
+    transform: scale(1) rotate(8deg);
+    filter: saturate(1.15);
+  }
+}
+
 .auth-page {
   min-height: 100vh;
   display: grid;
@@ -128,6 +207,14 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 button:active { transform: translateY(1px); }
 .primary { background: #2563eb; color: #fff; }
 .primary:hover { background: #1d4ed8; }
+.auth-2fa-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border-radius: 7px;
+  padding: 8px 14px;
+}
 .ghost { background: #eef2f7; color: #172033; }
 .ghost:hover { background: #e2e8f0; }
 .link-button { background: transparent; border: 0; color: #172033; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
@@ -369,6 +456,18 @@ button:active { transform: translateY(1px); }
 
 .visit-form {
   grid-template-columns: repeat(3, minmax(180px, 1fr));
+  align-items: start;
+}
+
+.visit-form label {
+  align-self: start;
+}
+
+.visit-form .field-error {
+  min-height: 14px;
+  font-size: 12px;
+  line-height: 14px;
+  margin-top: -2px;
 }
 
 .visit-form label:first-child {
@@ -460,8 +559,54 @@ td small { display: block; color: #667085; margin-top: 4px; }
   line-height: 1.4;
 }
 
+.photo-upload-field {
+  align-items: start;
+}
+
+.photo-upload-control {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+}
+
+.photo-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease, background-color .18s ease;
+}
+
+.photo-upload-button:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.photo-upload-button:active {
+  transform: translateY(1px);
+}
+
+.client-photo-preview {
+  display: block;
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #dce3ee;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
 @media (max-width: 820px) {
   .app { grid-template-columns: 1fr; }
+  .ajax-indicator { left: 0; }
   .sidebar { position: static; }
   .sidebar nav { grid-template-columns: repeat(2, 1fr); }
   .content { padding: 16px; }

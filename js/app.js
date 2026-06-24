@@ -11,6 +11,8 @@ const LAST_ORG_KEY = "loyalty.lastOrganizationId";
 ensureCss();
 
 let state = { me: null, orgs: [], org: null, permissionsConfigured: false, allowedPermissions: new Set(), hasOrganizationRole: false };
+let ajaxCount = 0;
+let drawToken = 0;
 
 const SETTINGS_PERMISSIONS = [
   "settings.legal.view",
@@ -73,12 +75,13 @@ function shell(content, title) {
 
   return `
     <div class="app">
+      <div class="ajax-indicator" aria-hidden="true"><span></span></div>
       <aside class="sidebar">
         <strong class="brand">Лояльность</strong>
         <select aria-label="Организация" data-org-switch>${orgOptions}</select>
         <button class="ghost" data-open-onboarding>Создать организацию</button>
         <nav>
-          ${navLink(`/organizations/${org.id}`, "Обзор")}
+          ${navLink(`/organizations/${org.id}`, "Главная")}
           ${navLink(`/organizations/${org.id}/clients`, "Клиенты")}
           ${navLink(`/organizations/${org.id}/loyalty`, "Лояльность")}
           ${navLink(`/organizations/${org.id}/settings`, "Настройки организации")}
@@ -86,10 +89,10 @@ function shell(content, title) {
       </aside>
       <main class="content">
         <header class="topbar">
-          <div><span>${escapeHtml(org.name)}</span><h1>${escapeHtml(title)}</h1></div>
+          <div><span data-org-title>${escapeHtml(org.name)}</span><h1 data-page-title>${escapeHtml(title)}</h1></div>
           <button class="ghost" data-logout>Выйти</button>
         </header>
-        ${content}
+        <div data-page-content>${content}</div>
       </main>
     </div>
   `;
@@ -101,7 +104,7 @@ function navigate(path) {
 }
 
 function reload() {
-  draw();
+  draw({ live: true });
 }
 
 async function ensureSession() {
@@ -140,11 +143,35 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
   if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx)];
-  return ["Обзор", await dashboard(ctx)];
+  return ["Главная", await dashboard(ctx)];
 }
 
-async function draw() {
-  render(root, '<main class="auth-page"><p>Загружаем...</p></main>');
+function applyPermissions() {
+  if (state.hasOrganizationRole) {
+    root.querySelector("[data-open-onboarding]")?.remove();
+  }
+  root.querySelectorAll("[data-permission]").forEach((node) => {
+    if (!can(node.dataset.permission)) node.remove();
+  });
+}
+
+function animateUpdate(node) {
+  node.classList.remove("live-updated");
+  requestAnimationFrame(() => {
+    node.classList.add("live-updated");
+    window.setTimeout(() => node.classList.remove("live-updated"), 650);
+  });
+}
+
+async function draw(options = {}) {
+  const token = ++drawToken;
+  const hadContent = !!root.innerHTML.trim();
+  const pageNode = options.live ? root.querySelector("[data-page-content]") : null;
+  if (pageNode) {
+    pageNode.classList.add("is-live-refreshing");
+  } else if (!hadContent) {
+    render(root, '<main class="auth-page"><div class="live-splash" aria-hidden="true"></div></main>');
+  }
   const routeInfo = route();
 
   if (routeInfo.page === "auth") {
@@ -158,7 +185,7 @@ async function draw() {
     if (state.hasOrganizationRole && state.orgs.length) {
       const org = chooseOrg(routeInfo);
       history.replaceState(null, "", `/organizations/${org.id}`);
-      draw();
+      draw({ live: true });
       return;
     }
     render(root, onboarding());
@@ -183,13 +210,19 @@ async function draw() {
 
   const ctx = { me: state.me, orgs: state.orgs, org: state.org, navigate, reload, can };
   const [title, content] = await pageContent(routeInfo, ctx);
-  render(root, shell(content, title));
-  if (state.hasOrganizationRole) {
-    root.querySelector("[data-open-onboarding]")?.remove();
+  if (token !== drawToken) return;
+  if (pageNode && root.querySelector("[data-page-title]")) {
+    root.querySelector("[data-org-title]").textContent = state.org.name;
+    root.querySelector("[data-page-title]").textContent = title;
+    pageNode.innerHTML = content;
+    pageNode.classList.remove("is-live-refreshing");
+    animateUpdate(pageNode);
+    applyPermissions();
+    return;
   }
-  root.querySelectorAll("[data-permission]").forEach((node) => {
-    if (!can(node.dataset.permission)) node.remove();
-  });
+  render(root, shell(content, title));
+  animateUpdate(root.querySelector("[data-page-content]") || root);
+  applyPermissions();
 }
 
 root.addEventListener("click", async (event) => {
@@ -220,6 +253,14 @@ root.addEventListener("change", (event) => {
 });
 
 window.addEventListener("popstate", draw);
+window.addEventListener("ajax:start", () => {
+  ajaxCount += 1;
+  document.body.classList.add("ajax-active");
+});
+window.addEventListener("ajax:end", () => {
+  ajaxCount = Math.max(ajaxCount - 1, 0);
+  if (!ajaxCount) document.body.classList.remove("ajax-active");
+});
 
 bindOnboarding(root);
 bindClients(root, { get org() { return state.org; }, navigate, reload });

@@ -24,20 +24,44 @@ async function errorMessage(response) {
 }
 
 export async function request(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: "include",
-    headers: options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers,
-    ...options,
-  });
+  window.dispatchEvent(new CustomEvent("ajax:start"));
+  try {
+    const response = await fetch(path, {
+      credentials: "include",
+      headers: options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers,
+      ...options,
+    });
 
-  if (!response.ok) throw new ApiError(await errorMessage(response), response.status);
-  if (response.status === 204) return null;
-  return response.json();
+    if (!response.ok) throw new ApiError(await errorMessage(response), response.status);
+    if (response.status === 204) return null;
+    return response.json();
+  } finally {
+    window.dispatchEvent(new CustomEvent("ajax:end"));
+  }
+}
+
+export async function upload(path, formData) {
+  window.dispatchEvent(new CustomEvent("ajax:start"));
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new ApiError(await errorMessage(response), response.status);
+    if (response.status === 204) return null;
+    return response.json();
+  } finally {
+    window.dispatchEvent(new CustomEvent("ajax:end"));
+  }
 }
 
 export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  start2fa: (body) => request("/auth/2fa/start", { method: "POST", body: JSON.stringify(body) }),
+  verify2fa: (body) => request("/auth/2fa/verify", { method: "POST", body: JSON.stringify(body) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
 
@@ -100,8 +124,8 @@ export const api = {
   setUserPermission: (body) => request("/users-access/user-permissions", { method: "POST", body: JSON.stringify(body) }),
   grantTemporaryAccess: (body) => request("/users-access/temporary-accesses", { method: "POST", body: JSON.stringify(body) }),
   setTwoFactorAuth: (body) => request("/users-access/two-factor-auth", { method: "POST", body: JSON.stringify(body) }),
-  auditLogs: () => request("/audit"),
-  events: () => request("/events"),
+  auditLogs: (orgId) => request(`/audit${orgId ? `?organization_id=${orgId}` : ""}`),
+  events: (orgId) => request(`/events${orgId ? `?organization_id=${orgId}` : ""}`),
 
   clients: (orgId, search = "") => {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
@@ -109,6 +133,11 @@ export const api = {
   },
   createClient: (body) => request("/crm-api/clients", { method: "POST", body: JSON.stringify(body) }),
   updateClient: (id, body) => request(`/crm-api/clients-core/clients/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  uploadClientPhoto: (id, file) => {
+    const data = new FormData();
+    data.append("file", file);
+    return upload(`/crm-api/clients-core/clients/${id}/photo`, data);
+  },
   deleteClient: (id) => request(`/crm-api/clients-core/clients/${id}`, { method: "DELETE" }),
   clientProfile: (id, orgId) => request(`/crm-api/client-profile/clients/${id}?organization_id=${orgId}`),
   clientProfileMetric: (id) => request(`/crm-api/client-profile/clients/${id}/metrics`),
@@ -131,6 +160,9 @@ export const api = {
   createBonusLevel: (body) => request("/loyalty-api/client-bonuses/levels", { method: "POST", body: JSON.stringify(body) }),
   updateBonusLevel: (id, body) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteBonusLevel: (id) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "DELETE" }),
+  bonusTypes: (orgId) => request(`/loyalty-api/client-bonuses/bonus-types?organization_id=${orgId}`),
+  createBonusType: (body) => request("/loyalty-api/client-bonuses/bonus-types", { method: "POST", body: JSON.stringify(body) }),
+  deleteBonusType: (id) => request(`/loyalty-api/client-bonuses/bonus-types/${id}`, { method: "DELETE" }),
   bonusBalance: (clientId, bonusType = "") => request(`/loyalty-api/client-bonuses/clients/${clientId}/balance${bonusType ? `?bonus_type=${encodeURIComponent(bonusType)}` : ""}`),
   bonusHistory: (clientId) => request(`/loyalty-api/client-bonuses/clients/${clientId}/history`),
   bonusHistoryAll: () => request("/loyalty-api/client-bonuses/history"),

@@ -4,6 +4,8 @@ import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMes
 let state = {
   clients: [],
   branches: [],
+  departments: [],
+  workplaces: [],
   users: [],
   memberships: [],
   branchMemberships: [],
@@ -12,10 +14,13 @@ let state = {
   selectedClient: null,
   selectedVisit: null,
   visitDraft: {},
+  visitErrors: {},
   selectedVisitDraft: {},
+  photoPreviewUrl: "",
+  photoFile: null,
 };
 
-const no = "Не указано";
+const no = "Без фото";
 
 function clean(value) {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== "" && item !== undefined && item !== null));
@@ -79,8 +84,69 @@ function readonly(label, value) {
   return `<div class="readonly-field"><span>${escapeHtml(label)}</span><b>${escapeHtml(String(value ?? "").trim() || no)}</b></div>`;
 }
 
+function clientPhotoUrl(client) {
+  if (!client?.id || !client?.photo_file_id) return "";
+  const version = client.updated_at ? encodeURIComponent(client.updated_at) : encodeURIComponent(client.photo_file_id);
+  return `/crm-api/clients-core/clients/${client.id}/photo?v=${version}`;
+}
+
+function photoField(client, previewUrl = "") {
+  const currentUrl = previewUrl || clientPhotoUrl(client);
+  return `
+    <div class="readonly-field modal-full photo-upload-field">
+      <span>Фото</span>
+      <label class="photo-upload-control">
+        <input name="photo_file" type="file" accept="image/*" hidden>
+        <span class="photo-upload-button">${currentUrl ? "Заменить фото" : "Выбрать фото"}</span>
+      </label>
+      ${currentUrl
+        ? `<img src="${escapeHtml(currentUrl)}" alt="Фото клиента" class="client-photo-preview">`
+        : `<b>Файл пока не выбран</b>`}
+    </div>
+  `;
+}
+
+function clearPhotoPreview() {
+  if (state.photoPreviewUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(state.photoPreviewUrl);
+  }
+  state.photoPreviewUrl = "";
+  state.photoFile = null;
+}
+
+function upsertClient(client) {
+  const next = [...state.clients];
+  const index = next.findIndex((item) => String(item.id) === String(client.id));
+  if (index >= 0) next[index] = { ...next[index], ...client };
+  else next.unshift(client);
+  state.clients = next;
+}
+
+function removeClient(clientId) {
+  state.clients = state.clients.filter((item) => String(item.id) !== String(clientId));
+}
+
 function field(label, name, value = "", attrs = "") {
   return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}" ${attrs}></label>`;
+}
+
+function visitField(label, control, error = "") {
+  return `<label><span>${escapeHtml(label)}</span>${control}${error ? `<small class="field-error">${escapeHtml(error)}</small>` : ""}</label>`;
+}
+
+function visitInputField(label, name, value = "", attrs = "", error = "") {
+  return visitField(label, `<input name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}" ${attrs}>`, error);
+}
+
+function visitSelectField(label, name, items, selected = "", placeholder = "Не выбрано", error = "", attrs = "") {
+  const options = [
+    `<option value="">${escapeHtml(placeholder)}</option>`,
+    ...items.map((item) => {
+      const value = String(item.id ?? item.value);
+      return `<option value="${escapeHtml(value)}" ${String(selected) === value ? "selected" : ""}>${escapeHtml(item.name ?? item.label)}</option>`;
+    }),
+  ];
+  return visitField(label, `<select name="${escapeHtml(name)}" ${attrs}>${options.join("")}</select>`, error);
 }
 
 function checkbox(label, name, checked) {
@@ -169,6 +235,8 @@ function visitDraftDefaults() {
   return {
     visit_at: new Date().toISOString().slice(0, 16),
     branch_id: "",
+    department_id: "",
+    workplace_id: "",
     employee_id: "",
     visit_status: "completed",
     total_cost: "0",
@@ -178,6 +246,15 @@ function visitDraftDefaults() {
     product_names: "",
     comment: "",
   };
+}
+
+function departmentOptions(branchId = "") {
+  return state.departments.filter((item) => String(item.branch_id) === String(branchId));
+}
+
+function workplaceOptions(branchId = "", departmentId = "") {
+  return state.workplaces.filter((item) =>
+    String(item.branch_id) === String(branchId) && String(item.department_id) === String(departmentId));
 }
 
 function visitEditDraftDefaults(visit) {
@@ -197,7 +274,9 @@ function visitEditDraftDefaults(visit) {
   };
 }
 
-function masterOptions() {
+function masterOptions(branchId = "", workplaceId = "") {
+  const workplace = state.workplaces.find((item) => String(item.id) === String(workplaceId));
+  const departmentId = workplace?.department_id ? String(workplace.department_id) : "";
   const masterRoleIds = new Set(
     state.roles
       .filter((item) => {
@@ -206,18 +285,99 @@ function masterOptions() {
       })
       .map((item) => String(item.id)),
   );
-  const userIds = new Set([
-    ...state.users
-      .filter((user) => {
-        const membership = state.memberships.find((item) => String(item.user_id) === String(user.id));
-        return membership && masterRoleIds.has(String(membership.role_id));
-      })
-      .map((item) => String(item.id)),
-  ]);
+  const orgMasterUserIds = new Set(
+    state.memberships
+      .filter((item) => masterRoleIds.has(String(item.role_id)))
+      .map((item) => String(item.user_id)),
+  );
+  const branchUserIds = new Set(
+    state.branchMemberships
+      .filter((item) => !branchId || String(item.branch_id) === String(branchId))
+      .filter((item) => !departmentId || !item.department_id || String(item.department_id) === departmentId)
+      .filter((item) => !masterRoleIds.size || masterRoleIds.has(String(item.role_id)))
+      .map((item) => String(item.user_id)),
+  );
 
   return state.users
-    .filter((item) => item.is_active && !item.is_blocked && userIds.has(String(item.id)))
+    .filter((item) => item.is_active && !item.is_blocked)
+    .filter((item) => branchId ? branchUserIds.has(String(item.id)) : orgMasterUserIds.has(String(item.id)))
     .map((item) => ({ id: item.id, name: displayUser(item) }));
+}
+
+function validateVisitData(data) {
+  const errors = {};
+  if (!String(data.visit_at || "").trim()) errors.visit_at = "Заполните дату и время.";
+  if (!String(data.branch_id || "").trim()) errors.branch_id = "Выберите филиал.";
+  if (!String(data.department_id || "").trim()) errors.department_id = "Выберите подразделение.";
+  if (!String(data.workplace_id || "").trim()) errors.workplace_id = "Выберите рабочее место.";
+  if (!String(data.employee_id || "").trim()) errors.employee_id = "Выберите сотрудника.";
+  if (!String(data.visit_status || "").trim()) errors.visit_status = "Выберите статус.";
+  if (!String(data.total_cost || "").trim()) errors.total_cost = "Укажите стоимость.";
+  if (!String(data.discount_amount || "").trim()) errors.discount_amount = "Укажите скидку.";
+  if (!String(data.paid_amount || "").trim()) errors.paid_amount = "Укажите сумму оплаты.";
+  if (!String(data.service_names || "").trim()) errors.service_names = "Укажите услуги.";
+  if (!String(data.product_names || "").trim()) errors.product_names = "Укажите товары.";
+  return errors;
+}
+
+function clientCreateRequiredControls(form) {
+  return [...form.querySelectorAll("input, select, textarea")].filter((control) => {
+    const type = String(control.type || "").toLowerCase();
+    const name = String(control.name || "");
+    if (control.disabled || control.readOnly) return false;
+    if (["button", "submit", "reset", "hidden", "checkbox", "radio"].includes(type)) return false;
+    return !["secondary_phone", "email"].includes(name);
+  });
+}
+
+function syncClientCreateForm(root) {
+  const form = root.querySelector("[data-client-create]");
+  if (!form) return;
+  const controls = clientCreateRequiredControls(form);
+  controls.forEach((control) => {
+    control.required = true;
+  });
+  const submit = form.querySelector('button[type="submit"], button.primary');
+  if (submit) {
+    submit.disabled = controls.some((control) => !String(control.value || "").trim());
+  }
+}
+
+function visitCreateFormMarkup() {
+  const visitDraft = { ...visitDraftDefaults(), ...state.visitDraft };
+  const branches = state.branches;
+  const departments = departmentOptions(visitDraft.branch_id);
+  const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
+  const masters = masterOptions(visitDraft.branch_id, visitDraft.workplace_id);
+  const errors = state.visitErrors || {};
+
+  return `
+    ${visitInputField("Дата и время", "visit_at", visitDraft.visit_at, 'type="datetime-local"', errors.visit_at)}
+    ${visitSelectField("Филиал", "branch_id", branches, visitDraft.branch_id, "Выберите филиал", errors.branch_id)}
+    ${visitSelectField("Подразделение", "department_id", departments, visitDraft.department_id, "Выберите подразделение", errors.department_id, visitDraft.branch_id ? "" : "disabled")}
+    ${visitSelectField("Рабочее место", "workplace_id", workplaces, visitDraft.workplace_id, "Выберите рабочее место", errors.workplace_id, visitDraft.department_id ? "" : "disabled")}
+    ${visitSelectField("Сотрудник", "employee_id", masters, visitDraft.employee_id, "Выберите сотрудника", errors.employee_id, visitDraft.workplace_id ? "" : "disabled")}
+    ${visitField("Статус", `<select name="visit_status">
+      <option value="completed" ${visitDraft.visit_status === "completed" ? "selected" : ""}>Завершен</option>
+      <option value="scheduled" ${visitDraft.visit_status === "scheduled" ? "selected" : ""}>Запланирован</option>
+      <option value="cancelled" ${visitDraft.visit_status === "cancelled" ? "selected" : ""}>Отменен</option>
+      <option value="no_show" ${visitDraft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
+    </select>`, errors.visit_status)}
+    ${visitInputField("Стоимость", "total_cost", visitDraft.total_cost, 'type="number"', errors.total_cost)}
+    ${visitInputField("Скидка", "discount_amount", visitDraft.discount_amount, 'type="number"', errors.discount_amount)}
+    ${visitInputField("Оплачено", "paid_amount", visitDraft.paid_amount, 'type="number" readonly', errors.paid_amount)}
+    ${visitInputField("Услуги", "service_names", visitDraft.service_names, 'placeholder="Можно несколько через запятую"', errors.service_names)}
+    ${visitInputField("Товары", "product_names", visitDraft.product_names, 'placeholder="Можно несколько через запятую"', errors.product_names)}
+    ${visitInputField("Комментарий", "comment", visitDraft.comment)}
+    <button class="primary">Добавить визит</button>
+    <p data-message></p>
+  `;
+}
+
+function syncVisitCreateForm(root) {
+  const form = root.querySelector("[data-visit-create]");
+  if (!form) return;
+  form.innerHTML = visitCreateFormMarkup();
 }
 
 function segmentExamples() {
@@ -296,7 +456,10 @@ function modal(client) {
   const accounts = client.accounts;
   const branches = state.branches;
   const visitDraft = { ...visitDraftDefaults(), ...state.visitDraft };
-  const masters = masterOptions();
+  const departments = departmentOptions(visitDraft.branch_id);
+  const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
+  const masters = masterOptions(visitDraft.branch_id, visitDraft.workplace_id);
+  const errors = state.visitErrors || {};
   const card = client.card;
 
   return `
@@ -323,7 +486,7 @@ function modal(client) {
             <option value="male" ${card.gender === "male" ? "selected" : ""}>Мужской</option>
             <option value="female" ${card.gender === "female" ? "selected" : ""}>Женский</option>
           </select></label>
-          ${field("Фото", "photo_file_id", card.photo_file_id)}
+          ${photoField(client, state.photoPreviewUrl)}
           ${field("Комментарий", "comment", card.comment)}
           ${field("Класс важности", "importance_class", card.importance_class, 'type="number"')}
           <label><span>Статус</span><select name="status">
@@ -350,7 +513,7 @@ function modal(client) {
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
             <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(visitDraft.visit_at)}"></label>
             ${selectField("Филиал", "branch_id", branches, visitDraft.branch_id, "Выберите филиал")}
-            ${selectField("Мастер", "employee_id", masters, visitDraft.employee_id, "Выберите мастера")}
+            ${selectField("Сотрудник", "employee_id", masters, visitDraft.employee_id, "Выберите мастера")}
             <label><span>Статус</span><select name="visit_status">
               <option value="completed" ${visitDraft.visit_status === "completed" ? "selected" : ""}>Завершен</option>
               <option value="scheduled" ${visitDraft.visit_status === "scheduled" ? "selected" : ""}>Запланирован</option>
@@ -468,9 +631,11 @@ function editableVisitModal(client) {
 export async function clients(ctx) {
   const params = new URLSearchParams(location.search);
   const search = params.get("q") || "";
-  const [items, branches, users, memberships, branchMemberships, roles, segments] = await Promise.all([
+  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments] = await Promise.all([
     api.clients(ctx.org.id, search).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
+    api.departments(ctx.org.id).catch(() => []),
+    api.workplaces(ctx.org.id).catch(() => []),
     api.users(ctx.org.id).catch(() => []),
     api.memberships(ctx.org.id).catch(() => []),
     api.branchMemberships(ctx.org.id).catch(() => []),
@@ -478,7 +643,7 @@ export async function clients(ctx) {
     api.clientSegments(ctx.org.id).catch(() => segmentExamples().map((name) => ({ name }))),
   ]);
 
-  state = { ...state, clients: items, branches, users, memberships, branchMemberships, roles, segments };
+  state = { ...state, clients: items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments };
 
   return `
     <section class="panel" data-clients>
@@ -510,17 +675,58 @@ export async function clients(ctx) {
 }
 
 export function bindClients(root, ctx) {
+  const syncClientForms = () => syncClientCreateForm(root);
+  syncClientForms();
+  const clientFormsObserver = new MutationObserver(() => {
+    syncClientForms();
+  });
+  clientFormsObserver.observe(root, { childList: true, subtree: true });
+
+  syncVisitCreateForm(root);
+
   root.addEventListener("input", (event) => {
+    if (event.target.matches('[name="photo_file"]')) {
+      clearPhotoPreview();
+      const file = event.target.files?.[0];
+      if (file) {
+        state.photoFile = file;
+        state.photoPreviewUrl = URL.createObjectURL(file);
+      }
+      ctx.reload();
+      return;
+    }
+
+    if (event.target.closest("[data-client-create]")) {
+      syncClientCreateForm(root);
+    }
+
     const form = event.target.closest("[data-visit-create], [data-visit-edit]");
     if (form) {
       if (form.matches("[data-visit-create]")) {
         state.visitDraft = { ...state.visitDraft, ...formData(form) };
+        if (event.target.name) state.visitErrors = { ...state.visitErrors, [event.target.name]: "" };
       } else {
         state.selectedVisitDraft = { ...state.selectedVisitDraft, ...formData(form) };
       }
       if (event.target.name === "branch_id" && form.matches("[data-visit-create]")) {
+        state.visitDraft.department_id = "";
+        state.visitDraft.workplace_id = "";
         state.visitDraft.employee_id = "";
-        ctx.reload();
+        state.visitErrors = { ...state.visitErrors, department_id: "", workplace_id: "", employee_id: "" };
+        syncVisitCreateForm(root);
+        return;
+      }
+      if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
+        state.visitDraft.workplace_id = "";
+        state.visitDraft.employee_id = "";
+        state.visitErrors = { ...state.visitErrors, workplace_id: "", employee_id: "" };
+        syncVisitCreateForm(root);
+        return;
+      }
+      if (event.target.name === "workplace_id" && form.matches("[data-visit-create]")) {
+        state.visitDraft.employee_id = "";
+        state.visitErrors = { ...state.visitErrors, employee_id: "" };
+        syncVisitCreateForm(root);
         return;
       }
     }
@@ -530,22 +736,36 @@ export function bindClients(root, ctx) {
     form.elements.paid_amount.value = String(Math.max(total - discount, 0));
     if (form.matches("[data-visit-create]")) {
       state.visitDraft.paid_amount = form.elements.paid_amount.value;
+      if (event.target.name === "total_cost" || event.target.name === "discount_amount") syncVisitCreateForm(root);
     } else {
       state.selectedVisitDraft.paid_amount = form.elements.paid_amount.value;
     }
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.closest("[data-client-create]")) {
+      syncClientCreateForm(root);
+    }
     const form = event.target.closest("[data-visit-create], [data-visit-edit]");
     if (!form) return;
     if (form.matches("[data-visit-create]")) {
       state.visitDraft = { ...state.visitDraft, ...formData(form) };
+      if (event.target.name) state.visitErrors = { ...state.visitErrors, [event.target.name]: "" };
     } else {
       state.selectedVisitDraft = { ...state.selectedVisitDraft, ...formData(form) };
     }
     if (event.target.name === "branch_id" && form.matches("[data-visit-create]")) {
+      state.visitDraft.department_id = "";
+      state.visitDraft.workplace_id = "";
       state.visitDraft.employee_id = "";
-      ctx.reload();
+      syncVisitCreateForm(root);
+    } else if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
+      state.visitDraft.workplace_id = "";
+      state.visitDraft.employee_id = "";
+      syncVisitCreateForm(root);
+    } else if (event.target.name === "workplace_id" && form.matches("[data-visit-create]")) {
+      state.visitDraft.employee_id = "";
+      syncVisitCreateForm(root);
     }
   });
 
@@ -566,7 +786,7 @@ export function bindClients(root, ctx) {
 
     try {
       if (form.matches("[data-client-create]")) {
-        await api.createClient(clean({
+        const created = await api.createClient(clean({
           organization_id: ctx.org.id,
           status: "active",
           first_name: optional(data.first_name),
@@ -579,7 +799,15 @@ export function bindClients(root, ctx) {
           gender: optional(data.gender),
           online_booking_enabled: true,
         }));
+        upsertClient(created);
       } else if (form.matches("[data-client-edit]") && state.selectedClient) {
+        const photoFile = state.photoFile || form.elements.photo_file?.files?.[0];
+        let photoFileId = state.selectedClient.photo_file_id;
+        if (photoFile) {
+          const photoUpdated = await api.uploadClientPhoto(state.selectedClient.id, photoFile);
+          photoFileId = photoUpdated.photo_file_id;
+        }
+
         const updated = await api.updateClient(state.selectedClient.id, clean({
           first_name: optional(data.first_name),
           last_name: optional(data.last_name),
@@ -592,15 +820,23 @@ export function bindClients(root, ctx) {
           vk_id: numberOrNull(data.vk_id),
           birth_date: optional(data.birth_date),
           gender: optional(data.gender),
-          photo_file_id: optional(data.photo_file_id),
+          photo_file_id: optional(photoFileId),
           comment: optional(data.comment),
           note: optional(data.note),
           importance_class: Number(data.importance_class || 0),
           online_booking_enabled: data.online_booking_enabled === "on",
           status: optional(data.status),
         }));
+        upsertClient(updated);
         state.selectedClient = await loadClientDetails(updated, ctx.org.id);
+        clearPhotoPreview();
       } else if (form.matches("[data-visit-create]") && state.selectedClient) {
+        const errors = validateVisitData(data);
+        if (Object.keys(errors).length) {
+          state.visitErrors = errors;
+          syncVisitCreateForm(root);
+          return;
+        }
         await api.createClientVisit(clean({
           organization_id: ctx.org.id,
           client_id: state.selectedClient.id,
@@ -615,6 +851,7 @@ export function bindClients(root, ctx) {
         }));
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
         state.visitDraft = {};
+        state.visitErrors = {};
       } else if (form.matches("[data-visit-edit]") && state.selectedClient && state.selectedVisit) {
         const currentVisit = state.selectedVisit.visit || state.selectedVisit;
         await api.updateClientVisit(currentVisit.id, clean({
@@ -638,7 +875,7 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
-    if (event.target.closest("[data-close-visit]") || event.target.matches("[data-visit-modal]")) {
+    if (event.target.closest("[data-close-visit]")) {
       state.selectedVisit = null;
       state.selectedVisitDraft = {};
       ctx.reload();
@@ -649,10 +886,13 @@ export function bindClients(root, ctx) {
     if (deleteClientButton) {
       if (!confirm("Удалить клиента?")) return;
       await api.deleteClient(deleteClientButton.dataset.deleteClient);
+      removeClient(deleteClientButton.dataset.deleteClient);
       if (state.selectedClient && String(state.selectedClient.id) === String(deleteClientButton.dataset.deleteClient)) {
+        clearPhotoPreview();
         state.selectedClient = null;
         state.selectedVisit = null;
         state.visitDraft = {};
+        state.visitErrors = {};
         state.selectedVisitDraft = {};
       }
       ctx.reload();
@@ -663,9 +903,11 @@ export function bindClients(root, ctx) {
     if (clientButton) {
       const client = state.clients.find((item) => String(item.id) === String(clientButton.dataset.openClient));
       if (client) {
+        clearPhotoPreview();
         state.selectedVisit = null;
         state.selectedVisitDraft = {};
         state.visitDraft = {};
+        state.visitErrors = {};
         state.selectedClient = await loadClientDetails(client, ctx.org.id);
         ctx.reload();
       }
@@ -693,10 +935,12 @@ export function bindClients(root, ctx) {
       return;
     }
 
-    if (event.target.closest("[data-close-client]") || event.target.matches("[data-client-modal]")) {
+    if (event.target.closest("[data-close-client]")) {
+      clearPhotoPreview();
       state.selectedClient = null;
       state.selectedVisit = null;
       state.visitDraft = {};
+      state.visitErrors = {};
       state.selectedVisitDraft = {};
       ctx.reload();
       return;
@@ -704,5 +948,24 @@ export function bindClients(root, ctx) {
 
     if (event.target.closest("[data-visit-modal] .modal-card")) return;
     if (event.target.closest("[data-client-modal] .modal-card")) return;
+  });
+
+  root.addEventListener("mousedown", (event) => {
+    if (event.target.matches("[data-visit-modal]")) {
+      state.selectedVisit = null;
+      state.selectedVisitDraft = {};
+      ctx.reload();
+      return;
+    }
+
+    if (event.target.matches("[data-client-modal]")) {
+      clearPhotoPreview();
+      state.selectedClient = null;
+      state.selectedVisit = null;
+      state.visitDraft = {};
+      state.visitErrors = {};
+      state.selectedVisitDraft = {};
+      ctx.reload();
+    }
   });
 }

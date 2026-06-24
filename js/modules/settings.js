@@ -1,8 +1,27 @@
 ﻿import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
 
+import { DateTime } from "https://esm.sh/luxon@3.5.0";
+
 const no = "Не указано";
 let cache = {};
+const TAX_SYSTEM_OPTIONS = [
+  { value: "УСН Доходы", label: "УСН Доходы" },
+  { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
+  { value: "ОСН", label: "ОСН" },
+  { value: "ПАТЕНТ", label: "ПАТЕНТ" },
+  { value: "НПД", label: "НПД" },
+];
+const LEGAL_TYPE_OPTIONS = [
+  { value: "ООО", label: "ООО" },
+  { value: "ИП", label: "ИП" },
+  { value: "Самозанятый", label: "Самозанятый" },
+];
+const VAT_RATE_OPTIONS = [
+  { value: "5%", label: "5%" },
+  { value: "20%", label: "20%" },
+];
+const DEFAULT_TIMEZONE = "Europe/Moscow";
 
 const PERMISSION_TREE = [
   {
@@ -103,17 +122,26 @@ function humanizeCode(value) {
     logout: "Выход",
     renew: "Продление",
     transfer: "Перенос",
+    freeze: "Заморозка",
+    unfreeze: "Разморозка",
+    expire: "Сгорание",
     client: "Клиент",
+    visit: "Визит",
     subscription: "Абонемент",
     promotion: "Акция",
+    client_created: "Создание клиента",
+    visit_created: "Создание визита",
     subscription_create: "Создание абонемента",
     subscription_renew: "Продление абонемента",
     subscription_transfer: "Перенос абонемента",
+    subscription_expired: "Сгорел абонемент",
+    subscription_visit_consumed: "Списано посещение по абонементу",
     promotion_create: "Создание акции",
     legal: "Юридическое лицо",
     legal_entity: "Юридическое лицо",
     client_subscription: "Абонемент клиента",
     client_promotion: "Акция клиента",
+    client_visit: "Визит клиента",
     branch: "Филиал",
     department: "Подразделение",
     workplace: "Рабочее место",
@@ -144,17 +172,43 @@ function formatDateTime(value) {
   });
 }
 
+function compactDetails(value) {
+  if (!value || typeof value !== "object") return "";
+  if (value.summary) return String(value.summary);
+  if (Array.isArray(value.details)) return value.details.filter(Boolean).join(" · ");
+  const fields = [];
+  if (value.full_name) fields.push(`Клиент: ${value.full_name}`);
+  if (value.client_id) fields.push(`Клиент: #${value.client_id}`);
+  if (value.subscription_name) fields.push(`Абонемент: ${value.subscription_name}`);
+  if (value.visit_status) fields.push(`Статус визита: ${value.visit_status}`);
+  if (value.primary_phone) fields.push(`Телефон: ${value.primary_phone}`);
+  if (value.branch_id) fields.push(`Филиал: #${value.branch_id}`);
+  if (value.employee_id) fields.push(`Сотрудник: #${value.employee_id}`);
+  return fields.join(" · ");
+}
+
+function auditDetails(item) {
+  return item.reason || compactDetails(item.new_value) || compactDetails(item.old_value) || no;
+}
+
+function eventDetails(item) {
+  return compactDetails(item.payload) || no;
+}
+
 function jsonOrNull(value) {
   if (!String(value || "").trim()) return null;
   return JSON.parse(value);
 }
 
 function legalRequisites(data) {
+  const vatEnabled = data.vat_enabled === "on";
   return {
     inn: optional(data.inn),
     ogrn: optional(data.ogrn),
     kpp: optional(data.kpp),
     legal_address: optional(data.legal_address),
+    vat_enabled: vatEnabled || undefined,
+    vat_rate: vatEnabled ? optional(data.vat_rate) : undefined,
   };
 }
 
@@ -165,6 +219,150 @@ function bankDetails(data) {
     settlement_account: optional(data.settlement_account),
     correspondent_account: optional(data.correspondent_account),
   };
+}
+
+function fieldLabel(control) {
+  return control.closest("label")?.querySelector("span")?.textContent?.trim()
+    || control.getAttribute("name")
+    || "поле";
+}
+
+function validateRequiredPanelForm(form) {
+  const controls = [...form.querySelectorAll("input, select, textarea")];
+  const emptyControl = controls.find((control) => {
+    const type = String(control.type || "").toLowerCase();
+    if (control.disabled || control.readOnly) return false;
+    if (["button", "submit", "reset", "hidden", "checkbox", "radio"].includes(type)) return false;
+    return !String(control.value || "").trim();
+  });
+  if (!emptyControl) return;
+  emptyControl.focus();
+  throw new Error(`Заполните поле: ${fieldLabel(emptyControl)}.`);
+}
+
+function requiredPanelControls(form) {
+  return [...form.querySelectorAll("input, select, textarea")].filter((control) => {
+    const type = String(control.type || "").toLowerCase();
+    if (control.disabled || control.readOnly) return false;
+    return !["button", "submit", "reset", "hidden", "checkbox", "radio"].includes(type);
+  });
+}
+
+function syncRequiredPanelForms(root) {
+  const forms = root.matches?.("[data-settings]")
+    ? root.querySelectorAll("form:not([data-entity-edit])")
+    : root.querySelectorAll("[data-settings] form:not([data-entity-edit])");
+  forms.forEach((form) => {
+    const controls = requiredPanelControls(form);
+    controls.forEach((control) => {
+      control.required = true;
+    });
+    const submit = form.querySelector('button[type="submit"], button.primary');
+    if (submit) {
+      submit.disabled = controls.some((control) => !String(control.value || "").trim());
+    }
+  });
+}
+
+function timezoneOptions(selected = DEFAULT_TIMEZONE) {
+  const supported = typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone")
+    : [
+      "Europe/Moscow",
+      "Europe/Kaliningrad",
+      "Europe/Samara",
+      "Asia/Yekaterinburg",
+      "Asia/Omsk",
+      "Asia/Krasnoyarsk",
+      "Asia/Irkutsk",
+      "Asia/Yakutsk",
+      "Asia/Vladivostok",
+      "Asia/Magadan",
+      "Asia/Kamchatka",
+    ];
+  const zones = supported.includes(selected) ? supported : [selected, ...supported];
+  return `
+    <label><span>Часовой пояс</span><select name="timezone">
+      ${zones.map((zone) => {
+        const offset = DateTime.now().setZone(zone).toFormat("'UTC'ZZ");
+        return `<option value="${escapeHtml(zone)}" ${zone === selected ? "selected" : ""}>${escapeHtml(`${zone} (${offset})`)}</option>`;
+      }).join("")}
+    </select></label>
+  `;
+}
+
+function vatFields(selectedRate = "", enabled = false) {
+  return `
+    <div style="display:flex; align-items:end; gap:12px; flex-wrap:wrap;">
+      <label class="checkbox" style="margin:0;">
+        <input type="checkbox" name="vat_enabled" ${enabled ? "checked" : ""}>
+        НДС
+      </label>
+      <label data-vat-rate-wrap style="min-width:220px;">
+        <span>Ставка НДС</span>
+        <select name="vat_rate" ${enabled ? "" : "disabled"}>
+          <option value="">Не выбрано</option>
+          ${VAT_RATE_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${selectedRate === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+        </select>
+      </label>
+    </div>
+  `;
+}
+
+function syncVatFields(scope) {
+  const container = scope.closest("form") || scope;
+  const checkbox = container.querySelector('[name="vat_enabled"]');
+  const wrap = container.querySelector("[data-vat-rate-wrap]");
+  const rate = container.querySelector('[name="vat_rate"]');
+  if (!checkbox || !wrap || !rate) return;
+  rate.disabled = !checkbox.checked;
+  if (!checkbox.checked) rate.value = "";
+}
+
+function workplaceDepartmentOptions(branchId = "", selectedDepartmentId = "") {
+  const filteredDepartments = cache.departments.filter((item) => String(item.branch_id) === String(branchId));
+  const options = [
+    `<option value="">${escapeHtml(branchId ? "Выберите подразделение" : "Сначала выберите филиал")}</option>`,
+    ...filteredDepartments.map((item) => {
+      const value = String(item.id);
+      return `<option value="${escapeHtml(value)}" ${String(selectedDepartmentId) === value ? "selected" : ""}>${escapeHtml(item.name)}</option>`;
+    }),
+  ];
+  return options.join("");
+}
+
+function syncWorkplaceForm(scope) {
+  const form = scope.closest("[data-workplace-create]") || scope;
+  const branch = form.querySelector('[name="branch_id"]');
+  const department = form.querySelector('[name="department_id"]');
+  const submit = form.querySelector('button[type="submit"], button.primary');
+  if (!branch || !department) return;
+  const hasBranch = !!String(branch.value || "").trim();
+  const currentDepartment = hasBranch ? department.value : "";
+  department.innerHTML = workplaceDepartmentOptions(branch.value, currentDepartment);
+  department.disabled = !hasBranch;
+  if (!hasBranch) department.value = "";
+  if (submit) submit.disabled = !hasBranch;
+}
+
+function syncUserDepartmentForm(scope) {
+  const form = scope.closest("[data-user-create], [data-user-access-create]") || scope;
+  const branch = form.querySelector('[name="branch_id"]');
+  const department = form.querySelector('[name="department_id"]');
+  const role = form.querySelector('[name="role_id"]');
+  const submit = form.querySelector('button[type="submit"], button.primary');
+  if (!branch || !department) return;
+  const hasBranch = !!String(branch.value || "").trim();
+  const currentDepartment = hasBranch ? department.value : "";
+  department.innerHTML = workplaceDepartmentOptions(branch.value, currentDepartment);
+  department.disabled = !hasBranch;
+  if (!hasBranch) department.value = "";
+  const hasDepartment = !!String(department.value || "").trim();
+  if (role) {
+    role.disabled = !hasDepartment;
+    if (!hasDepartment) role.value = "";
+  }
+  if (submit) submit.disabled = !hasDepartment;
 }
 
 function section(title, body, hint = "") {
@@ -223,8 +421,15 @@ function modalFields(type, item) {
   `;
   if (type === "legal") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
-    <label><span>Тип</span><input name="legal_type" value="${escapeHtml(item.legal_type || "")}"></label>
-    <label><span>Налоговая система</span><input name="tax_system" value="${escapeHtml(item.tax_system || "")}"></label>
+    <label><span>Тип</span><select name="legal_type">
+      <option value="">Не выбрано</option>
+      ${LEGAL_TYPE_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.legal_type === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
+    </select></label>
+    <label><span>Налоговая система</span><select name="tax_system">
+      <option value="">Не выбрано</option>
+      ${TAX_SYSTEM_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.tax_system === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
+    </select></label>
+    ${vatFields(item.requisites?.vat_rate || "", !!item.requisites?.vat_enabled)}
     <label><span>ИНН</span><input name="inn" value="${escapeHtml(item.requisites?.inn || "")}"></label>
     <label><span>ОГРН/ОГРНИП</span><input name="ogrn" value="${escapeHtml(item.requisites?.ogrn || "")}"></label>
     <label><span>КПП</span><input name="kpp" value="${escapeHtml(item.requisites?.kpp || "")}"></label>
@@ -238,9 +443,9 @@ function modalFields(type, item) {
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
     <label><span>Адрес</span><input name="address" value="${escapeHtml(item.address || "")}"></label>
     <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
-    <label><span>Часовой пояс</span><input name="timezone" value="${escapeHtml(item.timezone || "Europe/Moscow")}"></label>
-    ${selectField("Бренд", "brand_id", cache.brands, item.brand_id)}
+    ${timezoneOptions(item.timezone || DEFAULT_TIMEZONE)}
     ${selectField("Юридическое лицо", "legal_entity_id", cache.legalEntities, item.legal_entity_id)}
+    <label class="checkbox modal-full"><input type="checkbox" name="online_booking_enabled" ${item.online_booking_enabled ? "checked" : ""}> Онлайн-запись</label>
   `;
   if (type === "department") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
@@ -260,14 +465,12 @@ function modalFields(type, item) {
     <label><span>Фамилия</span><input name="last_name" value="${escapeHtml(item.last_name || "")}"></label>
     <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
     <label><span>Email</span><input name="email" value="${escapeHtml(item.email || "")}"></label>
+    <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
+    <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
     ${selectField("Роль в организации", "role_id", cache.roles, cache.memberships.find((membership) => membership.user_id === item.id)?.role_id)}
     <label><span>Активен</span><select name="is_active">
       <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
-    </select></label>
-    <label><span>Заблокирован</span><select name="is_blocked">
-      <option value="false" ${!item.is_blocked ? "selected" : ""}>Нет</option>
-      <option value="true" ${item.is_blocked ? "selected" : ""}>Да</option>
     </select></label>
   `;
   if (type === "role") return `
@@ -375,6 +578,8 @@ async function saveEntity(type, id, data) {
     last_name: optional(data.last_name),
     phone: optional(data.phone),
     email: optional(data.email),
+    telegram_id: numberOrNull(data.telegram_id),
+    max_id: numberOrNull(data.max_id),
     is_active: data.is_active === "true",
     is_blocked: data.is_blocked === "true",
   }).then(async (updated) => {
@@ -455,8 +660,8 @@ export async function settings(ctx) {
     api.permissions(ctx.org.id).catch(() => []),
     api.memberships(ctx.org.id).catch(() => []),
     api.branchMemberships(ctx.org.id).catch(() => []),
-    api.auditLogs().catch(() => []),
-    api.events().catch(() => []),
+    api.auditLogs(ctx.org.id).catch(() => []),
+    api.events(ctx.org.id).catch(() => []),
   ]);
   const rolePermissions = Object.fromEntries(await Promise.all(
     roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
@@ -472,8 +677,15 @@ export async function settings(ctx) {
         ${section("Юридические лица", `
           <form class="inline-form compact" data-legal-create data-permission="settings.legal.create">
             <label><span>Название</span><input name="name" required></label>
-            <label><span>Тип</span><input name="legal_type" placeholder="ООО, ИП"></label>
-            <label><span>Налоги</span><input name="tax_system"></label>
+            <label><span>Тип</span><select name="legal_type">
+              <option value="">Не выбрано</option>
+              ${LEGAL_TYPE_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
+            </select></label>
+            <label><span>Налоги</span><select name="tax_system">
+              <option value="">Не выбрано</option>
+              ${TAX_SYSTEM_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
+            </select></label>
+            ${vatFields()}
             <label><span>ИНН</span><input name="inn"></label>
             <label><span>ОГРН/ОГРНИП</span><input name="ogrn"></label>
             <label><span>КПП</span><input name="kpp"></label>
@@ -482,7 +694,7 @@ export async function settings(ctx) {
             <label><span>БИК</span><input name="bik"></label>
             <label><span>Расчётный счёт</span><input name="settlement_account"></label>
             <label><span>Корр. счёт</span><input name="correspondent_account"></label>
-            <button class="primary">Добавить Юридическое лицо</button>
+            <button class="primary" disabled>Добавить Юридическое лицо</button>
             <p data-message></p>
           </form>
           ${entityList(legalEntities, "Юридических лиц пока нет", "legal", (item) => item.name, (item) => `${item.legal_type || no} · ИНН ${item.requisites?.inn || no}`, {
@@ -497,10 +709,10 @@ export async function settings(ctx) {
             <label><span>Название</span><input name="name" required></label>
             <label><span>Адрес</span><input name="address"></label>
             <label><span>Телефон</span><input name="phone"></label>
-            <label><span>Часовой пояс</span><input name="timezone" value="Europe/Moscow"></label>
+            ${timezoneOptions()}
             ${selectField("Юридическое лицо", "legal_entity_id", legalEntities)}
             <label class="checkbox"><input type="checkbox" name="online_booking_enabled" checked> Онлайн-запись</label>
-            <button class="primary">Добавить филиал</button>
+            <button class="primary" disabled>Добавить филиал</button>
             <p data-message></p>
           </form>
           ${entityList(branches, "Филиалов пока нет", "branch", (branch) => branch.name, (branch) => `${branch.address || no} · ${branch.phone || no}`, {
@@ -514,7 +726,7 @@ export async function settings(ctx) {
           <form class="inline-form compact" data-department-create data-permission="settings.departments.create">
             ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
             <label><span>Название</span><input name="name" required></label>
-            <button class="primary">Добавить Подразделение</button>
+            <button class="primary" disabled>Добавить Подразделение</button>
             <p data-message></p>
           </form>
           ${entityList(departments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${nameById(branches, item.branch_id)}`, {
@@ -527,9 +739,9 @@ export async function settings(ctx) {
         ${section("Рабочие места", `
           <form class="inline-form compact" data-workplace-create data-permission="settings.workplaces.create">
             ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
-            ${selectField("Подразделение", "department_id", departments)}
+            <label><span>Подразделение</span><select name="department_id" disabled>${workplaceDepartmentOptions()}</select></label>
             <label><span>Название</span><input name="name" required></label>
-            <button class="primary">Добавить рабочее место</button>
+            <button class="primary" disabled>Добавить рабочее место</button>
             <p data-message></p>
           </form>
           ${entityList(workplaces, "Рабочих мест пока нет", "workplace", (item) => item.name, (item) => `${nameById(branches, item.branch_id)} · ${nameById(departments, item.department_id)}`, {
@@ -542,7 +754,7 @@ export async function settings(ctx) {
         ${section("Роли и права", `
           <form class="inline-form compact" data-role-create>
             <label><span>Роль</span><input name="name" required placeholder="собственник / администратор / мастер"></label>
-            <button class="primary">Создать роль</button>
+            <button class="primary" disabled>Создать роль</button>
             <p data-message></p>
           </form>
           ${section("Список ролей", `
@@ -562,30 +774,35 @@ export async function settings(ctx) {
             <label><span>Телефон</span><input name="phone"></label>
             <label><span>Email</span><input name="email"></label>
             <label><span>Пароль/хеш</span><input name="password" type="password" required></label>
-            ${selectField("Роль", "role_id", roles)}
-            <button class="primary">Создать пользователя</button>
+            ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
+            <label><span>Подразделение</span><select name="department_id" disabled>${workplaceDepartmentOptions()}</select></label>
+            <label><span>Роль</span><select name="role_id" disabled>
+              <option value="">Не выбрано</option>
+              ${roles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
+            </select></label>
+            <button class="primary" disabled>Создать пользователя</button>
             <p data-message></p>
           </form>
 
-          <form class="inline-form compact" data-org-role-assign data-permission="settings.users.assign_roles">
-            ${selectField("Пользователь", "user_id", users.map((user) => ({ id: user.id, name: [user.last_name, user.first_name, user.middle_name, user.email, user.phone].filter(Boolean).join(" ") || `#${user.id}` })), "", "Выберите пользователя")}
-            ${selectField("Роль", "role_id", roles, "", "Выберите роль")}
-            <button class="primary">Выдать роль в организации</button>
-            <p data-message></p>
-          </form>
-
-          <form class="inline-form compact" data-branch-user-create data-permission="settings.users.assign_roles">
+          <form class="inline-form compact" data-user-access-create data-permission="settings.users.assign_roles">
             ${selectField("Пользователь", "user_id", users.map((user) => ({ id: user.id, name: [user.last_name, user.first_name, user.middle_name, user.email, user.phone].filter(Boolean).join(" ") || `#${user.id}` })), "", "Выберите пользователя")}
             ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
-            ${selectField("Роль", "role_id", roles, "", "Выберите роль")}
-            <button class="primary">Выдать роль в филиале</button>
+            <label><span>Подразделение</span><select name="department_id" disabled>${workplaceDepartmentOptions()}</select></label>
+            <label><span>Роль</span><select name="role_id" disabled>
+              <option value="">Выберите роль</option>
+              ${roles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
+            </select></label>
+            <button class="primary" disabled>Выдать доступ</button>
             <p data-message></p>
           </form>
 
           <form class="inline-form compact" data-two-factor-create>
             ${selectField("Пользователь", "user_id", users.map((user) => ({ id: user.id, name: [user.last_name, user.first_name, user.middle_name, user.email, user.phone].filter(Boolean).join(" ") || `#${user.id}` })), "", "Выберите пользователя")}
-            <label><span>2FA метод</span><input name="method" value="sms" required></label>
-            <button class="primary">Включить 2FA</button>
+            <label><span>2FA метод</span><select name="method" required>
+              <option value="max">MAX</option>
+              <option value="telegram">Telegram</option>
+            </select></label>
+            <button class="primary" disabled>Включить 2FA</button>
             <p data-message></p>
           </form>
 
@@ -603,11 +820,12 @@ export async function settings(ctx) {
 
       <div id="audit" data-permission="settings.audit.view">
         ${section("Аудит и события", `
-          <table><thead><tr><th>Действие</th><th>Сущность</th><th>Дата и время</th></tr></thead><tbody>
+          <table><thead><tr><th>Действие</th><th>Сущность</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
             ${rows(auditLogs, "Записей аудита пока нет", (item) => `
               <tr>
                 <td>${escapeHtml(humanizeCode(item.action))}</td>
                 <td>${escapeHtml(humanizeCode(item.entity_type || item.entity))}</td>
+                <td>${escapeHtml(auditDetails(item))}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
             `)}
@@ -617,11 +835,12 @@ export async function settings(ctx) {
 
       <div id="events" data-permission="settings.events.view">
         ${section("События", `
-          <table><thead><tr><th>Событие</th><th>Сущность</th><th>Дата и время</th></tr></thead><tbody>
+          <table><thead><tr><th>Событие</th><th>Сущность</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
             ${rows(events, "Событий пока нет", (item) => `
               <tr>
-                <td>${escapeHtml(humanizeCode(item.event_name || item.name))}</td>
+                <td>${escapeHtml(humanizeCode(item.event_type || item.event_name || item.name))}</td>
                 <td>${escapeHtml(humanizeCode(item.entity_type))}</td>
+                <td>${escapeHtml(eventDetails(item))}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
             `)}
@@ -633,14 +852,59 @@ export async function settings(ctx) {
 }
 
 export function bindSettings(root, ctx) {
+  syncRequiredPanelForms(root);
+
+  root.addEventListener("input", (event) => {
+    if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
+      syncRequiredPanelForms(root);
+    }
+  });
+
+  root.addEventListener("change", (event) => {
+    if (event.target.matches('[name="vat_enabled"]')) {
+      syncVatFields(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.closest("[data-workplace-create]") && event.target.matches('[name="branch_id"]')) {
+      syncWorkplaceForm(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.closest("[data-user-create]") && event.target.matches('[name="branch_id"]')) {
+      syncUserDepartmentForm(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.closest("[data-user-create]") && event.target.matches('[name="department_id"]')) {
+      syncUserDepartmentForm(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.closest("[data-user-access-create]") && event.target.matches('[name="branch_id"]')) {
+      syncUserDepartmentForm(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.closest("[data-user-access-create]") && event.target.matches('[name="department_id"]')) {
+      syncUserDepartmentForm(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
+      syncRequiredPanelForms(root);
+    }
+  });
+
+  root.querySelectorAll("[data-workplace-create]").forEach((form) => syncWorkplaceForm(form));
+  root.querySelectorAll("[data-user-create]").forEach((form) => syncUserDepartmentForm(form));
+  root.querySelectorAll("[data-user-access-create]").forEach((form) => syncUserDepartmentForm(form));
+  syncRequiredPanelForms(root);
+
   root.addEventListener("submit", async (event) => {
     const form = event.target.closest("[data-settings] form");
     if (!form) return;
     event.preventDefault();
     setMessage(form, "");
-    const data = formData(form);
 
     try {
+      validateRequiredPanelForm(form);
+      if (!form.reportValidity()) return;
+      const data = formData(form);
       if (form.matches("[data-brand-create]")) {
         await api.createBrand({ organization_id: ctx.org.id, name: data.name });
       } else if (form.matches("[data-legal-create]")) {
@@ -670,6 +934,7 @@ export function bindSettings(root, ctx) {
           name: data.name,
         });
       } else if (form.matches("[data-workplace-create]")) {
+        if (!data.branch_id) throw new Error("Сначала выберите филиал.");
         await api.createWorkplace({
           organization_id: ctx.org.id,
           branch_id: Number(data.branch_id),
@@ -677,6 +942,7 @@ export function bindSettings(root, ctx) {
           name: data.name,
         });
       } else if (form.matches("[data-user-create]")) {
+        if (!data.department_id) throw new Error("Сначала выберите подразделение.");
         const created = await api.createUser({
           first_name: data.first_name,
           middle_name: optional(data.middle_name),
@@ -692,19 +958,27 @@ export function bindSettings(root, ctx) {
             role_id: Number(data.role_id),
           });
         }
-      } else if (form.matches("[data-org-role-assign]")) {
-        await api.assignUser({
-          user_id: Number(data.user_id),
-          organization_id: ctx.org.id,
-          role_id: Number(data.role_id),
-        });
+        if (data.branch_id && data.role_id) {
+          await api.assignUserToBranch({
+            organization_id: ctx.org.id,
+            user_id: created.id,
+            branch_id: Number(data.branch_id),
+            department_id: numberOrNull(data.department_id),
+            role_id: Number(data.role_id),
+          });
+        }
       } else if (form.matches("[data-role-create]")) {
         await api.createRole({ organization_id: ctx.org.id, name: data.name });
-      } else if (form.matches("[data-branch-user-create]")) {
+      } else if (form.matches("[data-user-access-create]")) {
+        if (!data.user_id) throw new Error("Сначала выберите пользователя.");
+        if (!data.branch_id) throw new Error("Сначала выберите филиал.");
+        if (!data.department_id) throw new Error("Сначала выберите подразделение.");
+        if (!data.role_id) throw new Error("Сначала выберите роль.");
         await api.assignUserToBranch({
           organization_id: ctx.org.id,
           user_id: Number(data.user_id),
           branch_id: Number(data.branch_id),
+          department_id: numberOrNull(data.department_id),
           role_id: Number(data.role_id),
         });
       } else if (form.matches("[data-two-factor-create]")) {
@@ -754,9 +1028,10 @@ export function bindSettings(root, ctx) {
     const closeButton = event.target.closest("[data-close-modal]");
     if (closeButton) {
       closeButton.closest("[data-settings-modal]")?.remove();
-      return;
     }
+  });
 
+  document.addEventListener("mousedown", (event) => {
     if (event.target.matches("[data-settings-modal]")) {
       event.target.remove();
     }
@@ -777,6 +1052,12 @@ export function bindSettings(root, ctx) {
       ctx.reload();
     } catch (error) {
       setMessage(form, error.message);
+    }
+  });
+
+  document.addEventListener("change", (event) => {
+    if (event.target.matches('[name="vat_enabled"]')) {
+      syncVatFields(event.target);
     }
   });
 }
