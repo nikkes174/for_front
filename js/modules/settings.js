@@ -5,6 +5,9 @@ import { DateTime } from "https://esm.sh/luxon@3.5.0";
 
 const no = "Не указано";
 let cache = {};
+let selectedEventVisit = null;
+let departmentFilterBranchId = "";
+let workplaceFilterBranchId = "";
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
   { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
@@ -22,6 +25,21 @@ const VAT_RATE_OPTIONS = [
   { value: "20%", label: "20%" },
 ];
 const DEFAULT_TIMEZONE = "Europe/Moscow";
+const TIMEZONE_CITY_OPTIONS = [
+  { value: "Europe/Kaliningrad", label: "Калининград" },
+  { value: "Europe/Moscow", label: "Москва" },
+  { value: "Europe/Samara", label: "Самара" },
+  { value: "Asia/Yekaterinburg", label: "Екатеринбург" },
+  { value: "Asia/Omsk", label: "Омск" },
+  { value: "Asia/Krasnoyarsk", label: "Красноярск" },
+  { value: "Asia/Irkutsk", label: "Иркутск" },
+  { value: "Asia/Yakutsk", label: "Якутск" },
+  { value: "Asia/Vladivostok", label: "Владивосток" },
+  { value: "Asia/Magadan", label: "Магадан" },
+  { value: "Asia/Kamchatka", label: "Петропавловск-Камчатский" },
+  { value: "Asia/Sakhalin", label: "Южно-Сахалинск" },
+  { value: "Asia/Anadyr", label: "Анадырь" },
+];
 
 const PERMISSION_TREE = [
   {
@@ -44,13 +62,41 @@ const PERMISSION_TREE = [
   {
     service: "Лояльность",
     sections: [
-      { name: "Правила", actions: [{ code: "loyalty.rules.view", name: "Просмотр" }] },
-      { name: "Уровни", actions: [{ code: "loyalty.levels.view", name: "Просмотр" }] },
-      { name: "Транзакции", actions: [{ code: "loyalty.transactions.view", name: "Просмотр" }] },
-      { name: "Акции", actions: [{ code: "loyalty.promotions.view", name: "Просмотр" }] },
-      { name: "Сертификаты", actions: [{ code: "loyalty.certificates.view", name: "Просмотр" }] },
-      { name: "Абонементы", actions: [{ code: "loyalty.subscriptions.view", name: "Просмотр" }] },
-      { name: "Рефералы", actions: [{ code: "loyalty.referrals.view", name: "Просмотр" }] },
+      { name: "Правила", actions: [
+        { code: "loyalty.rules.view", name: "Просмотр" },
+        { code: "loyalty.rules.create", name: "Создание" },
+        { code: "loyalty.rules.delete", name: "Удаление" },
+      ] },
+      { name: "Уровни", actions: [
+        { code: "loyalty.levels.view", name: "Просмотр" },
+        { code: "loyalty.levels.create", name: "Создание" },
+        { code: "loyalty.levels.delete", name: "Удаление" },
+      ] },
+      { name: "Транзакции", actions: [
+        { code: "loyalty.transactions.view", name: "Просмотр" },
+        { code: "loyalty.transactions.create", name: "Создание" },
+        { code: "loyalty.transactions.delete", name: "Удаление" },
+      ] },
+      { name: "Акции", actions: [
+        { code: "loyalty.promotions.view", name: "Просмотр" },
+        { code: "loyalty.promotions.create", name: "Создание" },
+        { code: "loyalty.promotions.delete", name: "Удаление" },
+      ] },
+      { name: "Сертификаты", actions: [
+        { code: "loyalty.certificates.view", name: "Просмотр" },
+        { code: "loyalty.certificates.create", name: "Создание" },
+        { code: "loyalty.certificates.delete", name: "Удаление" },
+      ] },
+      { name: "Абонементы", actions: [
+        { code: "loyalty.subscriptions.view", name: "Просмотр" },
+        { code: "loyalty.subscriptions.create", name: "Создание" },
+        { code: "loyalty.subscriptions.delete", name: "Удаление" },
+      ] },
+      { name: "Рефералы", actions: [
+        { code: "loyalty.referrals.view", name: "Просмотр" },
+        { code: "loyalty.referrals.create", name: "Создание" },
+        { code: "loyalty.referrals.delete", name: "Удаление" },
+      ] },
     ],
   },
   {
@@ -148,6 +194,7 @@ function humanizeCode(value) {
     role: "Роль",
     permission: "Право доступа",
     user: "Пользователь",
+    system: "Система",
     membership: "Доступ пользователя",
     event: "Событие",
   };
@@ -172,18 +219,60 @@ function formatDateTime(value) {
   });
 }
 
+function formatVisitDateTime(value) {
+  if (!value) return no;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ru-RU");
+}
+
+function visitStatusLabel(status) {
+  if (status === "completed") return "Завершен";
+  if (status === "scheduled") return "Запланирован";
+  if (status === "cancelled") return "Отменен";
+  if (status === "no_show") return "Не пришел";
+  return humanizeCode(status);
+}
+
+function readonly(label, value) {
+  return `<div class="readonly-field"><span>${escapeHtml(label)}</span><b>${escapeHtml(String(value ?? "").trim() || no)}</b></div>`;
+}
+
+function userLabelById(id) {
+  const user = (cache.users || []).find((item) => String(item.id) === String(id));
+  if (!user) return id || no;
+  return [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") || user.email || user.phone || `#${user.id}`;
+}
+
 function compactDetails(value) {
   if (!value || typeof value !== "object") return "";
   if (value.summary) return String(value.summary);
   if (Array.isArray(value.details)) return value.details.filter(Boolean).join(" · ");
   const fields = [];
+  if (value.subscription_name) fields.push(`Абонемент: ${value.subscription_name}`);
+  if (value.certificate_name) fields.push(`Сертификат: ${value.certificate_name}`);
+  if (value.certificate_code) fields.push(`Сертификат: ${value.certificate_code}`);
+  if (value.promotion_name) fields.push(`Акция: ${value.promotion_name}`);
+  if (value.program_name) fields.push(`Программа: ${value.program_name}`);
   if (value.full_name) fields.push(`Клиент: ${value.full_name}`);
   if (value.client_id) fields.push(`Клиент: #${value.client_id}`);
-  if (value.subscription_name) fields.push(`Абонемент: ${value.subscription_name}`);
+  if (value.referrer_client_id) fields.push(`Пригласивший клиент: #${value.referrer_client_id}`);
+  if (value.invited_client_id) fields.push(`Приглашенный клиент: #${value.invited_client_id}`);
   if (value.visit_status) fields.push(`Статус визита: ${value.visit_status}`);
   if (value.primary_phone) fields.push(`Телефон: ${value.primary_phone}`);
   if (value.branch_id) fields.push(`Филиал: #${value.branch_id}`);
   if (value.employee_id) fields.push(`Сотрудник: #${value.employee_id}`);
+  if (value.actor_id) fields.push(`Инициатор: #${value.actor_id}`);
+  if (value.bonus_type) fields.push(`Тип бонусов: ${value.bonus_type}`);
+  if (value.amount !== undefined && value.amount !== null) fields.push(`Сумма: ${value.amount}`);
+  if (value.balance !== undefined && value.balance !== null) fields.push(`Баланс: ${value.balance}`);
+  if (value.balance_amount !== undefined && value.balance_amount !== null) fields.push(`Баланс: ${value.balance_amount}`);
+  if (value.deposit_left !== undefined && value.deposit_left !== null) fields.push(`Остаток депозита: ${value.deposit_left}`);
+  if (value.visits_left !== undefined && value.visits_left !== null) fields.push(`Осталось посещений: ${value.visits_left}`);
+  if (value.status) fields.push(`Статус: ${humanizeCode(value.status)}`);
+  if (value.reason) fields.push(`Причина: ${value.reason}`);
+  if (value.expires_at) fields.push(`Действует до: ${formatDateTime(value.expires_at)}`);
+  if (value.used_at) fields.push(`Использовано: ${formatDateTime(value.used_at)}`);
   return fields.join(" · ");
 }
 
@@ -191,13 +280,61 @@ function auditDetails(item) {
   return item.reason || compactDetails(item.new_value) || compactDetails(item.old_value) || no;
 }
 
+function addDetail(fields, value) {
+  if (!value || fields.includes(value)) return;
+  fields.push(value);
+}
+
+function eventVisitDetails(item) {
+  const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+  const fields = [];
+  addDetail(fields, `Клиент: ${payload.full_name || (item.client_id ? `#${item.client_id}` : no)}`);
+  addDetail(fields, `Статус: ${visitStatusLabel(payload.visit_status)}`);
+  addDetail(fields, `Дата визита: ${formatVisitDateTime(payload.visit_at)}`);
+  if (payload.branch_id || item.branch_id) {
+    addDetail(fields, `Филиал: ${nameById(cache.branches || [], payload.branch_id || item.branch_id)}`);
+  }
+  if (payload.employee_id) {
+    addDetail(fields, `Сотрудник: ${userLabelById(payload.employee_id)}`);
+  }
+  if (payload.total_cost !== undefined && payload.total_cost !== null) {
+    addDetail(fields, `Стоимость: ${payload.total_cost}`);
+  }
+  if (payload.paid_amount !== undefined && payload.paid_amount !== null) {
+    addDetail(fields, `Оплачено: ${payload.paid_amount}`);
+  }
+  return fields.join(" · ") || no;
+}
+
 function eventDetails(item) {
-  return compactDetails(item.payload) || no;
+  if (item.entity_type === "client_visit") return eventVisitDetails(item);
+  const fields = [];
+  const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+  if (payload.summary) addDetail(fields, String(payload.summary));
+  if (Array.isArray(payload.details)) {
+    payload.details.filter(Boolean).forEach((detail) => addDetail(fields, String(detail)));
+  } else {
+    const details = compactDetails(payload);
+    if (details) details.split(" · ").forEach((detail) => addDetail(fields, detail));
+  }
+
+  const entityId = item.entity_id || payload.id || payload.subscription_id || payload.certificate_id || payload.visit_id;
+  if (item.entity_type && entityId) addDetail(fields, `${humanizeCode(item.entity_type)}: #${entityId}`);
+  if (item.client_id || payload.client_id) addDetail(fields, `Клиент: #${item.client_id || payload.client_id}`);
+  if (item.branch_id || payload.branch_id) addDetail(fields, `Филиал: #${item.branch_id || payload.branch_id}`);
+  if (payload.employee_id) addDetail(fields, `Сотрудник: #${payload.employee_id}`);
+  return fields.join(" · ") || no;
 }
 
 function jsonOrNull(value) {
   if (!String(value || "").trim()) return null;
   return JSON.parse(value);
+}
+
+function bigintIdOrNull(value) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  return normalized;
 }
 
 function legalRequisites(data) {
@@ -265,27 +402,16 @@ function syncRequiredPanelForms(root) {
 }
 
 function timezoneOptions(selected = DEFAULT_TIMEZONE) {
-  const supported = typeof Intl.supportedValuesOf === "function"
-    ? Intl.supportedValuesOf("timeZone")
-    : [
-      "Europe/Moscow",
-      "Europe/Kaliningrad",
-      "Europe/Samara",
-      "Asia/Yekaterinburg",
-      "Asia/Omsk",
-      "Asia/Krasnoyarsk",
-      "Asia/Irkutsk",
-      "Asia/Yakutsk",
-      "Asia/Vladivostok",
-      "Asia/Magadan",
-      "Asia/Kamchatka",
-    ];
-  const zones = supported.includes(selected) ? supported : [selected, ...supported];
+  const known = new Map(TIMEZONE_CITY_OPTIONS.map((item) => [item.value, item.label]));
+  const zones = [...TIMEZONE_CITY_OPTIONS];
+  if (selected && !known.has(selected)) {
+    zones.unshift({ value: selected, label: selected.split("/").pop()?.replace(/_/g, " ") || selected });
+  }
   return `
     <label><span>Часовой пояс</span><select name="timezone">
       ${zones.map((zone) => {
-        const offset = DateTime.now().setZone(zone).toFormat("'UTC'ZZ");
-        return `<option value="${escapeHtml(zone)}" ${zone === selected ? "selected" : ""}>${escapeHtml(`${zone} (${offset})`)}</option>`;
+        const offset = DateTime.now().setZone(zone.value).toFormat("'UTC'ZZ");
+        return `<option value="${escapeHtml(zone.value)}" ${zone.value === selected ? "selected" : ""}>${escapeHtml(`${zone.label} (${offset})`)}</option>`;
       }).join("")}
     </select></label>
   `;
@@ -331,6 +457,19 @@ function workplaceDepartmentOptions(branchId = "", selectedDepartmentId = "") {
   return options.join("");
 }
 
+function userWorkplaceOptions(branchId = "", departmentId = "", selectedWorkplaceId = "") {
+  const filteredWorkplaces = cache.workplaces.filter((item) =>
+    String(item.branch_id) === String(branchId) && String(item.department_id) === String(departmentId));
+  const options = [
+    `<option value="">${escapeHtml(departmentId ? "Выберите рабочее место" : "Сначала выберите подразделение")}</option>`,
+    ...filteredWorkplaces.map((item) => {
+      const value = String(item.id);
+      return `<option value="${escapeHtml(value)}" ${String(selectedWorkplaceId) === value ? "selected" : ""}>${escapeHtml(item.name)}</option>`;
+    }),
+  ];
+  return options.join("");
+}
+
 function syncWorkplaceForm(scope) {
   const form = scope.closest("[data-workplace-create]") || scope;
   const branch = form.querySelector('[name="branch_id"]');
@@ -350,6 +489,7 @@ function syncUserDepartmentForm(scope) {
   const branch = form.querySelector('[name="branch_id"]');
   const department = form.querySelector('[name="department_id"]');
   const role = form.querySelector('[name="role_id"]');
+  const workplace = form.querySelector('[name="workplace_id"]');
   const submit = form.querySelector('button[type="submit"], button.primary');
   if (!branch || !department) return;
   const hasBranch = !!String(branch.value || "").trim();
@@ -362,6 +502,12 @@ function syncUserDepartmentForm(scope) {
     role.disabled = !hasDepartment;
     if (!hasDepartment) role.value = "";
   }
+  if (workplace) {
+    const currentWorkplace = hasDepartment ? workplace.value : "";
+    workplace.innerHTML = userWorkplaceOptions(branch.value, department.value, currentWorkplace);
+    workplace.disabled = !hasDepartment;
+    if (!hasDepartment) workplace.value = "";
+  }
   if (submit) submit.disabled = !hasDepartment;
 }
 
@@ -370,6 +516,40 @@ function section(title, body, hint = "") {
     ? `<span class="title-hint" tabindex="0" aria-label="${escapeHtml(hint)}" data-tooltip="${escapeHtml(hint)}">?</span>`
     : "";
   return `<div class="subpanel"><h3 class="subpanel-title">${escapeHtml(title)}${hintMarkup}</h3>${body}</div>`;
+}
+
+function eventEntityCell(item) {
+  if (item.entity_type === "client_visit") {
+    return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(humanizeCode(item.entity_type))}</button>`;
+  }
+  return escapeHtml(humanizeCode(item.entity_type));
+}
+
+function eventVisitModal() {
+  if (!selectedEventVisit) return "";
+  const visit = selectedEventVisit.payload || {};
+  return `
+    <div class="modal-backdrop" data-event-visit-modal>
+      <div class="modal-card" onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <h3>Визит</h3>
+          <button type="button" class="ghost" data-close-event-visit>Закрыть</button>
+        </div>
+        <div class="modal-grid">
+          ${readonly("Дата и время", formatVisitDateTime(visit.visit_at))}
+          ${readonly("Филиал", nameById(cache.branches || [], visit.branch_id))}
+          ${readonly("Сотрудник", userLabelById(visit.employee_id))}
+          ${readonly("Клиент", visit.full_name || (selectedEventVisit.client_id ? `#${selectedEventVisit.client_id}` : ""))}
+          ${readonly("Статус визита", visitStatusLabel(visit.visit_status))}
+          ${readonly("Стоимость", visit.total_cost)}
+          ${readonly("Скидка", visit.discount_amount)}
+          ${readonly("Оплачено", visit.paid_amount)}
+          ${readonly("Задолженность", visit.debt_amount)}
+          ${readonly("Комментарий", visit.comment)}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function entityList(items, empty, type, title, subtitle = () => "", actions = {}) {
@@ -396,6 +576,24 @@ function entityList(items, empty, type, title, subtitle = () => "", actions = {}
         `;
       }).join("")}
     </div>
+  `;
+}
+
+function departmentFilterOptions(branches, selected = "") {
+  return `
+    <label><span>Фильтр по филиалу</span><select data-department-filter-branch>
+      <option value="" ${!selected ? "selected" : ""}>Все</option>
+      ${branches.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selected) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+    </select></label>
+  `;
+}
+
+function workplaceFilterOptions(branches, selected = "") {
+  return `
+    <label><span>Фильтр по филиалу</span><select data-workplace-filter-branch>
+      <option value="" ${!selected ? "selected" : ""}>Все</option>
+      ${branches.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selected) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+    </select></label>
   `;
 }
 
@@ -468,6 +666,11 @@ function modalFields(type, item) {
     <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
     <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
     ${selectField("Роль в организации", "role_id", cache.roles, cache.memberships.find((membership) => membership.user_id === item.id)?.role_id)}
+    <label><span>2FA метод</span><select name="two_factor_method">
+      <option value="">Не менять</option>
+      <option value="max">MAX</option>
+      <option value="telegram">Telegram</option>
+    </select></label>
     <label><span>Активен</span><select name="is_active">
       <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
@@ -578,8 +781,8 @@ async function saveEntity(type, id, data) {
     last_name: optional(data.last_name),
     phone: optional(data.phone),
     email: optional(data.email),
-    telegram_id: numberOrNull(data.telegram_id),
-    max_id: numberOrNull(data.max_id),
+    telegram_id: bigintIdOrNull(data.telegram_id),
+    max_id: bigintIdOrNull(data.max_id),
     is_active: data.is_active === "true",
     is_blocked: data.is_blocked === "true",
   }).then(async (updated) => {
@@ -589,6 +792,13 @@ async function saveEntity(type, id, data) {
       await api.updateMembership(membership.id, { role_id: roleId });
     } else if (roleId) {
       await api.assignUser({ user_id: Number(id), organization_id: cache.organizationId, role_id: roleId });
+    }
+    if (data.two_factor_method) {
+      await api.setTwoFactorAuth({
+        user_id: Number(id),
+        method: data.two_factor_method,
+        is_enabled: true,
+      });
     }
     return updated;
   });
@@ -666,8 +876,14 @@ export async function settings(ctx) {
   const rolePermissions = Object.fromEntries(await Promise.all(
     roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
   ));
+  const filteredDepartments = departmentFilterBranchId
+    ? departments.filter((item) => String(item.branch_id) === String(departmentFilterBranchId))
+    : departments;
+  const filteredWorkplaces = workplaceFilterBranchId
+    ? workplaces.filter((item) => String(item.branch_id) === String(workplaceFilterBranchId))
+    : workplaces;
 
-  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, departments, workplaces, modules, users, roles, permissions, memberships, branchMemberships, rolePermissions };
+  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, departments, workplaces, modules, users, roles, permissions, memberships, branchMemberships, rolePermissions, events };
 
   return `
     <section class="panel" data-settings>
@@ -729,7 +945,10 @@ export async function settings(ctx) {
             <button class="primary" disabled>Добавить Подразделение</button>
             <p data-message></p>
           </form>
-          ${entityList(departments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${nameById(branches, item.branch_id)}`, {
+          <form class="inline-form compact">
+            ${departmentFilterOptions(branches, departmentFilterBranchId)}
+          </form>
+          ${entityList(filteredDepartments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${nameById(branches, item.branch_id)}`, {
             deleteLabel: "Удалить",
           })}
         `, "Подразделения — это отделы внутри филиала, например администрация или мастера.")}
@@ -744,7 +963,10 @@ export async function settings(ctx) {
             <button class="primary" disabled>Добавить рабочее место</button>
             <p data-message></p>
           </form>
-          ${entityList(workplaces, "Рабочих мест пока нет", "workplace", (item) => item.name, (item) => `${nameById(branches, item.branch_id)} · ${nameById(departments, item.department_id)}`, {
+          <form class="inline-form compact">
+            ${workplaceFilterOptions(branches, workplaceFilterBranchId)}
+          </form>
+          ${entityList(filteredWorkplaces, "Рабочих мест пока нет", "workplace", (item) => item.name, (item) => `${nameById(branches, item.branch_id)} · ${nameById(departments, item.department_id)}`, {
             deleteLabel: "Удалить",
           })}
         `, "Рабочие места — это конкретные места оказания услуг внутри подразделений.")}
@@ -780,6 +1002,7 @@ export async function settings(ctx) {
               <option value="">Не выбрано</option>
               ${roles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
             </select></label>
+            <label><span>Рабочее место</span><select name="workplace_id" disabled>${userWorkplaceOptions()}</select></label>
             <button class="primary" disabled>Создать пользователя</button>
             <p data-message></p>
           </form>
@@ -793,16 +1016,6 @@ export async function settings(ctx) {
               ${roles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
             </select></label>
             <button class="primary" disabled>Выдать доступ</button>
-            <p data-message></p>
-          </form>
-
-          <form class="inline-form compact" data-two-factor-create>
-            ${selectField("Пользователь", "user_id", users.map((user) => ({ id: user.id, name: [user.last_name, user.first_name, user.middle_name, user.email, user.phone].filter(Boolean).join(" ") || `#${user.id}` })), "", "Выберите пользователя")}
-            <label><span>2FA метод</span><select name="method" required>
-              <option value="max">MAX</option>
-              <option value="telegram">Telegram</option>
-            </select></label>
-            <button class="primary" disabled>Включить 2FA</button>
             <p data-message></p>
           </form>
 
@@ -839,7 +1052,7 @@ export async function settings(ctx) {
             ${rows(events, "Событий пока нет", (item) => `
               <tr>
                 <td>${escapeHtml(humanizeCode(item.event_type || item.event_name || item.name))}</td>
-                <td>${escapeHtml(humanizeCode(item.entity_type))}</td>
+                <td>${eventEntityCell(item)}</td>
                 <td>${escapeHtml(eventDetails(item))}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
@@ -847,6 +1060,7 @@ export async function settings(ctx) {
           </tbody></table>
         `, "События — это системные записи о произошедших действиях.")}
       </div>
+      ${eventVisitModal()}
     </section>
   `;
 }
@@ -861,6 +1075,16 @@ export function bindSettings(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.matches("[data-department-filter-branch]")) {
+      departmentFilterBranchId = event.target.value || "";
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-workplace-filter-branch]")) {
+      workplaceFilterBranchId = event.target.value || "";
+      ctx.reload();
+      return;
+    }
     if (event.target.matches('[name="vat_enabled"]')) {
       syncVatFields(event.target);
       syncRequiredPanelForms(root);
@@ -943,6 +1167,7 @@ export function bindSettings(root, ctx) {
         });
       } else if (form.matches("[data-user-create]")) {
         if (!data.department_id) throw new Error("Сначала выберите подразделение.");
+        if (!data.workplace_id) throw new Error("Сначала выберите рабочее место.");
         const created = await api.createUser({
           first_name: data.first_name,
           middle_name: optional(data.middle_name),
@@ -964,6 +1189,7 @@ export function bindSettings(root, ctx) {
             user_id: created.id,
             branch_id: Number(data.branch_id),
             department_id: numberOrNull(data.department_id),
+            workplace_id: numberOrNull(data.workplace_id),
             role_id: Number(data.role_id),
           });
         }
@@ -981,12 +1207,6 @@ export function bindSettings(root, ctx) {
           department_id: numberOrNull(data.department_id),
           role_id: Number(data.role_id),
         });
-      } else if (form.matches("[data-two-factor-create]")) {
-        await api.setTwoFactorAuth({
-          user_id: Number(data.user_id),
-          method: data.method,
-          is_enabled: true,
-        });
       }
       ctx.reload();
     } catch (error) {
@@ -995,6 +1215,20 @@ export function bindSettings(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const openVisitButton = event.target.closest("[data-open-event-visit]");
+    if (openVisitButton) {
+      selectedEventVisit = (cache.events || []).find((item) => String(item.id) === String(openVisitButton.dataset.openEventVisit)) || null;
+      ctx.reload();
+      return;
+    }
+
+    const closeVisitButton = event.target.closest("[data-close-event-visit]");
+    if (closeVisitButton) {
+      selectedEventVisit = null;
+      ctx.reload();
+      return;
+    }
+
     const editButton = event.target.closest("[data-edit-entity]");
     if (editButton) {
       const item = findEntity(editButton.dataset.editEntity, editButton.dataset.id);
@@ -1032,6 +1266,11 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("mousedown", (event) => {
+    if (event.target.matches("[data-event-visit-modal]")) {
+      selectedEventVisit = null;
+      ctx.reload();
+      return;
+    }
     if (event.target.matches("[data-settings-modal]")) {
       event.target.remove();
     }

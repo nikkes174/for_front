@@ -15,7 +15,7 @@ export function onboarding() {
   `;
 }
 
-export function bindOnboarding(root) {
+export function bindOnboarding(root, options = {}) {
   root.addEventListener("submit", async (event) => {
     const form = event.target.closest("[data-create-organization]");
     if (!form) return;
@@ -26,7 +26,12 @@ export function bindOnboarding(root) {
     try {
       const org = await api.createOrganization({ name: data.name, settings: {} });
       localStorage.setItem("loyalty.lastOrganizationId", String(org.id));
-      location.href = `/organizations/${org.id}`;
+      const path = `/organizations/${org.id}`;
+      if (options.navigate) {
+        options.navigate(path);
+      } else {
+        location.href = "/";
+      }
     } catch (error) {
       setMessage(form, error.message);
     }

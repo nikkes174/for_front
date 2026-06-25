@@ -262,7 +262,7 @@ window.addEventListener("ajax:end", () => {
   if (!ajaxCount) document.body.classList.remove("ajax-active");
 });
 
-bindOnboarding(root);
+bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, reload });
 bindSettings(root, { get org() { return state.org; }, reload });

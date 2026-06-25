@@ -241,6 +241,7 @@ function visitDraftDefaults() {
     visit_status: "completed",
     total_cost: "0",
     discount_amount: "0",
+    discount_type: "amount",
     paid_amount: "0",
     service_names: "",
     product_names: "",
@@ -267,11 +268,28 @@ function visitEditDraftDefaults(visit) {
     visit_status: source.visit_status || "completed",
     total_cost: String(source.total_cost ?? 0),
     discount_amount: String(source.discount_amount ?? 0),
+    discount_type: "amount",
     paid_amount: String(source.paid_amount ?? 0),
     service_names: parsed.serviceNames || "",
     product_names: parsed.productNames || "",
     comment: parsed.comment || "",
   };
+}
+
+function resolveDiscountAmount(totalCost, discountAmount, discountType = "amount") {
+  const total = Number(totalCost || 0);
+  const discount = Number(discountAmount || 0);
+  if (discountType === "percent") {
+    const percent = Math.min(Math.max(discount, 0), 100);
+    return (total * percent) / 100;
+  }
+  return Math.max(discount, 0);
+}
+
+function calculatePaidAmount(totalCost, discountAmount, discountType = "amount") {
+  const total = Number(totalCost || 0);
+  const resolvedDiscount = resolveDiscountAmount(total, discountAmount, discountType);
+  return String(Math.max(total - resolvedDiscount, 0));
 }
 
 function masterOptions(branchId = "", workplaceId = "") {
@@ -364,7 +382,7 @@ function visitCreateFormMarkup() {
       <option value="no_show" ${visitDraft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
     </select>`, errors.visit_status)}
     ${visitInputField("Стоимость", "total_cost", visitDraft.total_cost, 'type="number"', errors.total_cost)}
-    ${visitInputField("Скидка", "discount_amount", visitDraft.discount_amount, 'type="number"', errors.discount_amount)}
+    ${visitField("Скидка", `<div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div>`, errors.discount_amount)}
     ${visitInputField("Оплачено", "paid_amount", visitDraft.paid_amount, 'type="number" readonly', errors.paid_amount)}
     ${visitInputField("Услуги", "service_names", visitDraft.service_names, 'placeholder="Можно несколько через запятую"', errors.service_names)}
     ${visitInputField("Товары", "product_names", visitDraft.product_names, 'placeholder="Можно несколько через запятую"', errors.product_names)}
@@ -521,7 +539,7 @@ function modal(client) {
               <option value="no_show" ${visitDraft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
             </select></label>
             <label><span>Стоимость</span><input name="total_cost" type="number" value="${escapeHtml(visitDraft.total_cost)}"></label>
-            <label><span>Скидка</span><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"></label>
+            <label><span>Скидка</span><div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
             <label><span>Оплачено</span><input name="paid_amount" type="number" value="${escapeHtml(visitDraft.paid_amount)}" readonly></label>
             <label><span>Услуги</span><input name="service_names" value="${escapeHtml(visitDraft.service_names)}" placeholder="Можно несколько через запятую"></label>
             <label><span>Товары</span><input name="product_names" value="${escapeHtml(visitDraft.product_names)}" placeholder="Можно несколько через запятую"></label>
@@ -614,7 +632,7 @@ function editableVisitModal(client) {
             <option value="no_show" ${draft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
           </select></label>
           <label><span>Стоимость</span><input name="total_cost" type="number" value="${escapeHtml(draft.total_cost)}"></label>
-          <label><span>Скидка</span><input name="discount_amount" type="number" value="${escapeHtml(draft.discount_amount)}"></label>
+          <label><span>Скидка</span><div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(draft.discount_amount)}"><select name="discount_type"><option value="amount" ${draft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${draft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
           <label><span>Оплачено</span><input name="paid_amount" type="number" value="${escapeHtml(draft.paid_amount)}" readonly></label>
           <label><span>Услуги</span><input name="service_names" value="${escapeHtml(draft.service_names)}" placeholder="Можно несколько через запятую"></label>
           <label><span>Товары</span><input name="product_names" value="${escapeHtml(draft.product_names)}" placeholder="Можно несколько через запятую"></label>
@@ -730,13 +748,14 @@ export function bindClients(root, ctx) {
         return;
       }
     }
-    if (!form || !["total_cost", "discount_amount"].includes(event.target.name)) return;
-    const total = Number(form.elements.total_cost.value || 0);
-    const discount = Number(form.elements.discount_amount.value || 0);
-    form.elements.paid_amount.value = String(Math.max(total - discount, 0));
+    if (!form || !["total_cost", "discount_amount", "discount_type"].includes(event.target.name)) return;
+    form.elements.paid_amount.value = calculatePaidAmount(
+      form.elements.total_cost.value,
+      form.elements.discount_amount.value,
+      form.elements.discount_type?.value,
+    );
     if (form.matches("[data-visit-create]")) {
       state.visitDraft.paid_amount = form.elements.paid_amount.value;
-      if (event.target.name === "total_cost" || event.target.name === "discount_amount") syncVisitCreateForm(root);
     } else {
       state.selectedVisitDraft.paid_amount = form.elements.paid_amount.value;
     }
@@ -753,6 +772,18 @@ export function bindClients(root, ctx) {
       if (event.target.name) state.visitErrors = { ...state.visitErrors, [event.target.name]: "" };
     } else {
       state.selectedVisitDraft = { ...state.selectedVisitDraft, ...formData(form) };
+    }
+    if (["total_cost", "discount_amount", "discount_type"].includes(event.target.name)) {
+      form.elements.paid_amount.value = calculatePaidAmount(
+        form.elements.total_cost.value,
+        form.elements.discount_amount.value,
+        form.elements.discount_type?.value,
+      );
+      if (form.matches("[data-visit-create]")) {
+        state.visitDraft.paid_amount = form.elements.paid_amount.value;
+      } else {
+        state.selectedVisitDraft.paid_amount = form.elements.paid_amount.value;
+      }
     }
     if (event.target.name === "branch_id" && form.matches("[data-visit-create]")) {
       state.visitDraft.department_id = "";
@@ -845,7 +876,7 @@ export function bindClients(root, ctx) {
           employee_id: numberOrNull(data.employee_id),
           visit_status: data.visit_status,
           total_cost: Number(data.total_cost || 0),
-          discount_amount: Number(data.discount_amount || 0),
+          discount_amount: resolveDiscountAmount(data.total_cost, data.discount_amount, data.discount_type),
           paid_amount: Number(data.paid_amount || 0),
           comment: optional(buildVisitComment(data)),
         }));
@@ -860,7 +891,7 @@ export function bindClients(root, ctx) {
           employee_id: numberOrNull(data.employee_id),
           visit_status: optional(data.visit_status),
           total_cost: Number(data.total_cost || 0),
-          discount_amount: Number(data.discount_amount || 0),
+          discount_amount: resolveDiscountAmount(data.total_cost, data.discount_amount, data.discount_type),
           paid_amount: Number(data.paid_amount || 0),
           comment: optional(buildVisitComment(data)),
         }));
