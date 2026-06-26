@@ -96,7 +96,8 @@ export const api = {
   createModule: (body) => request("/organizations/modules", { method: "POST", body: JSON.stringify(body) }),
   updateModule: (id, body) => request(`/organizations/modules/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 
-  users: (orgId) => request(`/users-access/organizations/${orgId}/users`),
+  users: (orgId, limit = 100) => request(`/users-access/organizations/${orgId}/users?limit=${limit}`),
+  user: (id) => request(`/users-access/users/${id}`),
   createUser: (body) => request("/users-access/users", { method: "POST", body: JSON.stringify(body) }),
   updateUser: (id, body) => request(`/users-access/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   blockUser: (id) => request(`/users-access/users/${id}/block`, { method: "POST" }),

@@ -5,8 +5,6 @@ const params = new URLSearchParams(location.search);
 let mode = params.get("mode") === "register" || location.pathname === "/register" ? "register" : "login";
 let twoFactor = null;
 let loginDraft = "";
-let checkedIdentifier = "";
-let authCheckTimer = null;
 
 ensureCss();
 
@@ -70,46 +68,16 @@ function draw() {
   render(root, authHtml());
 }
 
-function showTwoFactorModal() {
-  root.querySelector("[data-2fa-modal]")?.remove();
-  root.querySelector(".auth-page")?.insertAdjacentHTML("beforeend", twoFactorHtml());
-  root.querySelector('[data-2fa-form] [name="code"]')?.focus();
-}
-
-async function checkLoginTwoFactor(identifier) {
-  const clean = String(identifier || "").trim();
-  if (mode !== "login" || clean.length < 5 || clean === checkedIdentifier) return;
-  checkedIdentifier = clean;
-  try {
-    const result = await api.start2fa({ identifier: clean });
-    if (result?.two_factor_required && clean === loginDraft.trim()) {
-      twoFactor = result;
-      showTwoFactorModal();
-    }
-  } catch {
-    // Early 2FA probing should not break the regular password flow.
-  }
-}
-
 root.addEventListener("input", (event) => {
   if (!event.target.matches('[name="login"]')) return;
   loginDraft = event.target.value;
   twoFactor = null;
   root.querySelector("[data-2fa-modal]")?.remove();
-  clearTimeout(authCheckTimer);
-  authCheckTimer = setTimeout(() => checkLoginTwoFactor(loginDraft), 500);
-});
-
-root.addEventListener("change", (event) => {
-  if (!event.target.matches('[name="login"]')) return;
-  loginDraft = event.target.value;
-  checkLoginTwoFactor(loginDraft);
 });
 
 root.addEventListener("click", (event) => {
   if (event.target.closest("[data-2fa-cancel]")) {
     twoFactor = null;
-    checkedIdentifier = "";
     root.querySelector("[data-2fa-modal]")?.remove();
     return;
   }
@@ -118,8 +86,6 @@ root.addEventListener("click", (event) => {
   if (!button) return;
   mode = button.dataset.mode;
   twoFactor = null;
-  checkedIdentifier = "";
-  clearTimeout(authCheckTimer);
   history.replaceState(null, "", `/auth.html?mode=${mode}`);
   draw();
 });
@@ -155,12 +121,7 @@ root.addEventListener("submit", async (event) => {
         password: data.password,
       });
     } else {
-      const result = await api.login({ login: data.login, password: data.password });
-      if (result?.two_factor_required) {
-        twoFactor = result;
-        showTwoFactorModal();
-        return;
-      }
+      await api.login({ login: data.login, password: data.password });
     }
     location.href = "/";
   } catch (error) {

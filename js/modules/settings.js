@@ -244,6 +244,12 @@ function userLabelById(id) {
   return [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") || user.email || user.phone || `#${user.id}`;
 }
 
+function userShortNameById(id) {
+  const user = (cache.users || []).find((item) => String(item.id) === String(id));
+  if (!user) return id || no;
+  return [user.last_name, user.first_name].filter(Boolean).join(" ") || userLabelById(id);
+}
+
 function compactDetails(value) {
   if (!value || typeof value !== "object") return "";
   if (value.summary) return String(value.summary);
@@ -262,7 +268,7 @@ function compactDetails(value) {
   if (value.primary_phone) fields.push(`Телефон: ${value.primary_phone}`);
   if (value.branch_id) fields.push(`Филиал: #${value.branch_id}`);
   if (value.employee_id) fields.push(`Сотрудник: #${value.employee_id}`);
-  if (value.actor_id) fields.push(`Инициатор: #${value.actor_id}`);
+  if (value.actor_id) fields.push(`Инициатор: ${userShortNameById(value.actor_id)}`);
   if (value.bonus_type) fields.push(`Тип бонусов: ${value.bonus_type}`);
   if (value.amount !== undefined && value.amount !== null) fields.push(`Сумма: ${value.amount}`);
   if (value.balance !== undefined && value.balance !== null) fields.push(`Баланс: ${value.balance}`);
@@ -297,6 +303,9 @@ function eventVisitDetails(item) {
   if (payload.employee_id) {
     addDetail(fields, `Сотрудник: ${userLabelById(payload.employee_id)}`);
   }
+  if (item.actor_id || payload.actor_id) {
+    addDetail(fields, `Инициатор: ${userShortNameById(item.actor_id || payload.actor_id)}`);
+  }
   if (payload.total_cost !== undefined && payload.total_cost !== null) {
     addDetail(fields, `Стоимость: ${payload.total_cost}`);
   }
@@ -323,6 +332,7 @@ function eventDetails(item) {
   if (item.client_id || payload.client_id) addDetail(fields, `Клиент: #${item.client_id || payload.client_id}`);
   if (item.branch_id || payload.branch_id) addDetail(fields, `Филиал: #${item.branch_id || payload.branch_id}`);
   if (payload.employee_id) addDetail(fields, `Сотрудник: #${payload.employee_id}`);
+  if (item.actor_id || payload.actor_id) addDetail(fields, `Инициатор: ${userShortNameById(item.actor_id || payload.actor_id)}`);
   return fields.join(" · ") || no;
 }
 
@@ -530,7 +540,7 @@ function eventVisitModal() {
   const visit = selectedEventVisit.payload || {};
   return `
     <div class="modal-backdrop" data-event-visit-modal>
-      <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-card">
         <div class="modal-head">
           <h3>Визит</h3>
           <button type="button" class="ghost" data-close-event-visit>Закрыть</button>
@@ -666,11 +676,6 @@ function modalFields(type, item) {
     <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
     <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
     ${selectField("Роль в организации", "role_id", cache.roles, cache.memberships.find((membership) => membership.user_id === item.id)?.role_id)}
-    <label><span>2FA метод</span><select name="two_factor_method">
-      <option value="">Не менять</option>
-      <option value="max">MAX</option>
-      <option value="telegram">Telegram</option>
-    </select></label>
     <label><span>Активен</span><select name="is_active">
       <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
@@ -793,13 +798,6 @@ async function saveEntity(type, id, data) {
     } else if (roleId) {
       await api.assignUser({ user_id: Number(id), organization_id: cache.organizationId, role_id: roleId });
     }
-    if (data.two_factor_method) {
-      await api.setTwoFactorAuth({
-        user_id: Number(id),
-        method: data.two_factor_method,
-        is_enabled: true,
-      });
-    }
     return updated;
   });
   if (type === "role") return api.updateRole(id, { name: data.name }).then(async (updated) => {
@@ -865,7 +863,7 @@ export async function settings(ctx) {
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
     api.modules(ctx.org.id).catch(() => []),
-    api.users(ctx.org.id).catch(() => []),
+    api.users(ctx.org.id, 500).catch(() => []),
     api.roles(ctx.org.id).catch(() => []),
     api.permissions(ctx.org.id).catch(() => []),
     api.memberships(ctx.org.id).catch(() => []),
@@ -876,6 +874,17 @@ export async function settings(ctx) {
   const rolePermissions = Object.fromEntries(await Promise.all(
     roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
   ));
+  const userIds = new Set(users.map((user) => String(user.id)));
+  const missingActorIds = [...new Set(events
+    .map((item) => item.actor_id || item.payload?.actor_id)
+    .filter(Boolean)
+    .map((id) => String(id))
+    .filter((id) => !userIds.has(id)))];
+  const actorUsers = await Promise.all(missingActorIds.map((id) => api.user(id).catch(() => null)));
+  const usersWithActors = [
+    ...users,
+    ...actorUsers.filter(Boolean).filter((user) => !userIds.has(String(user.id))),
+  ];
   const filteredDepartments = departmentFilterBranchId
     ? departments.filter((item) => String(item.branch_id) === String(departmentFilterBranchId))
     : departments;
@@ -883,7 +892,7 @@ export async function settings(ctx) {
     ? workplaces.filter((item) => String(item.branch_id) === String(workplaceFilterBranchId))
     : workplaces;
 
-  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, departments, workplaces, modules, users, roles, permissions, memberships, branchMemberships, rolePermissions, events };
+  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, events };
 
   return `
     <section class="panel" data-settings>
