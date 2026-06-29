@@ -82,6 +82,21 @@ export const api = {
   updateLegalEntity: (id, body) => request(`/organizations/legal-entities/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteLegalEntity: (id) => request(`/organizations/legal-entities/${id}`, { method: "DELETE" }),
 
+  productCategories: (orgId) => request(`/organizations/${orgId}/product-categories`),
+  createProductCategory: (body) => request("/organizations/product-categories", { method: "POST", body: JSON.stringify(body) }),
+  updateProductCategory: (id, body) => request(`/organizations/product-categories/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteProductCategory: (id) => request(`/organizations/product-categories/${id}`, { method: "DELETE" }),
+
+  productItems: (orgId, categoryId = "") => request(`/organizations/${orgId}/product-items${categoryId ? `?category_id=${categoryId}` : ""}`),
+  createProductItem: (body) => request("/organizations/product-items", { method: "POST", body: JSON.stringify(body) }),
+  updateProductItem: (id, body) => request(`/organizations/product-items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteProductItem: (id) => request(`/organizations/product-items/${id}`, { method: "DELETE" }),
+
+  achievements: (orgId) => request(`/organizations/${orgId}/achievements`),
+  createAchievement: (body) => request("/organizations/achievements", { method: "POST", body: JSON.stringify(body) }),
+  updateAchievement: (id, body) => request(`/organizations/achievements/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteAchievement: (id) => request(`/organizations/achievements/${id}`, { method: "DELETE" }),
+
   departments: (orgId) => request(`/organizations/${orgId}/departments`),
   createDepartment: (body) => request("/organizations/departments", { method: "POST", body: JSON.stringify(body) }),
   updateDepartment: (id, body) => request(`/organizations/departments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),

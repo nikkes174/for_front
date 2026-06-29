@@ -8,6 +8,7 @@ let cache = {};
 let selectedEventVisit = null;
 let departmentFilterBranchId = "";
 let workplaceFilterBranchId = "";
+let productItemFilterCategoryId = "";
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
   { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
@@ -19,6 +20,29 @@ const LEGAL_TYPE_OPTIONS = [
   { value: "ООО", label: "ООО" },
   { value: "ИП", label: "ИП" },
   { value: "Самозанятый", label: "Самозанятый" },
+];
+const PRODUCT_CATEGORY_TYPE_OPTIONS = [
+  { value: "product", label: "Товар" },
+  { value: "service", label: "Услуга" },
+];
+const ACHIEVEMENT_LOGIC_OPTIONS = [
+  { value: "and", label: "Все условия" },
+  { value: "or", label: "Любое условие" },
+];
+const ACHIEVEMENT_PARAMETER_OPTIONS = [
+  { value: "client_age_days", label: "Длительность наличия в базе, дней" },
+  { value: "last_visit_days_ago", label: "Последний визит, дней назад" },
+  { value: "has_photo", label: "Наличие фото" },
+  { value: "visit_frequency", label: "Частота посещений" },
+  { value: "client_profit", label: "Прибыль от клиента" },
+];
+const ACHIEVEMENT_OPERATOR_OPTIONS = [
+  { value: "gt", label: "Больше" },
+  { value: "gte", label: "Больше или равно" },
+  { value: "lt", label: "Меньше" },
+  { value: "lte", label: "Меньше или равно" },
+  { value: "eq", label: "Равно" },
+  { value: "neq", label: "Не равно" },
 ];
 const VAT_RATE_OPTIONS = [
   { value: "5%", label: "5%" },
@@ -106,6 +130,14 @@ const PERMISSION_TREE = [
         { code: "settings.legal.view", name: "Просмотр" },
         { code: "settings.legal.create", name: "Создание" },
       ] },
+      { name: "Категории товаров и услуг", actions: [
+        { code: "settings.categories.view", name: "Просмотр" },
+        { code: "settings.categories.create", name: "Создание" },
+      ] },
+      { name: "Товары и услуги", actions: [
+        { code: "settings.items.view", name: "Просмотр" },
+        { code: "settings.items.create", name: "Создание" },
+      ] },
       { name: "Филиалы", actions: [
         { code: "settings.branches.view", name: "Просмотр" },
         { code: "settings.branches.create", name: "Создание" },
@@ -127,6 +159,10 @@ const PERMISSION_TREE = [
       { name: "Бренды", actions: [
         { code: "settings.brands.view", name: "Просмотр" },
         { code: "settings.brands.create", name: "Создание" },
+      ] },
+        { name: "Достижения", actions: [
+        { code: "settings.achievements.view", name: "Просмотр" },
+        { code: "settings.achievements.create", name: "Создание" },
       ] },
       { name: "Аудит", actions: [
         { code: "settings.audit.view", name: "Аудит" },
@@ -151,6 +187,258 @@ function permissionByCode(code) {
 
 function nameById(items, id) {
   return items.find((item) => item.id === id)?.name || id || no;
+}
+
+function categoryTypeLabel(value) {
+  return PRODUCT_CATEGORY_TYPE_OPTIONS.find((item) => item.value === value)?.label || value || no;
+}
+
+function achievementLogicLabel(value) {
+  return ACHIEVEMENT_LOGIC_OPTIONS.find((item) => item.value === value)?.label || value || no;
+}
+
+function achievementParameterLabel(value) {
+  return ACHIEVEMENT_PARAMETER_OPTIONS.find((item) => item.value === value)?.label || value || no;
+}
+
+function achievementOperatorLabel(value) {
+  return ACHIEVEMENT_OPERATOR_OPTIONS.find((item) => item.value === value)?.label || value || no;
+}
+
+function parseAchievementValue(value) {
+  const text = String(value || "").trim();
+  if (/^(да|true|1)$/i.test(text)) return true;
+  if (/^(нет|false|0)$/i.test(text)) return false;
+  const numeric = Number(text.replace(",", "."));
+  return text && !Number.isNaN(numeric) ? numeric : text;
+}
+
+function achievementValueField(condition = {}) {
+  if (condition.parameter === "has_photo") {
+    const value = condition.value === true || condition.value === "true" || String(condition.value).toLowerCase() === "да" ? "true" : "false";
+    return `
+      <label><span>Значение</span><select name="condition_value" required>
+        <option value="true" ${value === "true" ? "selected" : ""}>Да</option>
+        <option value="false" ${value === "false" ? "selected" : ""}>Нет</option>
+      </select></label>
+    `;
+  }
+  return `
+    <label><span>Значение</span><input name="condition_value" type="number" step="0.01" value="${escapeHtml(condition.value ?? "")}" placeholder="Например, 365" required></label>
+  `;
+}
+
+function achievementConditionRow(condition = {}) {
+  return `
+    <div class="achievement-condition-row" data-achievement-condition-row>
+      <label><span>Параметр</span><select name="condition_parameter" required>
+        ${ACHIEVEMENT_PARAMETER_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${condition.parameter === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+      </select></label>
+      <label><span>Оператор</span><select name="condition_operator" required>
+        ${ACHIEVEMENT_OPERATOR_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${condition.operator === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+      </select></label>
+      ${achievementValueField(condition)}
+      <button type="button" class="ghost" data-remove-achievement-condition>Удалить</button>
+    </div>
+  `;
+}
+
+function achievementConditionsFields(conditions = []) {
+  const rows = conditions.length ? conditions : [{}];
+  return `
+    <div class="achievement-builder modal-full">
+      <div class="achievement-builder-head">
+        <b>Условия</b>
+        <button type="button" class="ghost" data-add-achievement-condition>Добавить условие</button>
+      </div>
+      <div class="achievement-conditions" data-achievement-conditions>
+      ${rows.map((condition) => achievementConditionRow(condition)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function achievementPayload(data, form) {
+  const formObject = form ? new FormData(form) : null;
+  const parameters = formObject?.getAll("condition_parameter") || [];
+  const operators = formObject?.getAll("condition_operator") || [];
+  const values = formObject?.getAll("condition_value") || [];
+  const conditions = parameters
+    .map((parameter, index) => ({
+      parameter,
+      operator: operators[index],
+      value: parseAchievementValue(values[index]),
+    }))
+    .filter((condition) => condition.parameter && condition.operator);
+
+  if (!conditions.length) throw new Error("Добавьте хотя бы один параметр достижения.");
+
+  return {
+    name: data.name,
+    logic: data.logic || "and",
+    conditions,
+  };
+}
+
+function achievementDetails(item) {
+  const separator = ` ${achievementLogicLabel(item.logic)} `;
+  return (item.conditions || [])
+    .map((condition) => `${achievementParameterLabel(condition.parameter)} ${achievementOperatorLabel(condition.operator)} ${condition.value}`)
+    .join(separator);
+}
+
+function handleAchievementConditionClick(event, syncRoot = null) {
+  const addButton = event.target.closest("[data-add-achievement-condition]");
+  if (addButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const form = addButton.closest("form");
+    form?.querySelector("[data-achievement-conditions]")?.insertAdjacentHTML("beforeend", achievementConditionRow());
+    if (syncRoot) syncRequiredPanelForms(syncRoot);
+    return true;
+  }
+
+  const removeButton = event.target.closest("[data-remove-achievement-condition]");
+  if (!removeButton) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const container = removeButton.closest("[data-achievement-conditions]");
+  const rows = container ? [...container.querySelectorAll("[data-achievement-condition-row]")] : [];
+  if (rows.length > 1) removeButton.closest("[data-achievement-condition-row]")?.remove();
+  if (syncRoot) syncRequiredPanelForms(syncRoot);
+  return true;
+}
+
+function syncAchievementConditionValueField(control) {
+  const row = control.closest("[data-achievement-condition-row]");
+  if (!row) return;
+  const valueLabel = row.querySelector('[name="condition_value"]')?.closest("label");
+  if (!valueLabel) return;
+  valueLabel.outerHTML = achievementValueField({
+    parameter: control.value,
+    operator: row.querySelector('[name="condition_operator"]')?.value,
+    value: "",
+  });
+}
+
+function syncBranchAchievementSummary(control) {
+  const root = control.closest("[data-branch-achievement-select]");
+  if (!root) return;
+  const checked = [...root.querySelectorAll('input[name="branch_achievement_ids"]:checked')]
+    .map((input) => input.closest("label")?.textContent?.trim())
+    .filter(Boolean);
+  const summary = root.querySelector("[data-branch-achievement-summary]");
+  if (!summary) return;
+  summary.textContent = checked.length
+    ? checked.length > 2
+      ? `Выбрано: ${checked.length}`
+      : checked.join(", ")
+    : "Не выбрано";
+}
+
+function productItemDetails(item) {
+  const category = (cache.categories || []).find((categoryItem) => String(categoryItem.id) === String(item.category_id));
+  const categoryLabel = category ? `${category.name} (${categoryTypeLabel(category.type)})` : no;
+  const price = item.price === null || item.price === undefined ? no : item.price;
+  return `${categoryLabel} · Цена: ${price} · ${item.active ? "активен" : "неактивен"}`;
+}
+
+function productItemCategory(item) {
+  return (cache.categories || []).find((category) => String(category.id) === String(item.category_id));
+}
+
+function categoryTypeById(categoryId) {
+  return (cache.categories || []).find((category) => String(category.id) === String(categoryId))?.type;
+}
+
+function productItemStaffFields(item) {
+  const selected = new Set((item.staff || []).map((staffItem) => String(staffItem.id)));
+  const users = cache.users || [];
+  if (!users.length) return "";
+  return `
+    <div class="permission-section modal-full">
+      <strong>Сотрудники, оказывающие услугу</strong>
+      <div class="permission-actions">
+        ${users.map((user) => `
+          <label class="checkbox">
+            <input type="checkbox" name="staff_user_ids" value="${escapeHtml(user.id)}" ${selected.has(String(user.id)) ? "checked" : ""}>
+            ${escapeHtml(userLabelById(user.id))}
+          </label>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function branchProductItemFields(branch) {
+  const selected = new Set((branch.product_item_ids || []).map((id) => String(id)));
+  const productItems = cache.productItems || [];
+  const services = productItems.filter((item) => categoryTypeById(item.category_id) === "service");
+  const products = productItems.filter((item) => categoryTypeById(item.category_id) === "product");
+  const selectedServiceId = services.find((item) => selected.has(String(item.id)))?.id || "";
+  const selectedProductId = products.find((item) => selected.has(String(item.id)))?.id || "";
+  return `
+    ${selectField("Услуги", "branch_service_item_id", services.map((item) => ({ id: item.id, name: item.title })), selectedServiceId, "Не выбрано")}
+    ${selectField("Товары", "branch_product_item_id", products.map((item) => ({ id: item.id, name: item.title })), selectedProductId, "Не выбрано")}
+  `;
+}
+
+function branchAchievementFields(branch) {
+  const achievements = cache.achievements || [];
+  if (!achievements.length) return "";
+  const selected = new Set((branch.achievement_ids || []).map((id) => String(id)));
+  const selectedNames = achievements
+    .filter((achievement) => selected.has(String(achievement.id)))
+    .map((achievement) => achievement.name);
+  const summary = selectedNames.length
+    ? selectedNames.length > 2
+      ? `Выбрано: ${selectedNames.length}`
+      : selectedNames.join(", ")
+    : "Не выбрано";
+  return `
+    <div class="branch-multiselect modal-full" data-branch-achievement-select>
+      <span>Достижения филиала</span>
+      <details class="branch-multiselect-dropdown">
+        <summary><span data-branch-achievement-summary>${escapeHtml(summary)}</span></summary>
+        <div class="branch-multiselect-options">
+          ${achievements.map((achievement) => `
+            <label class="checkbox">
+              <input type="checkbox" name="branch_achievement_ids" value="${escapeHtml(achievement.id)}" ${selected.has(String(achievement.id)) ? "checked" : ""}>
+              ${escapeHtml(achievement.name)}
+            </label>
+          `).join("")}
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+function productItemExtraFields(item) {
+  const category = productItemCategory(item);
+  if (category?.type === "service") return `
+    <label><span>Мин. цена</span><input name="price_min" type="number" step="0.01" min="0" value="${escapeHtml(item.price_min ?? "")}"></label>
+    <label><span>Макс. цена</span><input name="price_max" type="number" step="0.01" min="0" value="${escapeHtml(item.price_max ?? "")}"></label>
+    <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
+    <label><span>Длительность, сек</span><input name="seance_length" type="number" step="1" min="0" value="${escapeHtml(item.seance_length ?? "")}"></label>
+    <label><span>Вес сортировки</span><input name="weight" type="number" step="1" value="${escapeHtml(item.weight ?? "")}"></label>
+    <label><span>Внешний ID</span><input name="api_id" value="${escapeHtml(item.api_id || "")}"></label>
+    ${productItemStaffFields(item)}
+    <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
+  `;
+  if (category?.type === "product") return `
+    <label><span>Штрих-код</span><input name="barcode" value="${escapeHtml(item.barcode || "")}"></label>
+    <label><span>Единица измерения</span><select name="unit_short_title">
+      <option value="">Не выбрано</option>
+      <option value="шт" ${item.unit_short_title === "шт" ? "selected" : ""}>шт</option>
+      <option value="гр" ${item.unit_short_title === "гр" ? "selected" : ""}>гр</option>
+    </select></label>
+    <label><span>Себестоимость</span><input name="actual_cost" type="number" step="0.01" min="0" value="${escapeHtml(item.actual_cost ?? "")}"></label>
+    <label><span>Соотношение ед.</span><input name="unit_equals" type="number" step="0.01" min="0" value="${escapeHtml(item.unit_equals ?? "")}"></label>
+    <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
+  `;
+  return `
+    <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
+  `;
 }
 
 function humanizeCode(value) {
@@ -607,10 +895,22 @@ function workplaceFilterOptions(branches, selected = "") {
   `;
 }
 
+function productItemCategoryFilterOptions(categories, selected = "") {
+  return `
+    <label><span>Фильтр по категории</span><select data-product-item-filter-category>
+      <option value="" ${!selected ? "selected" : ""}>Все</option>
+      ${categories.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selected) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)} (${escapeHtml(categoryTypeLabel(item.type))})</option>`).join("")}
+    </select></label>
+  `;
+}
+
 function findEntity(type, id) {
   const source = {
     brand: cache.brands,
     legal: cache.legalEntities,
+    category: cache.categories,
+    productItem: cache.productItems,
+    achievement: cache.achievements,
     branch: cache.branches,
     department: cache.departments,
     workplace: cache.workplaces,
@@ -647,12 +947,37 @@ function modalFields(type, item) {
     <label><span>Расчётный счёт</span><input name="settlement_account" value="${escapeHtml(item.bank_details?.settlement_account || "")}"></label>
     <label><span>Корр. счёт</span><input name="correspondent_account" value="${escapeHtml(item.bank_details?.correspondent_account || "")}"></label>
   `;
+  if (type === "category") return `
+    <label><span>Название категории</span><input name="name" value="${escapeHtml(item.name)}" required></label>
+    <label><span>Тип</span><select name="type">
+      ${PRODUCT_CATEGORY_TYPE_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.type === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
+    </select></label>
+  `;
+  if (type === "productItem") return `
+    ${selectField("Категория", "category_id", cache.categories.map((category) => ({ id: category.id, name: `${category.name} (${categoryTypeLabel(category.type)})` })), item.category_id, "Выберите категорию")}
+    <label><span>Название</span><input name="title" value="${escapeHtml(item.title)}" required></label>
+    <label><span>Цена</span><input name="price" type="number" step="0.01" min="0" value="${escapeHtml(item.price ?? "")}"></label>
+    ${productItemExtraFields(item)}
+    <label><span>Активен</span><select name="active">
+      <option value="true" ${item.active ? "selected" : ""}>Да</option>
+      <option value="false" ${!item.active ? "selected" : ""}>Нет</option>
+    </select></label>
+  `;
+  if (type === "achievement") return `
+    <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
+    <label><span>Клиент должен выполнить</span><select name="logic">
+      ${ACHIEVEMENT_LOGIC_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.logic === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
+    </select></label>
+    ${achievementConditionsFields(item.conditions || [])}
+  `;
   if (type === "branch") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
     <label><span>Адрес</span><input name="address" value="${escapeHtml(item.address || "")}"></label>
     <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
     ${timezoneOptions(item.timezone || DEFAULT_TIMEZONE)}
     ${selectField("Юридическое лицо", "legal_entity_id", cache.legalEntities, item.legal_entity_id)}
+    ${branchProductItemFields(item)}
+    ${branchAchievementFields(item)}
     <label class="checkbox modal-full"><input type="checkbox" name="online_booking_enabled" ${item.online_booking_enabled ? "checked" : ""}> Онлайн-запись</label>
   `;
   if (type === "department") return `
@@ -724,6 +1049,9 @@ function openEntityModal(type, item) {
   const titles = {
     brand: "Бренд",
     legal: "Юридическое лицо",
+    category: "Категория товаров и услуг",
+    productItem: "Товар или услуга",
+    achievement: "Достижение",
     branch: "Филиал",
     department: "Подразделение",
     workplace: "Рабочее место",
@@ -757,7 +1085,7 @@ function openEntityModal(type, item) {
   `);
 }
 
-async function saveEntity(type, id, data) {
+async function saveEntity(type, id, data, form = null) {
   if (type === "brand") return api.updateBrand(id, { name: data.name });
   if (type === "legal") return api.updateLegalEntity(id, {
     name: data.name,
@@ -766,6 +1094,41 @@ async function saveEntity(type, id, data) {
     requisites: legalRequisites(data),
     bank_details: bankDetails(data),
   });
+  if (type === "category") {
+    if (!api.updateProductCategory) throw new Error("API категорий не подключен.");
+    return api.updateProductCategory(id, {
+      name: data.name,
+      type: data.type,
+    });
+  }
+  if (type === "productItem") {
+    if (!api.updateProductItem) throw new Error("API товаров и услуг не подключен.");
+    const categoryType = categoryTypeById(data.category_id);
+    return api.updateProductItem(id, {
+      category_id: Number(data.category_id),
+      title: data.title,
+      price: numberOrNull(data.price),
+      price_min: categoryType === "service" ? numberOrNull(data.price_min) : null,
+      price_max: categoryType === "service" ? numberOrNull(data.price_max) : null,
+      discount: categoryType === "service" ? numberOrNull(data.discount) : null,
+      comment: optional(data.comment),
+      weight: categoryType === "service" ? numberOrNull(data.weight) : null,
+      api_id: categoryType === "service" ? optional(data.api_id) : null,
+      barcode: categoryType === "product" ? optional(data.barcode) : null,
+      unit_short_title: categoryType === "product" ? optional(data.unit_short_title) : null,
+      service_unit_short_title: categoryType === "product" ? optional(data.unit_short_title) : null,
+      actual_cost: categoryType === "product" ? numberOrNull(data.actual_cost) : null,
+      unit_actual_cost: categoryType === "product" ? numberOrNull(data.unit_actual_cost) : null,
+      unit_equals: categoryType === "product" ? numberOrNull(data.unit_equals) : null,
+      seance_length: categoryType === "service" ? numberOrNull(data.seance_length) : null,
+      staff: categoryType === "service" ? (data.staff_user_ids || []).map((userId) => ({ id: Number(userId) })) : null,
+      active: data.active === "true",
+    });
+  }
+  if (type === "achievement") {
+    if (!api.updateAchievement) throw new Error("API достижений не подключен.");
+    return api.updateAchievement(id, achievementPayload(data, form));
+  }
   if (type === "branch") return api.updateBranch(id, {
     name: data.name,
     address: optional(data.address),
@@ -773,6 +1136,8 @@ async function saveEntity(type, id, data) {
     timezone: optional(data.timezone),
     brand_id: numberOrNull(data.brand_id),
     legal_entity_id: numberOrNull(data.legal_entity_id),
+    product_item_ids: data.product_item_ids || [],
+    achievement_ids: data.achievement_ids || [],
   });
   if (type === "department") return api.updateDepartment(id, { name: data.name });
   if (type === "workplace") return api.updateWorkplace(id, {
@@ -831,6 +1196,18 @@ async function saveEntity(type, id, data) {
 
 async function deleteEntity(type, id) {
   if (type === "legal") return api.deleteLegalEntity(id);
+  if (type === "category") {
+    if (!api.deleteProductCategory) throw new Error("API категорий не подключен.");
+    return api.deleteProductCategory(id);
+  }
+  if (type === "productItem") {
+    if (!api.deleteProductItem) throw new Error("API товаров и услуг не подключен.");
+    return api.deleteProductItem(id);
+  }
+  if (type === "achievement") {
+    if (!api.deleteAchievement) throw new Error("API достижений не подключен.");
+    return api.deleteAchievement(id);
+  }
   if (type === "branch") return api.deleteBranch(id);
   if (type === "department") return api.deleteDepartment(id);
   if (type === "workplace") return api.deleteWorkplace(id);
@@ -846,6 +1223,9 @@ export async function settings(ctx) {
     branches,
     brands,
     legalEntities,
+    categories,
+    productItems,
+    achievements,
     departments,
     workplaces,
     modules,
@@ -860,6 +1240,9 @@ export async function settings(ctx) {
     api.branches(ctx.org.id).catch(() => []),
     api.brands(ctx.org.id).catch(() => []),
     api.legalEntities(ctx.org.id).catch(() => []),
+    (api.productCategories?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
+    (api.productItems?.(ctx.org.id, productItemFilterCategoryId) || Promise.resolve([])).catch(() => []),
+    (api.achievements?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
     api.modules(ctx.org.id).catch(() => []),
@@ -892,7 +1275,7 @@ export async function settings(ctx) {
     ? workplaces.filter((item) => String(item.branch_id) === String(workplaceFilterBranchId))
     : workplaces;
 
-  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, events };
+  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, categories, productItems, achievements, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, events };
 
   return `
     <section class="panel" data-settings>
@@ -926,6 +1309,61 @@ export async function settings(ctx) {
             deleteLabel: "Удалить",
           })}
         `, "Юридические лица — это функциональная зона или отдел внутри бизнеса.")}
+      </div>
+
+      <div id="categories" data-permission="settings.categories.view">
+        ${section("Категории товаров и услуг", `
+          <form class="inline-form compact" data-category-create data-permission="settings.categories.create">
+            <label><span>Название категории</span><input name="name" required></label>
+            <label><span>Тип</span><select name="type">
+              ${PRODUCT_CATEGORY_TYPE_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
+            </select></label>
+            <button class="primary" disabled>Добавить категорию</button>
+            <p data-message></p>
+          </form>
+          ${entityList(categories, "Категорий пока нет", "category", (item) => item.name, (item) => categoryTypeLabel(item.type), {
+            deleteLabel: "Удалить",
+          })}
+        `, "Категории товаров и услуг — это категории, приписанные к организации.")}
+      </div>
+
+      <div id="product-items" data-permission="settings.items.view">
+        ${section("Товары и услуги", `
+          <form class="inline-form compact" data-product-item-create data-permission="settings.items.create">
+            ${selectField("Категория", "category_id", categories.map((category) => ({ id: category.id, name: `${category.name} (${categoryTypeLabel(category.type)})` })), "", "Выберите категорию")}
+            <label><span>Название</span><input name="title" required></label>
+            <label><span>Цена</span><input name="price" type="number" step="0.01" min="0"></label>
+            <label><span>Активен</span><select name="active">
+              <option value="true">Да</option>
+              <option value="false">Нет</option>
+            </select></label>
+            <button class="primary" disabled>Добавить товар или услугу</button>
+            <p data-message></p>
+          </form>
+          <form class="inline-form compact">
+            ${productItemCategoryFilterOptions(categories, productItemFilterCategoryId)}
+          </form>
+          ${entityList(productItems, "Товаров и услуг пока нет", "productItem", (item) => item.title, productItemDetails, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Товары и услуги привязаны к категориям организации.")}
+      </div>
+
+      <div id="achievements" data-permission="settings.achievements.view">
+        ${section("Достижения", `
+          <form class="inline-form compact" data-achievement-create data-permission="settings.achievements.create">
+            <label><span>Название</span><input name="name" required></label>
+            <label><span>Клиент должен выполнить</span><select name="logic">
+              ${ACHIEVEMENT_LOGIC_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
+            </select></label>
+            ${achievementConditionsFields()}
+            <button class="primary" disabled>Добавить достижение</button>
+            <p data-message></p>
+          </form>
+          ${entityList(achievements, "Достижений пока нет", "achievement", (item) => item.name, achievementDetails, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Достижения собираются из одного или нескольких параметров клиента.")}
       </div>
 
       <div id="branches" data-permission="settings.branches.view">
@@ -1094,6 +1532,11 @@ export function bindSettings(root, ctx) {
       ctx.reload();
       return;
     }
+    if (event.target.matches("[data-product-item-filter-category]")) {
+      productItemFilterCategoryId = event.target.value || "";
+      ctx.reload();
+      return;
+    }
     if (event.target.matches('[name="vat_enabled"]')) {
       syncVatFields(event.target);
       syncRequiredPanelForms(root);
@@ -1116,6 +1559,10 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.closest("[data-user-access-create]") && event.target.matches('[name="department_id"]')) {
       syncUserDepartmentForm(event.target);
+      syncRequiredPanelForms(root);
+    }
+    if (event.target.matches('[name="condition_parameter"]')) {
+      syncAchievementConditionValueField(event.target);
       syncRequiredPanelForms(root);
     }
     if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
@@ -1148,6 +1595,29 @@ export function bindSettings(root, ctx) {
           tax_system: optional(data.tax_system),
           requisites: legalRequisites(data),
           bank_details: bankDetails(data),
+        });
+      } else if (form.matches("[data-category-create]")) {
+        if (!api.createProductCategory) throw new Error("API категорий не подключен.");
+        await api.createProductCategory({
+          organization_id: ctx.org.id,
+          name: data.name,
+          type: data.type,
+        });
+      } else if (form.matches("[data-product-item-create]")) {
+        if (!api.createProductItem) throw new Error("API товаров и услуг не подключен.");
+        await api.createProductItem({
+          organization_id: ctx.org.id,
+          category_id: Number(data.category_id),
+          title: data.title,
+          price: numberOrNull(data.price),
+          comment: optional(data.comment),
+          active: data.active === "true",
+        });
+      } else if (form.matches("[data-achievement-create]")) {
+        if (!api.createAchievement) throw new Error("API достижений не подключен.");
+        await api.createAchievement({
+          organization_id: ctx.org.id,
+          ...achievementPayload(data, form),
         });
       } else if (form.matches("[data-branch-create]")) {
         await api.createBranch({
@@ -1224,6 +1694,8 @@ export function bindSettings(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    if (handleAchievementConditionClick(event, root)) return;
+
     const openVisitButton = event.target.closest("[data-open-event-visit]");
     if (openVisitButton) {
       selectedEventVisit = (cache.events || []).find((item) => String(item.id) === String(openVisitButton.dataset.openEventVisit)) || null;
@@ -1250,6 +1722,9 @@ export function bindSettings(root, ctx) {
     const type = deleteButton.dataset.deleteEntity;
     const labels = {
       legal: "Удалить юридическое лицо?",
+      category: "Удалить категорию?",
+      productItem: "Удалить товар или услугу?",
+      achievement: "Удалить достижение?",
       branch: "Удалить филиал?",
       department: "Удалить подразделение?",
       workplace: "Удалить рабочее место?",
@@ -1268,6 +1743,8 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("click", (event) => {
+    if (handleAchievementConditionClick(event)) return;
+
     const closeButton = event.target.closest("[data-close-modal]");
     if (closeButton) {
       closeButton.closest("[data-settings-modal]")?.remove();
@@ -1279,6 +1756,11 @@ export function bindSettings(root, ctx) {
       selectedEventVisit = null;
       ctx.reload();
       return;
+    }
+    if (!event.target.closest("[data-branch-achievement-select]")) {
+      document.querySelectorAll("[data-branch-achievement-select] details[open]").forEach((item) => {
+        item.removeAttribute("open");
+      });
     }
     if (event.target.matches("[data-settings-modal]")) {
       event.target.remove();
@@ -1295,7 +1777,20 @@ export function bindSettings(root, ctx) {
       if (form.dataset.type === "role") {
         payload.permission_codes = new FormData(form).getAll("permission_codes");
       }
-      await saveEntity(form.dataset.type, form.dataset.id, payload);
+      if (form.dataset.type === "productItem") {
+        payload.staff_user_ids = new FormData(form).getAll("staff_user_ids");
+      }
+      if (form.dataset.type === "branch") {
+        payload.product_item_ids = [
+          numberOrNull(payload.branch_service_item_id),
+          numberOrNull(payload.branch_product_item_id),
+        ].filter((id) => id !== null);
+        payload.achievement_ids = new FormData(form)
+          .getAll("branch_achievement_ids")
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id));
+      }
+      await saveEntity(form.dataset.type, form.dataset.id, payload, form);
       form.closest("[data-settings-modal]")?.remove();
       ctx.reload();
     } catch (error) {
@@ -1307,6 +1802,11 @@ export function bindSettings(root, ctx) {
     if (event.target.matches('[name="vat_enabled"]')) {
       syncVatFields(event.target);
     }
+    if (event.target.matches('[name="condition_parameter"]')) {
+      syncAchievementConditionValueField(event.target);
+    }
+    if (event.target.matches('[name="branch_achievement_ids"]')) {
+      syncBranchAchievementSummary(event.target);
+    }
   });
 }
-

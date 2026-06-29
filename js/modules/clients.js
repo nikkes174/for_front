@@ -11,16 +11,24 @@ let state = {
   branchMemberships: [],
   roles: [],
   segments: [],
+  productCategories: [],
+  productItems: [],
   selectedClient: null,
   selectedVisit: null,
   visitDraft: {},
   visitErrors: {},
+  bonusTransactionType: "accrual",
   selectedVisitDraft: {},
   photoPreviewUrl: "",
   photoFile: null,
 };
 
 const no = "Без фото";
+const bonusTransactionTypes = {
+  accrual: "Начисление",
+  write_off: "Списание",
+  expiration: "Сгорание",
+};
 
 function clean(value) {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== "" && item !== undefined && item !== null));
@@ -78,6 +86,17 @@ function dateTimeInput(value) {
 
 function money(value) {
   return Number(value ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+}
+
+function bonusTypeOptions(items, selected = "") {
+  const options = (items || []).map((item) => ({
+    value: item.code,
+    label: item.name,
+  }));
+  if (selected && !options.some((item) => String(item.value) === String(selected))) {
+    options.push({ value: selected, label: selected === "cashback" ? "Кэшбэк" : selected });
+  }
+  return options;
 }
 
 function readonly(label, value) {
@@ -245,6 +264,7 @@ function visitDraftDefaults() {
     paid_amount: "0",
     service_names: "",
     product_names: "",
+    source: "",
     comment: "",
   };
 }
@@ -256,6 +276,29 @@ function departmentOptions(branchId = "") {
 function workplaceOptions(branchId = "", departmentId = "") {
   return state.workplaces.filter((item) =>
     String(item.branch_id) === String(branchId) && String(item.department_id) === String(departmentId));
+}
+
+function productCategoryType(categoryId) {
+  return state.productCategories.find((item) => String(item.id) === String(categoryId))?.type;
+}
+
+function branchProductItems(branchId = "", type = "") {
+  const branch = state.branches.find((item) => String(item.id) === String(branchId));
+  const availableIds = new Set((branch?.product_item_ids || []).map((id) => String(id)));
+  if (!branch || !availableIds.size) return [];
+  return state.productItems.filter((item) =>
+    availableIds.has(String(item.id)) && (!type || productCategoryType(item.category_id) === type));
+}
+
+function visitProductInputField(label, name, branchId, type, value = "", error = "", listKey = "") {
+  const options = branchProductItems(branchId, type);
+  const listId = `${listKey || name}-${type}-options`;
+  return visitField(label, `
+    <input name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}" list="${escapeHtml(listId)}" placeholder="${escapeHtml(branchId ? "Начните вводить название" : "Сначала выберите филиал")}">
+    <datalist id="${escapeHtml(listId)}">
+      ${options.map((item) => `<option value="${escapeHtml(item.title)}"></option>`).join("")}
+    </datalist>
+  `, error);
 }
 
 function visitEditDraftDefaults(visit) {
@@ -272,6 +315,7 @@ function visitEditDraftDefaults(visit) {
     paid_amount: String(source.paid_amount ?? 0),
     service_names: parsed.serviceNames || "",
     product_names: parsed.productNames || "",
+    source: source.source || "",
     comment: parsed.comment || "",
   };
 }
@@ -333,8 +377,10 @@ function validateVisitData(data) {
   if (!String(data.total_cost || "").trim()) errors.total_cost = "Укажите стоимость.";
   if (!String(data.discount_amount || "").trim()) errors.discount_amount = "Укажите скидку.";
   if (!String(data.paid_amount || "").trim()) errors.paid_amount = "Укажите сумму оплаты.";
-  if (!String(data.service_names || "").trim()) errors.service_names = "Укажите услуги.";
-  if (!String(data.product_names || "").trim()) errors.product_names = "Укажите товары.";
+  if (!String(data.service_names || "").trim() && !String(data.product_names || "").trim()) {
+    errors.service_names = "Укажите услугу или товар.";
+    errors.product_names = "Укажите услугу или товар.";
+  }
   return errors;
 }
 
@@ -384,8 +430,9 @@ function visitCreateFormMarkup() {
     ${visitInputField("Стоимость", "total_cost", visitDraft.total_cost, 'type="number"', errors.total_cost)}
     ${visitField("Скидка", `<div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div>`, errors.discount_amount)}
     ${visitInputField("Оплачено", "paid_amount", visitDraft.paid_amount, 'type="number" readonly', errors.paid_amount)}
-    ${visitInputField("Услуги", "service_names", visitDraft.service_names, 'placeholder="Можно несколько через запятую"', errors.service_names)}
-    ${visitInputField("Товары", "product_names", visitDraft.product_names, 'placeholder="Можно несколько через запятую"', errors.product_names)}
+    ${visitProductInputField("Услуги", "service_names", visitDraft.branch_id, "service", visitDraft.service_names, errors.service_names, "visit-create-services")}
+    ${visitProductInputField("Товары", "product_names", visitDraft.branch_id, "product", visitDraft.product_names, errors.product_names, "visit-create-products")}
+    ${visitInputField("Источник", "source", visitDraft.source)}
     ${visitInputField("Комментарий", "comment", visitDraft.comment)}
     <button class="primary">Добавить визит</button>
     <p data-message></p>
@@ -445,7 +492,7 @@ function clientCardData(client) {
 }
 
 async function loadClientDetails(client, orgId) {
-  const [profile, metric, visits, accounts, categories, additionalFields, clientBranches] = await Promise.all([
+  const [profile, metric, visits, accounts, categories, additionalFields, clientBranches, bonusTypes, bonusBalance, bonusHistory] = await Promise.all([
     api.clientProfile(client.id, orgId).catch(() => null),
     api.clientProfileMetric(client.id).catch(() => null),
     api.clientHistoryVisits(client.id).catch(() => []),
@@ -453,6 +500,9 @@ async function loadClientDetails(client, orgId) {
     api.clientCategories(client.id).catch(() => []),
     api.clientAdditionalFieldValues(client.id).catch(() => []),
     api.clientBranches(client.id).catch(() => []),
+    api.bonusTypes(orgId).catch(() => []),
+    api.bonusBalance(client.id).catch(() => null),
+    api.bonusHistory(client.id).catch(() => []),
   ]);
 
   return {
@@ -465,6 +515,9 @@ async function loadClientDetails(client, orgId) {
     categories,
     additionalFields,
     clientBranches: clientBranches?.length ? clientBranches : branchesFromVisits(visits),
+    bonusTypes,
+    bonusBalance,
+    bonusHistory,
   };
 }
 
@@ -541,8 +594,9 @@ function modal(client) {
             <label><span>Стоимость</span><input name="total_cost" type="number" value="${escapeHtml(visitDraft.total_cost)}"></label>
             <label><span>Скидка</span><div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
             <label><span>Оплачено</span><input name="paid_amount" type="number" value="${escapeHtml(visitDraft.paid_amount)}" readonly></label>
-            <label><span>Услуги</span><input name="service_names" value="${escapeHtml(visitDraft.service_names)}" placeholder="Можно несколько через запятую"></label>
-            <label><span>Товары</span><input name="product_names" value="${escapeHtml(visitDraft.product_names)}" placeholder="Можно несколько через запятую"></label>
+            ${visitProductInputField("Услуги", "service_names", visitDraft.branch_id, "service", visitDraft.service_names, "", "visit-panel-services")}
+            ${visitProductInputField("Товары", "product_names", visitDraft.branch_id, "product", visitDraft.product_names, "", "visit-panel-products")}
+            <label><span>Источник</span><input name="source" value="${escapeHtml(visitDraft.source)}"></label>
             <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visitDraft.comment)}"></label>
             <button class="primary">Добавить визит</button>
             <p data-message></p>
@@ -568,6 +622,27 @@ function modal(client) {
           </div>
         </div>
         <div class="subpanel">
+          <h3>Бонусные операции</h3>
+          <div class="modal-grid">
+            ${readonly("Баланс бонусов", client.bonusBalance ? money(client.bonusBalance.balance) : "")}
+          </div>
+          <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
+            ${selectField("Операция", "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), state.bonusTransactionType)}
+            ${selectField("Тип бонусов", "bonus_type", bonusTypeOptions(client.bonusTypes), "")}
+            <label><span>Сумма</span><input name="amount" type="number" min="1" value="1"></label>
+            <label><span>Причина</span><input name="reason"></label>
+            <button class="primary">Выполнить</button>
+            <p data-message></p>
+          </form>
+          <table><tbody>
+            ${rows(client.bonusHistory || [], "История бонусов пока пуста.", (item) => `<tr>
+              <td>${escapeHtml(item.reason || `${item.bonus_type || "bonus"} #${item.id}`)}</td>
+              <td>${escapeHtml(item.transaction_type || item.operation || "")}</td>
+              <td>${escapeHtml(money(item.amount))}</td>
+            </tr>`)}
+          </tbody></table>
+        </div>
+        <div class="subpanel">
           <h3>Сегменты клиента</h3>
           ${simpleList(state.segments, "Сегменты пока не рассчитаны.", (item) => `${item.name}${item.is_dynamic ? " · динамический" : ""}`)}
         </div>
@@ -584,7 +659,7 @@ function visitModal(client) {
   const parsed = parseVisitComment(visit.comment);
   return `
     <div class="modal-backdrop" data-visit-modal>
-      <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-card">
         <div class="modal-head">
           <h3>Визит</h3>
           <button type="button" class="ghost" data-close-visit>Закрыть</button>
@@ -600,6 +675,7 @@ function visitModal(client) {
           ${readonly("Скидка", money(visit.discount_amount))}
           ${readonly("Оплачено", money(visit.paid_amount))}
           ${readonly("Задолженность", money(visit.debt_amount))}
+          ${readonly("Источник", visit.source)}
           ${readonly("Комментарий", parsed.comment)}
         </div>
       </div>
@@ -616,7 +692,7 @@ function editableVisitModal(client) {
   const draft = { ...visitEditDraftDefaults(selected), ...state.selectedVisitDraft };
   return `
     <div class="modal-backdrop" data-visit-modal>
-      <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-card">
         <div class="modal-head">
           <h3>Визит</h3>
           <button type="button" class="ghost" data-close-visit>Закрыть</button>
@@ -634,8 +710,9 @@ function editableVisitModal(client) {
           <label><span>Стоимость</span><input name="total_cost" type="number" value="${escapeHtml(draft.total_cost)}"></label>
           <label><span>Скидка</span><div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(draft.discount_amount)}"><select name="discount_type"><option value="amount" ${draft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${draft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
           <label><span>Оплачено</span><input name="paid_amount" type="number" value="${escapeHtml(draft.paid_amount)}" readonly></label>
-          <label><span>Услуги</span><input name="service_names" value="${escapeHtml(draft.service_names)}" placeholder="Можно несколько через запятую"></label>
-          <label><span>Товары</span><input name="product_names" value="${escapeHtml(draft.product_names)}" placeholder="Можно несколько через запятую"></label>
+          ${visitProductInputField("Услуги", "service_names", draft.branch_id, "service", draft.service_names, "", "visit-edit-services")}
+          ${visitProductInputField("Товары", "product_names", draft.branch_id, "product", draft.product_names, "", "visit-edit-products")}
+          <label><span>Источник</span><input name="source" value="${escapeHtml(draft.source)}"></label>
           <label><span>Комментарий</span><input name="comment" value="${escapeHtml(draft.comment)}"></label>
           ${readonly("Задолженность", money(visit.debt_amount))}
           <p data-message></p>
@@ -649,7 +726,7 @@ function editableVisitModal(client) {
 export async function clients(ctx) {
   const params = new URLSearchParams(location.search);
   const search = params.get("q") || "";
-  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments] = await Promise.all([
+  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems] = await Promise.all([
     api.clients(ctx.org.id, search).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
@@ -659,9 +736,11 @@ export async function clients(ctx) {
     api.branchMemberships(ctx.org.id).catch(() => []),
     api.roles(ctx.org.id).catch(() => []),
     api.clientSegments(ctx.org.id).catch(() => segmentExamples().map((name) => ({ name }))),
+    (api.productCategories?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
+    (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
   ]);
 
-  state = { ...state, clients: items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments };
+  state = { ...state, clients: items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems };
 
   return `
     <section class="panel" data-clients>
@@ -718,6 +797,10 @@ export function bindClients(root, ctx) {
       syncClientCreateForm(root);
     }
 
+    if (event.target.closest("[data-client-bonus-op]")) {
+      state.bonusTransactionType = event.target.form?.elements.transaction_type?.value || "accrual";
+    }
+
     const form = event.target.closest("[data-visit-create], [data-visit-edit]");
     if (form) {
       if (form.matches("[data-visit-create]")) {
@@ -730,8 +813,16 @@ export function bindClients(root, ctx) {
         state.visitDraft.department_id = "";
         state.visitDraft.workplace_id = "";
         state.visitDraft.employee_id = "";
+        state.visitDraft.service_names = "";
+        state.visitDraft.product_names = "";
         state.visitErrors = { ...state.visitErrors, department_id: "", workplace_id: "", employee_id: "" };
         syncVisitCreateForm(root);
+        return;
+      }
+      if (event.target.name === "branch_id" && form.matches("[data-visit-edit]")) {
+        state.selectedVisitDraft.service_names = "";
+        state.selectedVisitDraft.product_names = "";
+        ctx.reload();
         return;
       }
       if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
@@ -765,6 +856,10 @@ export function bindClients(root, ctx) {
     if (event.target.closest("[data-client-create]")) {
       syncClientCreateForm(root);
     }
+    if (event.target.closest("[data-client-bonus-op]")) {
+      state.bonusTransactionType = event.target.form?.elements.transaction_type?.value || "accrual";
+    }
+
     const form = event.target.closest("[data-visit-create], [data-visit-edit]");
     if (!form) return;
     if (form.matches("[data-visit-create]")) {
@@ -789,7 +884,13 @@ export function bindClients(root, ctx) {
       state.visitDraft.department_id = "";
       state.visitDraft.workplace_id = "";
       state.visitDraft.employee_id = "";
+      state.visitDraft.service_names = "";
+      state.visitDraft.product_names = "";
       syncVisitCreateForm(root);
+    } else if (event.target.name === "branch_id" && form.matches("[data-visit-edit]")) {
+      state.selectedVisitDraft.service_names = "";
+      state.selectedVisitDraft.product_names = "";
+      ctx.reload();
     } else if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
       state.visitDraft.workplace_id = "";
       state.visitDraft.employee_id = "";
@@ -861,6 +962,18 @@ export function bindClients(root, ctx) {
         upsertClient(updated);
         state.selectedClient = await loadClientDetails(updated, ctx.org.id);
         clearPhotoPreview();
+      } else if (form.matches("[data-client-bonus-op]") && state.selectedClient) {
+        state.bonusTransactionType = data.transaction_type || "accrual";
+        const body = {
+          client_id: state.selectedClient.id,
+          bonus_type: data.bonus_type,
+          amount: Number(data.amount || 0),
+          reason: data.reason,
+        };
+        if (data.transaction_type === "write_off") await api.writeOffBonus(body);
+        else if (data.transaction_type === "expiration") await api.expireBonus(body);
+        else await api.accrueBonus(body);
+        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
       } else if (form.matches("[data-visit-create]") && state.selectedClient) {
         const errors = validateVisitData(data);
         if (Object.keys(errors).length) {
@@ -878,6 +991,7 @@ export function bindClients(root, ctx) {
           total_cost: Number(data.total_cost || 0),
           discount_amount: resolveDiscountAmount(data.total_cost, data.discount_amount, data.discount_type),
           paid_amount: Number(data.paid_amount || 0),
+          source: optional(data.source),
           comment: optional(buildVisitComment(data)),
         }));
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
@@ -893,6 +1007,7 @@ export function bindClients(root, ctx) {
           total_cost: Number(data.total_cost || 0),
           discount_amount: resolveDiscountAmount(data.total_cost, data.discount_amount, data.discount_type),
           paid_amount: Number(data.paid_amount || 0),
+          source: optional(data.source),
           comment: optional(buildVisitComment(data)),
         }));
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
@@ -909,7 +1024,7 @@ export function bindClients(root, ctx) {
     if (event.target.closest("[data-close-visit]")) {
       state.selectedVisit = null;
       state.selectedVisitDraft = {};
-      ctx.reload();
+      event.target.closest("[data-visit-modal]")?.remove();
       return;
     }
 
@@ -973,7 +1088,7 @@ export function bindClients(root, ctx) {
       state.visitDraft = {};
       state.visitErrors = {};
       state.selectedVisitDraft = {};
-      ctx.reload();
+      event.target.closest("[data-client-modal]")?.remove();
       return;
     }
 
@@ -985,7 +1100,7 @@ export function bindClients(root, ctx) {
     if (event.target.matches("[data-visit-modal]")) {
       state.selectedVisit = null;
       state.selectedVisitDraft = {};
-      ctx.reload();
+      event.target.remove();
       return;
     }
 
@@ -996,7 +1111,7 @@ export function bindClients(root, ctx) {
       state.visitDraft = {};
       state.visitErrors = {};
       state.selectedVisitDraft = {};
-      ctx.reload();
+      event.target.remove();
     }
   });
 }

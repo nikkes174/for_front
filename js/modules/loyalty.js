@@ -31,6 +31,12 @@ const loyaltyState = {
   },
   referralRewardType: "bonus",
   referralRewardAmountType: "percent",
+  referralDraft: {
+    program_name: "",
+    reward_bonus_type: "",
+    reward_amount: "0",
+    trigger_event: "first_visit",
+  },
   actionResult: "",
 };
 
@@ -157,10 +163,10 @@ const loyaltyTabs = [
   ["rules", "Правила"],
   ["levels", "Уровни"],
   ["transactions", "Бонусы"],
-  ["subscriptions", "Абонементы"],
-  ["certificates", "Сертификаты"],
-  ["referrals", "Рефералы"],
-  ["promotions", "Акции"],
+  ["subscriptions", "Абонементы", true],
+  ["certificates", "Сертификаты", true],
+  ["referrals", "Рефералы", true],
+  ["promotions", "Акции", true],
 ];
 
 const permissions = {
@@ -374,6 +380,7 @@ function deleteButtonIfAllowed(ctx, kind, id) {
 
 function createPermissionForForm(form) {
   if (form.matches("[data-loyalty-rule-create]")) return createPermissions.rules;
+  if (form.matches("[data-loyalty-transition-rule-create]")) return createPermissions.rules;
   if (form.matches("[data-loyalty-level-create]")) return createPermissions.levels;
   if (form.matches("[data-loyalty-bonus-type-create], [data-loyalty-bonus-op]")) return createPermissions.transactions;
   if (form.matches("[data-loyalty-subscription-create]")) return createPermissions.subscriptions;
@@ -500,6 +507,16 @@ function currentBonusTypeOptions(items, selected = "") {
     options.push({ value: selected, label: selected });
   }
   return options;
+}
+
+function saveReferralDraft(form) {
+  const data = formData(form);
+  loyaltyState.referralDraft = {
+    program_name: data.program_name || "",
+    reward_bonus_type: data.reward_bonus_type || "",
+    reward_amount: data.reward_amount || "0",
+    trigger_event: data.trigger_event || "first_visit",
+  };
 }
 
 function editPayload(kind, data) {
@@ -642,24 +659,46 @@ function clientSelector(clients, selectedClient) {
 }
 
 function rulesSection(ctx, rules, selectedClient, bonusTypes, levels) {
+  const bonusRules = (rules || []).filter((item) => !isTransitionRule(item));
   return `
     <div class="subpanel">${titleWithHint(L.rulesTitle, L.rulesHint)}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${select(L.type, "rule_type", Object.entries(ruleTypes).map(([value, label]) => ({ value, label })), "service")}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${field(L.amount, "amount", "0", 'type="number"')}${field(L.termDays, "expires_in_days", "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(levels, loyaltyState.ruleExtras.client_level), loyaltyState.ruleExtras.client_level)}${field(L.levelParams, "level_params", loyaltyState.ruleExtras.level_params, 'placeholder="10"')}<button class="primary" disabled>${L.createRule}</button><p data-message></p></form>` : ""}
-      <table><tbody>${rows(rules, L.rulesEmpty, (item) => `<tr><td>${editButton("rule", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`)}</tbody></table>
+      <table><tbody>${rows(bonusRules, L.rulesEmpty, (item) => `<tr><td>${editButton("rule", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`)}</tbody></table>
+    </div>
+    ${transitionRulesSection(ctx, rules, levels)}`;
+}
+
+function isTransitionRule(item) {
+  return item?.rule_type === "level_transition" || item?.target_type === "level_transition" || item?.usage_restrictions?.transition_rule === true;
+}
+
+function transitionRulesSection(ctx, rules, levels) {
+  const transitionRules = (rules || []).filter(isTransitionRule);
+  return `
+    <div class="subpanel">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
+      ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-transition-rule-create>
+        ${field("Прибыль от клиента больше", "profit_threshold", "0", 'type="number" step="0.01" min="0"')}
+        ${select("Перейти на уровень", "client_level", levelOptions(levels), "")}
+        <button class="primary" disabled>Создать правило</button>
+        <p data-message></p>
+      </form>` : ""}
+      <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
+        const threshold = item.usage_restrictions?.profit_amount_gt ?? item.usage_restrictions?.conditions?.[0]?.value ?? "";
+        return `<tr><td>${escapeHtml(`Прибыль от клиента > ${threshold}`)}</td><td>${escapeHtml(item.client_level || L.notSet)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
+      })}</tbody></table>
     </div>`;
 }
 
 function levelsSection(ctx, levels) {
-  return `<div class="subpanel">${titleWithHint(L.levelsTitle, L.levelsHint)}${canCreate(ctx, "levels") ? `<form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}${field(L.cashback, "params", loyaltyState.levelParams, 'placeholder="10"')}<button class="primary" disabled>${L.createLevel}</button><p data-message></p></form>` : ""}<table><tbody>${rows(levels, L.levelsEmpty, (item) => `<tr><td>${editButton("level", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "level", item.id)}</td></tr>`)}</tbody></table></div>`;
+  return `<div class="subpanel">${titleWithHint(L.levelsTitle, L.levelsHint)}${canCreate(ctx, "levels") ? `<form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}<button class="primary" disabled>${L.createLevel}</button><p data-message></p></form>` : ""}<table><tbody>${rows(levels, L.levelsEmpty, (item) => `<tr><td>${editButton("level", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "level", item.id)}</td></tr>`)}</tbody></table></div>`;
 }
 
 function bonusTypesSection(ctx, bonusTypes) {
-  const visibleBonusTypes = (bonusTypes || []).filter((item) => String(item.code) !== "cashback");
-  return `<div class="subpanel">${titleWithHint(L.bonusTypesTitle, L.bonusTypesHint)}${canCreate(ctx, "transactions") ? `<form class="inline-form compact" data-loyalty-bonus-type-create>${field(L.name, "name")}<button class="primary" disabled>${L.createBonusType}</button><p data-message></p></form>` : ""}<table><tbody>${rows(visibleBonusTypes, L.bonusTypesEmpty, (item) => `<tr><td>${escapeHtml(item.name)}</td><td class="actions">${visibleBonusTypes.length > 1 ? deleteButtonIfAllowed(ctx, "bonus-type", item.id) : ""}</td></tr>`)}</tbody></table></div>`;
+  return `<div class="subpanel">${titleWithHint(L.bonusTypesTitle, L.bonusTypesHint)}${canCreate(ctx, "transactions") ? `<form class="inline-form compact" data-loyalty-bonus-type-create>${field(L.name, "name")}<button class="primary" disabled>${L.createBonusType}</button><p data-message></p></form>` : ""}<table><tbody>${rows(bonusTypes || [], L.bonusTypesEmpty, (item) => `<tr><td>${escapeHtml(item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "bonus-type", item.id)}</td></tr>`)}</tbody></table></div>`;
 }
 
 function transactionsSection(ctx, clients, selectedClient, balance, history, bonusTypes) {
-  return `${bonusTypesSection(ctx, bonusTypes)}<div class="subpanel">${titleWithHint(L.bonusOps, L.bonusOpsHint)}<div class="modal-grid"><div class="readonly-field"><span>${L.client}</span><b>${escapeHtml(selectedClient ? clientName(selectedClient) : L.notSelected)}</b></div><div class="readonly-field"><span>${L.bonusBalance}</span><b>${escapeHtml(balance ? String(balance.balance) : "0")}</b></div></div>${canCreate(ctx, "transactions") ? `<form class="inline-form compact" data-loyalty-bonus-op>${select(L.client, "client_id", clientOptions(clients, selectedClient), selectedClient?.id || "")}${select(L.operation, "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), loyaltyState.bonusTransactionType)}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${field(L.sum, "amount", "0", 'type="number"')}${field(L.reason, "reason")}<button class="primary" disabled>${L.run}</button><p data-message></p></form>` : ""}<table><tbody>${rows(history, L.bonusHistoryEmpty, (item) => `<tr><td>${editButton("bonus", item, item.reason || `${item.bonus_type} #${item.id}`)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "bonus", item.id)}</td></tr>`)}</tbody></table></div>`;
+  return bonusTypesSection(ctx, bonusTypes);
 }
 
 function subscriptionsSection(clients, selectedClient, subscriptions) {
@@ -709,11 +748,12 @@ function certificatesSection(clients, selectedClient, certificates) {
 function referralsSection(clients, selectedClient, referralStats, referrals, bonusTypes) {
   const referralRewardType = loyaltyState.referralRewardType || "bonus";
   const referralAmountType = loyaltyState.referralRewardAmountType || "percent";
+  const referralDraft = loyaltyState.referralDraft || {};
   const programs = (referrals || []).filter((item) => !item.referrer_client_id);
   const clientPrograms = selectedClient ? (referrals || []).filter((item) => String(item.referrer_client_id) === String(selectedClient.id)) : [];
   const programTable = rows(programs, L.sourcesEmpty, (item) => `<tr><td>${editButton("referral", item, item.program_name || `#${item.id}`)}</td><td>${escapeHtml(item.trigger_event === "any_visit" ? L.anyVisit : L.firstVisitOnly)}</td><td class="actions">${selectedClient ? actionButton(L.addClientToProgram, "data-referral-assign", item.id) : ""}${deleteButton("referral", item.id)}</td></tr>`);
   const clientProgramTable = rows(clientPrograms, L.sourcesEmpty, (item) => `<tr><td>${editButton("referral", item, item.program_name || `#${item.id}`)}</td><td>${escapeHtml(item.referral_link || L.notSet)}</td><td class="actions">${actionButton(L.copyLink, "data-referral-copy-link", item.id)}${actionButton("\u041f\u0435\u0440\u0432\u044b\u0439 \u0432\u0438\u0437\u0438\u0442", "data-referral-first-visit", item.id)}${actionButton("\u041d\u0430\u0447\u0438\u0441\u043b\u0438\u0442\u044c", "data-referral-reward", item.id)}${actionButton("\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c", "data-referral-cancel", item.id)}${deleteButton("referral", item.id)}</td></tr>`);
-  return `<div class="subpanel">${titleWithHint(L.referralProgram, L.referralsHint)}<div class="modal-grid"><div class="readonly-field"><span>${L.invites}</span><b>${escapeHtml(referralStats ? String(referralStats.invites_count) : "0")}</b></div><div class="readonly-field"><span>${L.successful}</span><b>${escapeHtml(referralStats ? String(referralStats.successful_invites_count) : "0")}</b></div></div><form class="inline-form compact" data-loyalty-referral-create>${field(L.programName, "program_name")}${select(L.reward, "reward_type", [{ value: "bonus", label: L.bonus }, { value: "money", label: L.money }], referralRewardType)}<label style="${referralRewardType === "money" ? "opacity:0.45;" : ""}"><span>${escapeHtml(L.bonusKind)}</span><select name="reward_bonus_type" ${referralRewardType === "money" ? "disabled" : ""}>${currentBonusTypeOptions(bonusTypes).map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}</select></label>${select(L.accrual, "reward_amount_type", referralAmountTypeOptions(referralAmountType), referralAmountType)}${field(referralAmountType === "percent" ? L.accrualFor : L.sum, "reward_amount", "0", 'type="number" step="0.01"')}${select(L.triggerEvent, "trigger_event", [{ value: "first_visit", label: L.firstVisitOnly }, { value: "any_visit", label: L.anyVisit }], "first_visit")}${referralAmountType === "percent" ? referralAccrualPicker() : ""}<button class="primary" disabled>${L.createSource}</button><p data-message></p></form>${selectedClient ? "" : `<p class="empty">${escapeHtml(L.noClientSelected)}</p>`}<div class="inline-form compact"><button type="button" class="ghost" data-referral-register="link">${L.detectByLink}</button></div><h4>${escapeHtml(L.referralProgram)}</h4><table><thead><tr><th>${escapeHtml(L.programName)}</th><th>${escapeHtml(L.triggerEvent)}</th><th></th></tr></thead><tbody>${programTable}</tbody></table><h4>${escapeHtml(L.clientPrograms)}</h4><table><thead><tr><th>${escapeHtml(L.programName)}</th><th>${escapeHtml(L.link)}</th><th></th></tr></thead><tbody>${clientProgramTable}</tbody></table></div>`;
+  return `<div class="subpanel">${titleWithHint(L.referralProgram, L.referralsHint)}<div class="modal-grid"><div class="readonly-field"><span>${L.invites}</span><b>${escapeHtml(referralStats ? String(referralStats.invites_count) : "0")}</b></div><div class="readonly-field"><span>${L.successful}</span><b>${escapeHtml(referralStats ? String(referralStats.successful_invites_count) : "0")}</b></div></div><form class="inline-form compact" data-loyalty-referral-create>${field(L.programName, "program_name", referralDraft.program_name || "")}${select(L.reward, "reward_type", [{ value: "bonus", label: L.bonus }, { value: "money", label: L.money }], referralRewardType)}<label style="${referralRewardType === "money" ? "opacity:0.45;" : ""}"><span>${escapeHtml(L.bonusKind)}</span><select name="reward_bonus_type" ${referralRewardType === "money" ? "disabled" : ""}>${currentBonusTypeOptions(bonusTypes, referralDraft.reward_bonus_type || "").map((item) => `<option value="${escapeHtml(item.value)}" ${String(item.value) === String(referralDraft.reward_bonus_type || "") ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}</select></label>${select(L.accrual, "reward_amount_type", referralAmountTypeOptions(referralAmountType), referralAmountType)}${field(referralAmountType === "percent" ? L.accrualFor : L.sum, "reward_amount", referralDraft.reward_amount || "0", 'type="number" step="0.01"')}${select(L.triggerEvent, "trigger_event", [{ value: "first_visit", label: L.firstVisitOnly }, { value: "any_visit", label: L.anyVisit }], referralDraft.trigger_event || "first_visit")}${referralAmountType === "percent" ? referralAccrualPicker() : ""}<button class="primary" disabled>${L.createSource}</button><p data-message></p></form>${selectedClient ? "" : `<p class="empty">${escapeHtml(L.noClientSelected)}</p>`}<div class="inline-form compact"><button type="button" class="ghost" data-referral-register="link">${L.detectByLink}</button></div><h4>${escapeHtml(L.referralProgram)}</h4><table><thead><tr><th>${escapeHtml(L.programName)}</th><th>${escapeHtml(L.triggerEvent)}</th><th></th></tr></thead><tbody>${programTable}</tbody></table><h4>${escapeHtml(L.clientPrograms)}</h4><table><thead><tr><th>${escapeHtml(L.programName)}</th><th>${escapeHtml(L.link)}</th><th></th></tr></thead><tbody>${clientProgramTable}</tbody></table></div>`;
 }
 
 function promotionsSection(clients, selectedClient, promotions) {
@@ -752,7 +792,9 @@ export async function loyalty(ctx, tab = "rules") {
     <section class="panel" data-loyalty data-tab="${escapeHtml(activeTab)}">
       <h2>Лояльность</h2>
       <nav class="tabs">
-        ${visibleTabs.map(([key, title]) => `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
+        ${visibleTabs.map(([key, title, disabled]) => disabled
+          ? `<span class="tab-disabled">${escapeHtml(title)}</span>`
+          : `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
       </nav>
       ${clientSelector(clients, selectedClient)}
       ${selectedClientBanner(selectedClient)}
@@ -773,6 +815,8 @@ export function bindLoyalty(root, ctx) {
   syncLoyaltyCreateForms(root);
 
   root.addEventListener("input", (event) => {
+    const referralForm = event.target.closest("[data-loyalty-referral-create]");
+    if (referralForm) saveReferralDraft(referralForm);
     if (event.target.closest("[data-loyalty] form:not([data-loyalty-client-search]):not([data-loyalty-edit-form])")) {
       syncLoyaltyCreateForms(root);
     }
@@ -780,15 +824,21 @@ export function bindLoyalty(root, ctx) {
 
   root.addEventListener("change", (event) => {
     if (event.target.matches('[name="reward_type"]')) {
+      const referralForm = event.target.closest("[data-loyalty-referral-create]");
+      if (referralForm) saveReferralDraft(referralForm);
       loyaltyState.referralRewardType = event.target.value || "bonus";
       ctx.reload();
       return;
     }
     if (event.target.matches('[name="reward_amount_type"]')) {
+      const referralForm = event.target.closest("[data-loyalty-referral-create]");
+      if (referralForm) saveReferralDraft(referralForm);
       loyaltyState.referralRewardAmountType = event.target.value || "percent";
       ctx.reload();
       return;
     }
+    const referralForm = event.target.closest("[data-loyalty-referral-create]");
+    if (referralForm) saveReferralDraft(referralForm);
     if (event.target.closest("[data-loyalty] form:not([data-loyalty-client-search]):not([data-loyalty-edit-form])")) {
       syncLoyaltyCreateForms(root);
     }
@@ -863,11 +913,32 @@ export function bindLoyalty(root, ctx) {
         if (loyaltyState.selectedClientId) {
           await api.applyRule(rule.id, loyaltyState.selectedClientId, ctx.org.id);
         }
+      } else if (form.matches("[data-loyalty-transition-rule-create]")) {
+        await api.createRule({
+          organization_id: ctx.org.id,
+          name: `Переход на уровень: ${data.client_level}`,
+          rule_type: "service",
+          bonus_type: "cashback",
+          amount: 0,
+          target_type: "level_transition",
+          is_active: true,
+          client_level: optional(data.client_level),
+          usage_restrictions: {
+            transition_rule: true,
+            profit_amount_gt: Number(data.profit_threshold || 0),
+            conditions: [
+              {
+                field: "profit_amount",
+                operator: "gt",
+                value: Number(data.profit_threshold || 0),
+              },
+            ],
+          },
+        });
       } else if (form.matches("[data-loyalty-level-create]")) {
         await api.createBonusLevel({
           organization_id: ctx.org.id,
           name: data.name,
-          params: optional(data.params) ? { cashback: Number(data.params) } : undefined,
         });
       } else if (form.matches("[data-loyalty-bonus-type-create]")) {
         await api.createBonusType({
@@ -943,6 +1014,12 @@ export function bindLoyalty(root, ctx) {
           apply_to_products,
           is_active: true,
         });
+        loyaltyState.referralDraft = {
+          program_name: "",
+          reward_bonus_type: "",
+          reward_amount: "0",
+          trigger_event: "first_visit",
+        };
       } else if (form.matches("[data-loyalty-promotion-create]")) {
         const clientId = Number(data.client_id || loyaltyState.selectedClientId) || null;
 
