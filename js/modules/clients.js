@@ -1,6 +1,8 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
 
+const CLIENTS_PAGE_SIZE = 10;
+
 let state = {
   clients: [],
   branches: [],
@@ -97,6 +99,21 @@ function bonusTypeOptions(items, selected = "") {
     options.push({ value: selected, label: selected === "cashback" ? "Кэшбэк" : selected });
   }
   return options;
+}
+
+function bonusTypeName(items, code) {
+  const item = (items || []).find((bonusType) => String(bonusType.code) === String(code));
+  return item?.name || code || "";
+}
+
+function currentLoyaltyLevel(history) {
+  return (history || []).find((item) => item.client_level)?.client_level || "";
+}
+
+function lastLoyaltyAction(history) {
+  const item = (history || [])[0];
+  if (!item) return "";
+  return [dateTime(item.created_at), item.reason || item.transaction_type].filter(Boolean).join(" · ");
 }
 
 function readonly(label, value) {
@@ -532,6 +549,8 @@ function modal(client) {
   const masters = masterOptions(visitDraft.branch_id, visitDraft.workplace_id);
   const errors = state.visitErrors || {};
   const card = client.card;
+  const loyaltyLevel = currentLoyaltyLevel(client.bonusHistory);
+  const loyaltyBonusType = client.bonusBalance?.bonus_type || client.bonusTypes?.[0]?.code || "";
 
   return `
     <div class="modal-backdrop" data-client-modal>
@@ -625,6 +644,11 @@ function modal(client) {
           <h3>Бонусные операции</h3>
           <div class="modal-grid">
             ${readonly("Баланс бонусов", client.bonusBalance ? money(client.bonusBalance.balance) : "")}
+          </div>
+          <div class="modal-grid">
+            ${readonly("Уровень клиента", loyaltyLevel)}
+            ${readonly("Тип бонусов", bonusTypeName(client.bonusTypes, loyaltyBonusType))}
+            ${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}
           </div>
           <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
             ${selectField("Операция", "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), state.bonusTransactionType)}
@@ -726,8 +750,11 @@ function editableVisitModal(client) {
 export async function clients(ctx) {
   const params = new URLSearchParams(location.search);
   const search = params.get("q") || "";
+  const requestedPage = Number(params.get("page") || 1);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
+  const offset = (page - 1) * CLIENTS_PAGE_SIZE;
   const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems] = await Promise.all([
-    api.clients(ctx.org.id, search).catch(() => []),
+    api.clients(ctx.org.id, { query: search, offset, limit: CLIENTS_PAGE_SIZE + 1 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
@@ -740,7 +767,17 @@ export async function clients(ctx) {
     (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
   ]);
 
-  state = { ...state, clients: items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems };
+  const pageItems = items.slice(0, CLIENTS_PAGE_SIZE);
+  const hasNextPage = items.length > CLIENTS_PAGE_SIZE;
+  const pageUrl = (nextPage) => {
+    const nextParams = new URLSearchParams();
+    if (search) nextParams.set("q", search);
+    if (nextPage > 1) nextParams.set("page", nextPage);
+    const qs = nextParams.toString();
+    return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
+  };
+
+  state = { ...state, clients: pageItems, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems };
 
   return `
     <section class="panel" data-clients>
@@ -756,11 +793,20 @@ export async function clients(ctx) {
         <button class="primary">Добавить клиента</button>
         <p data-message></p>
       </form>
-      <form data-client-search>
-        <input class="search" name="q" value="${escapeHtml(search)}" placeholder="Поиск по имени, телефону или email">
+      <form class="client-search" data-client-search>
+        <label><span>Поиск</span><input name="q" value="${escapeHtml(search)}" placeholder="Фамилия, телефон или email"></label>
+        <button class="primary">Найти</button>
+        ${search ? `<a class="ghost pagination-link" href="/organizations/${ctx.org.id}/clients">Сбросить</a>` : ""}
       </form>
       <div class="entity-list">
-          ${rows(items, "Клиентов пока нет.", clientRow)}
+          ${rows(pageItems, "Клиентов пока нет.", clientRow)}
+      </div>
+      <div class="pagination">
+        <span>Страница ${escapeHtml(page)}</span>
+        <div>
+          ${page > 1 ? `<a class="ghost pagination-link" href="${pageUrl(page - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
+          ${hasNextPage ? `<a class="ghost pagination-link" href="${pageUrl(page + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
+        </div>
       </div>
       <div class="subpanel">
         <h3>Сервис сегментации</h3>
@@ -906,7 +952,10 @@ export function bindClients(root, ctx) {
     if (search) {
       event.preventDefault();
       const data = formData(search);
-      ctx.navigate(`/organizations/${ctx.org.id}/clients${data.q ? `?q=${encodeURIComponent(data.q)}` : ""}`);
+      const params = new URLSearchParams();
+      if (data.q) params.set("q", data.q);
+      const qs = params.toString();
+      ctx.navigate(`/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`);
       return;
     }
 
@@ -966,6 +1015,7 @@ export function bindClients(root, ctx) {
         state.bonusTransactionType = data.transaction_type || "accrual";
         const body = {
           client_id: state.selectedClient.id,
+          organization_id: ctx.org.id,
           bonus_type: data.bonus_type,
           amount: Number(data.amount || 0),
           reason: data.reason,

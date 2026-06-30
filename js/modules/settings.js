@@ -8,7 +8,8 @@ let cache = {};
 let selectedEventVisit = null;
 let departmentFilterBranchId = "";
 let workplaceFilterBranchId = "";
-let productItemFilterCategoryId = "";
+let productFilterCategoryId = "";
+let serviceFilterCategoryId = "";
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
   { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
@@ -309,6 +310,28 @@ function handleAchievementConditionClick(event, syncRoot = null) {
   return true;
 }
 
+function handleProductAmountClick(event, syncRoot = null) {
+  const addButton = event.target.closest("[data-add-product-amount]");
+  if (addButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const form = addButton.closest("form");
+    form?.querySelector("[data-product-amounts]")?.insertAdjacentHTML("beforeend", productItemActualAmountRow());
+    if (syncRoot) syncRequiredPanelForms(syncRoot);
+    return true;
+  }
+
+  const removeButton = event.target.closest("[data-remove-product-amount]");
+  if (!removeButton) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const container = removeButton.closest("[data-product-amounts]");
+  const rows = container ? [...container.querySelectorAll("[data-product-amount-row]")] : [];
+  if (rows.length > 1) removeButton.closest("[data-product-amount-row]")?.remove();
+  if (syncRoot) syncRequiredPanelForms(syncRoot);
+  return true;
+}
+
 function syncAchievementConditionValueField(control) {
   const row = control.closest("[data-achievement-condition-row]");
   if (!row) return;
@@ -336,6 +359,36 @@ function syncBranchAchievementSummary(control) {
     : "Не выбрано";
 }
 
+function syncServiceStaffSummary(control) {
+  const root = control.closest("[data-service-staff-select]");
+  if (!root) return;
+  const checked = [...root.querySelectorAll('input[name="staff_user_ids"]:checked')]
+    .map((input) => input.closest("label")?.textContent?.trim())
+    .filter(Boolean);
+  const summary = root.querySelector("[data-service-staff-summary]");
+  if (!summary) return;
+  summary.textContent = checked.length
+    ? checked.length > 2
+      ? `Выбрано: ${checked.length}`
+      : checked.join(", ")
+    : "Не выбрано";
+}
+
+function syncBranchProductItemSummary(control) {
+  const root = control.closest("[data-branch-product-item-select]");
+  if (!root) return;
+  const checked = [...root.querySelectorAll("input:checked")]
+    .map((input) => input.closest("label")?.textContent?.trim())
+    .filter(Boolean);
+  const summary = root.querySelector("[data-branch-product-item-summary]");
+  if (!summary) return;
+  summary.textContent = checked.length
+    ? checked.length > 2
+      ? `Выбрано: ${checked.length}`
+      : checked.join(", ")
+    : "Не выбрано";
+}
+
 function productItemDetails(item) {
   const category = (cache.categories || []).find((categoryItem) => String(categoryItem.id) === String(item.category_id));
   const categoryLabel = category ? `${category.name} (${categoryTypeLabel(category.type)})` : no;
@@ -355,19 +408,97 @@ function productItemStaffFields(item) {
   const selected = new Set((item.staff || []).map((staffItem) => String(staffItem.id)));
   const users = cache.users || [];
   if (!users.length) return "";
+  const selectedNames = users
+    .filter((user) => selected.has(String(user.id)))
+    .map((user) => userLabelById(user.id));
+  const summary = selectedNames.length
+    ? selectedNames.length > 2
+      ? `Выбрано: ${selectedNames.length}`
+      : selectedNames.join(", ")
+    : "Не выбрано";
   return `
-    <div class="permission-section modal-full">
-      <strong>Сотрудники, оказывающие услугу</strong>
-      <div class="permission-actions">
-        ${users.map((user) => `
-          <label class="checkbox">
-            <input type="checkbox" name="staff_user_ids" value="${escapeHtml(user.id)}" ${selected.has(String(user.id)) ? "checked" : ""}>
-            ${escapeHtml(userLabelById(user.id))}
-          </label>
-        `).join("")}
+    <div class="branch-multiselect modal-full" data-service-staff-select>
+      <span>Сотрудники, оказывающие услугу</span>
+      <details class="branch-multiselect-dropdown">
+        <summary><span data-service-staff-summary>${escapeHtml(summary)}</span></summary>
+        <div class="branch-multiselect-options">
+          ${users.map((user) => `
+            <label class="checkbox">
+              <input type="checkbox" name="staff_user_ids" value="${escapeHtml(user.id)}" ${selected.has(String(user.id)) ? "checked" : ""}>
+              ${escapeHtml(userLabelById(user.id))}
+            </label>
+          `).join("")}
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+function serviceStaffPayload(form) {
+  const formObject = form ? new FormData(form) : null;
+  return (formObject?.getAll("staff_user_ids") || []).map((userId) => ({
+    id: Number(userId),
+  }));
+}
+
+function serviceImagePath(item) {
+  return item.image_group?.images?.basic?.path || "";
+}
+
+function serviceImageGroupPayload(data) {
+  const path = optional(data.image_path);
+  if (!path) return null;
+  return {
+    entity: "settings_service",
+    images: {
+      basic: {
+        path,
+        version: "basic",
+      },
+    },
+  };
+}
+
+function productItemActualAmountRow(item = {}) {
+  return `
+    <div class="achievement-condition-row" data-product-amount-row>
+      <label><span>ID склада</span><input name="actual_amount_storage_id" type="number" step="1" min="0" value="${escapeHtml(item.storage_id ?? "")}"></label>
+      <label><span>Количество</span><input name="actual_amount_value" type="number" step="0.01" min="0" value="${escapeHtml(item.amount ?? "")}"></label>
+      <button type="button" class="ghost" data-remove-product-amount>Удалить</button>
+    </div>
+  `;
+}
+
+function productItemActualAmountsFields(items = []) {
+  const rows = items.length ? items : [{}];
+  return `
+    <div class="achievement-builder modal-full">
+      <div class="achievement-builder-head">
+        <b>Остатки по складам</b>
+        <button type="button" class="ghost" data-add-product-amount>Добавить остаток</button>
+      </div>
+      <div class="achievement-conditions" data-product-amounts>
+        ${rows.map((item) => productItemActualAmountRow(item)).join("")}
       </div>
     </div>
   `;
+}
+
+function parseActualAmounts(form) {
+  if (!form) return null;
+  const formObject = new FormData(form);
+  const storageIds = formObject.getAll("actual_amount_storage_id");
+  const amounts = formObject.getAll("actual_amount_value");
+  const result = storageIds
+    .map((storageId, index) => ({
+      storage_id: numberOrNull(storageId),
+      amount: numberOrNull(amounts[index]),
+    }))
+    .filter((item) => item.storage_id !== null || item.amount !== null);
+  if (result.some((item) => item.storage_id === null || item.amount === null)) {
+    throw new Error("Для каждого остатка заполните и склад, и количество.");
+  }
+  return result.length ? result : null;
 }
 
 function branchProductItemFields(branch) {
@@ -375,11 +506,38 @@ function branchProductItemFields(branch) {
   const productItems = cache.productItems || [];
   const services = productItems.filter((item) => categoryTypeById(item.category_id) === "service");
   const products = productItems.filter((item) => categoryTypeById(item.category_id) === "product");
-  const selectedServiceId = services.find((item) => selected.has(String(item.id)))?.id || "";
-  const selectedProductId = products.find((item) => selected.has(String(item.id)))?.id || "";
+  const serviceSummary = productItemSelectSummary(services, selected);
+  const productSummary = productItemSelectSummary(products, selected);
   return `
-    ${selectField("Услуги", "branch_service_item_id", services.map((item) => ({ id: item.id, name: item.title })), selectedServiceId, "Не выбрано")}
-    ${selectField("Товары", "branch_product_item_id", products.map((item) => ({ id: item.id, name: item.title })), selectedProductId, "Не выбрано")}
+    ${branchProductItemSelect("Услуги", "branch_service_item_ids", services, selected, serviceSummary)}
+    ${branchProductItemSelect("Товары", "branch_product_item_ids", products, selected, productSummary)}
+  `;
+}
+
+function productItemSelectSummary(items, selected) {
+  const selectedNames = items
+    .filter((item) => selected.has(String(item.id)))
+    .map((item) => item.title);
+  if (!selectedNames.length) return "Не выбрано";
+  return selectedNames.length > 2 ? `Выбрано: ${selectedNames.length}` : selectedNames.join(", ");
+}
+
+function branchProductItemSelect(label, name, items, selected, summary) {
+  return `
+    <div class="branch-multiselect modal-full" data-branch-product-item-select>
+      <span>${escapeHtml(label)}</span>
+      <details class="branch-multiselect-dropdown">
+        <summary><span data-branch-product-item-summary>${escapeHtml(summary)}</span></summary>
+        <div class="branch-multiselect-options">
+          ${items.length ? items.map((item) => `
+            <label class="checkbox">
+              <input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(item.id)}" ${selected.has(String(item.id)) ? "checked" : ""}>
+              ${escapeHtml(item.title)}
+            </label>
+          `).join("") : `<p class="empty">Нет доступных вариантов</p>`}
+        </div>
+      </details>
+    </div>
   `;
 }
 
@@ -416,24 +574,31 @@ function branchAchievementFields(branch) {
 function productItemExtraFields(item) {
   const category = productItemCategory(item);
   if (category?.type === "service") return `
+    <label><span>ID услуги организации</span><input name="salon_service_id" type="number" step="1" min="0" value="${escapeHtml(item.salon_service_id ?? "")}"></label>
     <label><span>Мин. цена</span><input name="price_min" type="number" step="0.01" min="0" value="${escapeHtml(item.price_min ?? "")}"></label>
     <label><span>Макс. цена</span><input name="price_max" type="number" step="0.01" min="0" value="${escapeHtml(item.price_max ?? "")}"></label>
     <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
     <label><span>Длительность, сек</span><input name="seance_length" type="number" step="1" min="0" value="${escapeHtml(item.seance_length ?? "")}"></label>
     <label><span>Вес сортировки</span><input name="weight" type="number" step="1" value="${escapeHtml(item.weight ?? "")}"></label>
     <label><span>Внешний ID</span><input name="api_id" value="${escapeHtml(item.api_id || "")}"></label>
+    <label class="modal-full"><span>URL изображения</span><input name="image_path" type="url" value="${escapeHtml(serviceImagePath(item))}"></label>
     ${productItemStaffFields(item)}
     <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
   `;
   if (category?.type === "product") return `
+    <label><span>ID товара</span><input name="good_id" type="number" step="1" min="0" value="${escapeHtml(item.good_id ?? "")}"></label>
     <label><span>Штрих-код</span><input name="barcode" value="${escapeHtml(item.barcode || "")}"></label>
+    <label><span>ID ед. продажи</span><input name="unit_id" type="number" step="1" min="0" value="${escapeHtml(item.unit_id ?? "")}"></label>
     <label><span>Единица измерения</span><select name="unit_short_title">
       <option value="">Не выбрано</option>
       <option value="шт" ${item.unit_short_title === "шт" ? "selected" : ""}>шт</option>
       <option value="гр" ${item.unit_short_title === "гр" ? "selected" : ""}>гр</option>
     </select></label>
+    <label><span>ID ед. списания</span><input name="service_unit_id" type="number" step="1" min="0" value="${escapeHtml(item.service_unit_id ?? "")}"></label>
     <label><span>Себестоимость</span><input name="actual_cost" type="number" step="0.01" min="0" value="${escapeHtml(item.actual_cost ?? "")}"></label>
+    <label><span>Себестоимость единицы</span><input name="unit_actual_cost" type="number" step="0.01" min="0" value="${escapeHtml(item.unit_actual_cost ?? "")}"></label>
     <label><span>Соотношение ед.</span><input name="unit_equals" type="number" step="0.01" min="0" value="${escapeHtml(item.unit_equals ?? "")}"></label>
+    ${productItemActualAmountsFields(item.actual_amounts || [])}
     <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
   `;
   return `
@@ -895,12 +1060,28 @@ function workplaceFilterOptions(branches, selected = "") {
   `;
 }
 
-function productItemCategoryFilterOptions(categories, selected = "") {
+function productItemCategoryFilterOptions(categories, selected = "", attr = "data-product-item-filter-category") {
   return `
-    <label><span>Фильтр по категории</span><select data-product-item-filter-category>
+    <label><span>Фильтр по категории</span><select ${attr}>
       <option value="" ${!selected ? "selected" : ""}>Все</option>
       ${categories.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selected) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)} (${escapeHtml(categoryTypeLabel(item.type))})</option>`).join("")}
     </select></label>
+  `;
+}
+
+function productItemCreateForm(categories, title) {
+  return `
+    <form class="inline-form compact" data-product-item-create data-permission="settings.items.create">
+      ${selectField("Категория", "category_id", categories.map((category) => ({ id: category.id, name: category.name })), "", "Выберите категорию")}
+      <label><span>Название</span><input name="title" required></label>
+      <label><span>Цена</span><input name="price" type="number" step="0.01" min="0"></label>
+      <label><span>Активен</span><select name="active">
+        <option value="true">Да</option>
+        <option value="false">Нет</option>
+      </select></label>
+      <button class="primary" disabled>Добавить ${escapeHtml(title)}</button>
+      <p data-message></p>
+    </form>
   `;
 }
 
@@ -954,7 +1135,15 @@ function modalFields(type, item) {
     </select></label>
   `;
   if (type === "productItem") return `
-    ${selectField("Категория", "category_id", cache.categories.map((category) => ({ id: category.id, name: `${category.name} (${categoryTypeLabel(category.type)})` })), item.category_id, "Выберите категорию")}
+    ${selectField(
+      "Категория",
+      "category_id",
+      cache.categories
+        .filter((category) => category.type === productItemCategory(item)?.type)
+        .map((category) => ({ id: category.id, name: category.name })),
+      item.category_id,
+      "Выберите категорию",
+    )}
     <label><span>Название</span><input name="title" value="${escapeHtml(item.title)}" required></label>
     <label><span>Цена</span><input name="price" type="number" step="0.01" min="0" value="${escapeHtml(item.price ?? "")}"></label>
     ${productItemExtraFields(item)}
@@ -1062,6 +1251,7 @@ function openEntityModal(type, item) {
     branchMembership: "Доступ к филиалу",
   };
   const modalTitle = item.name
+    || item.title
     || item.module_name
     || [item.last_name, item.first_name, item.middle_name].filter(Boolean).join(" ")
     || item.email
@@ -1108,20 +1298,26 @@ async function saveEntity(type, id, data, form = null) {
       category_id: Number(data.category_id),
       title: data.title,
       price: numberOrNull(data.price),
+      salon_service_id: categoryType === "service" ? numberOrNull(data.salon_service_id) : null,
       price_min: categoryType === "service" ? numberOrNull(data.price_min) : null,
       price_max: categoryType === "service" ? numberOrNull(data.price_max) : null,
       discount: categoryType === "service" ? numberOrNull(data.discount) : null,
       comment: optional(data.comment),
       weight: categoryType === "service" ? numberOrNull(data.weight) : null,
       api_id: categoryType === "service" ? optional(data.api_id) : null,
+      good_id: categoryType === "product" ? numberOrNull(data.good_id) : null,
       barcode: categoryType === "product" ? optional(data.barcode) : null,
+      unit_id: categoryType === "product" ? numberOrNull(data.unit_id) : null,
       unit_short_title: categoryType === "product" ? optional(data.unit_short_title) : null,
+      service_unit_id: categoryType === "product" ? numberOrNull(data.service_unit_id) : null,
       service_unit_short_title: categoryType === "product" ? optional(data.unit_short_title) : null,
       actual_cost: categoryType === "product" ? numberOrNull(data.actual_cost) : null,
       unit_actual_cost: categoryType === "product" ? numberOrNull(data.unit_actual_cost) : null,
       unit_equals: categoryType === "product" ? numberOrNull(data.unit_equals) : null,
+      actual_amounts: categoryType === "product" ? parseActualAmounts(form) : null,
       seance_length: categoryType === "service" ? numberOrNull(data.seance_length) : null,
-      staff: categoryType === "service" ? (data.staff_user_ids || []).map((userId) => ({ id: Number(userId) })) : null,
+      staff: categoryType === "service" ? serviceStaffPayload(form) : null,
+      image_group: categoryType === "service" ? serviceImageGroupPayload(data) : null,
       active: data.active === "true",
     });
   }
@@ -1241,7 +1437,7 @@ export async function settings(ctx) {
     api.brands(ctx.org.id).catch(() => []),
     api.legalEntities(ctx.org.id).catch(() => []),
     (api.productCategories?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
-    (api.productItems?.(ctx.org.id, productItemFilterCategoryId) || Promise.resolve([])).catch(() => []),
+    (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
     (api.achievements?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
@@ -1276,6 +1472,14 @@ export async function settings(ctx) {
     : workplaces;
 
   cache = { organizationId: ctx.org.id, branches, brands, legalEntities, categories, productItems, achievements, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, events };
+  const productCategories = categories.filter((category) => category.type === "product");
+  const serviceCategories = categories.filter((category) => category.type === "service");
+  const products = productItems
+    .filter((item) => categoryTypeById(item.category_id) === "product")
+    .filter((item) => !productFilterCategoryId || String(item.category_id) === String(productFilterCategoryId));
+  const services = productItems
+    .filter((item) => categoryTypeById(item.category_id) === "service")
+    .filter((item) => !serviceFilterCategoryId || String(item.category_id) === String(serviceFilterCategoryId));
 
   return `
     <section class="panel" data-settings>
@@ -1328,25 +1532,27 @@ export async function settings(ctx) {
       </div>
 
       <div id="product-items" data-permission="settings.items.view">
-        ${section("Товары и услуги", `
-          <form class="inline-form compact" data-product-item-create data-permission="settings.items.create">
-            ${selectField("Категория", "category_id", categories.map((category) => ({ id: category.id, name: `${category.name} (${categoryTypeLabel(category.type)})` })), "", "Выберите категорию")}
-            <label><span>Название</span><input name="title" required></label>
-            <label><span>Цена</span><input name="price" type="number" step="0.01" min="0"></label>
-            <label><span>Активен</span><select name="active">
-              <option value="true">Да</option>
-              <option value="false">Нет</option>
-            </select></label>
-            <button class="primary" disabled>Добавить товар или услугу</button>
-            <p data-message></p>
-          </form>
+        ${section("Товары", `
+          ${productItemCreateForm(productCategories, "товар")}
           <form class="inline-form compact">
-            ${productItemCategoryFilterOptions(categories, productItemFilterCategoryId)}
+            ${productItemCategoryFilterOptions(productCategories, productFilterCategoryId, "data-product-filter-category")}
           </form>
-          ${entityList(productItems, "Товаров и услуг пока нет", "productItem", (item) => item.title, productItemDetails, {
+          ${entityList(products, "Товаров пока нет", "productItem", (item) => item.title, productItemDetails, {
             deleteLabel: "Удалить",
           })}
-        `, "Товары и услуги привязаны к категориям организации.")}
+        `, "Товары привязаны к товарным категориям организации.")}
+      </div>
+
+      <div id="service-items" data-permission="settings.items.view">
+        ${section("Услуги", `
+          ${productItemCreateForm(serviceCategories, "услугу")}
+          <form class="inline-form compact">
+            ${productItemCategoryFilterOptions(serviceCategories, serviceFilterCategoryId, "data-service-filter-category")}
+          </form>
+          ${entityList(services, "Услуг пока нет", "productItem", (item) => item.title, productItemDetails, {
+            deleteLabel: "Удалить",
+          })}
+        `, "Услуги привязаны к категориям услуг организации.")}
       </div>
 
       <div id="achievements" data-permission="settings.achievements.view">
@@ -1532,8 +1738,13 @@ export function bindSettings(root, ctx) {
       ctx.reload();
       return;
     }
-    if (event.target.matches("[data-product-item-filter-category]")) {
-      productItemFilterCategoryId = event.target.value || "";
+    if (event.target.matches("[data-product-filter-category]")) {
+      productFilterCategoryId = event.target.value || "";
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-service-filter-category]")) {
+      serviceFilterCategoryId = event.target.value || "";
       ctx.reload();
       return;
     }
@@ -1695,6 +1906,7 @@ export function bindSettings(root, ctx) {
 
   root.addEventListener("click", async (event) => {
     if (handleAchievementConditionClick(event, root)) return;
+    if (handleProductAmountClick(event, root)) return;
 
     const openVisitButton = event.target.closest("[data-open-event-visit]");
     if (openVisitButton) {
@@ -1744,6 +1956,7 @@ export function bindSettings(root, ctx) {
 
   document.addEventListener("click", (event) => {
     if (handleAchievementConditionClick(event)) return;
+    if (handleProductAmountClick(event)) return;
 
     const closeButton = event.target.closest("[data-close-modal]");
     if (closeButton) {
@@ -1759,6 +1972,16 @@ export function bindSettings(root, ctx) {
     }
     if (!event.target.closest("[data-branch-achievement-select]")) {
       document.querySelectorAll("[data-branch-achievement-select] details[open]").forEach((item) => {
+        item.removeAttribute("open");
+      });
+    }
+    if (!event.target.closest("[data-service-staff-select]")) {
+      document.querySelectorAll("[data-service-staff-select] details[open]").forEach((item) => {
+        item.removeAttribute("open");
+      });
+    }
+    if (!event.target.closest("[data-branch-product-item-select]")) {
+      document.querySelectorAll("[data-branch-product-item-select] details[open]").forEach((item) => {
         item.removeAttribute("open");
       });
     }
@@ -1782,9 +2005,11 @@ export function bindSettings(root, ctx) {
       }
       if (form.dataset.type === "branch") {
         payload.product_item_ids = [
-          numberOrNull(payload.branch_service_item_id),
-          numberOrNull(payload.branch_product_item_id),
-        ].filter((id) => id !== null);
+          ...new FormData(form).getAll("branch_service_item_ids"),
+          ...new FormData(form).getAll("branch_product_item_ids"),
+        ]
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id));
         payload.achievement_ids = new FormData(form)
           .getAll("branch_achievement_ids")
           .map((id) => Number(id))
@@ -1807,6 +2032,12 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.matches('[name="branch_achievement_ids"]')) {
       syncBranchAchievementSummary(event.target);
+    }
+    if (event.target.matches('[name="staff_user_ids"]')) {
+      syncServiceStaffSummary(event.target);
+    }
+    if (event.target.matches('[name="branch_service_item_ids"], [name="branch_product_item_ids"]')) {
+      syncBranchProductItemSummary(event.target);
     }
   });
 }

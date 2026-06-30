@@ -1,8 +1,9 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, rows, setMessage } from "../dom.js";
 
+const CLIENTS_PAGE_SIZE = 10;
+
 const loyaltyState = {
-  clientQuery: "",
   selectedClientId: null,
   levelParams: "",
   bonusTransactionType: "accrual",
@@ -598,13 +599,40 @@ function clientOptions(clients, selectedClient) {
   ];
 }
 
+function loyaltyClientFilters() {
+  const params = new URLSearchParams(location.search);
+  const query = params.get("q") || "";
+  const requestedPage = Number(params.get("page") || 1);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
+  const offset = (page - 1) * CLIENTS_PAGE_SIZE;
+  return { query, page, offset };
+}
+
+function loyaltyPageUrl(orgId, tab, filters, nextPage) {
+  const params = new URLSearchParams();
+  if (filters.query) params.set("q", filters.query);
+  if (nextPage > 1) params.set("page", nextPage);
+  const qs = params.toString();
+  return `/organizations/${orgId}/loyalty/${tab}${qs ? `?${qs}` : ""}`;
+}
+
 async function loadClientContext(orgId) {
-  const clients = await api.clients(orgId, loyaltyState.clientQuery).catch(() => []);
-  const selectedClient = clients.find((item) => String(item.id) === String(loyaltyState.selectedClientId)) || null;
+  const filters = loyaltyClientFilters();
+  const items = await api.clients(orgId, {
+    query: filters.query,
+    offset: filters.offset,
+    limit: CLIENTS_PAGE_SIZE + 1,
+  }).catch(() => []);
+  const clients = items.slice(0, CLIENTS_PAGE_SIZE);
+  const hasNextPage = items.length > CLIENTS_PAGE_SIZE;
+  let selectedClient = clients.find((item) => String(item.id) === String(loyaltyState.selectedClientId)) || null;
+  if (!selectedClient && loyaltyState.selectedClientId) {
+    selectedClient = await api.clientProfile(loyaltyState.selectedClientId, orgId).catch(() => null);
+  }
   const rules = await api.rules(orgId).catch(() => []);
   const levels = await api.bonusLevels(orgId).catch(() => []);
   const bonusTypes = await api.bonusTypes(orgId).catch(() => []);
-  const result = { clients, selectedClient, rules, levels, bonusTypes };
+  const result = { clients, selectedClient, rules, levels, bonusTypes, filters, hasNextPage };
 
   if (!selectedClient) {
     const [history, subscriptions, certificates, referralSources, promotions] = await Promise.all([
@@ -626,7 +654,7 @@ async function loadClientContext(orgId) {
     };
   }
 
-  const [balance, history, subscriptions, certificates, referralStats, referrals, promotions] = await Promise.all([
+  const [balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric] = await Promise.all([
     api.bonusBalance(selectedClient.id).catch(() => null),
     api.bonusHistory(selectedClient.id).catch(() => []),
     api.subscriptions(selectedClient.id).catch(() => []),
@@ -634,17 +662,20 @@ async function loadClientContext(orgId) {
     api.referralStats(selectedClient.id).catch(() => null),
     api.referralSources().catch(() => []),
     api.promotions(selectedClient.id).catch(() => []),
+    api.clientProfileMetric(selectedClient.id).catch(() => selectedClient.metrics || null),
   ]);
 
-  return { ...result, balance, history, subscriptions, certificates, referralStats, referrals, promotions };
+  return { ...result, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric };
 }
 
-function clientSelector(clients, selectedClient) {
+function clientSelector(orgId, tab, clients, selectedClient, filters, hasNextPage) {
   return `
     <div class="subpanel">
       ${titleWithHint("Клиент для программы лояльности", L.clientSelectorHint)}
-      <form data-loyalty-client-search>
-        <input class="search" name="q" value="${escapeHtml(loyaltyState.clientQuery)}" placeholder="Поиск клиента по имени, телефону или email">
+      <form class="client-search" data-loyalty-client-search>
+        <label><span>Поиск</span><input name="q" value="${escapeHtml(filters.query)}" placeholder="Фамилия, телефон или email"></label>
+        <button class="primary">Найти</button>
+        ${filters.query ? `<a class="ghost pagination-link" href="${loyaltyPageUrl(orgId, tab, { query: "" }, 1)}">Сбросить</a>` : ""}
       </form>
       <div class="entity-list">
         ${clients.length ? clients.map((client) => `
@@ -653,6 +684,13 @@ function clientSelector(clients, selectedClient) {
             <span>${escapeHtml(client.primary_phone || client.email || "Без контакта")}</span>
           </button>
         `).join("") : `<p class="empty">Клиенты не найдены.</p>`}
+      </div>
+      <div class="pagination">
+        <span>Страница ${escapeHtml(filters.page)}</span>
+        <div>
+          ${filters.page > 1 ? `<a class="ghost pagination-link" href="${loyaltyPageUrl(orgId, tab, filters, filters.page - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
+          ${hasNextPage ? `<a class="ghost pagination-link" href="${loyaltyPageUrl(orgId, tab, filters, filters.page + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
+        </div>
       </div>
     </div>
   `;
@@ -665,26 +703,27 @@ function rulesSection(ctx, rules, selectedClient, bonusTypes, levels) {
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${select(L.type, "rule_type", Object.entries(ruleTypes).map(([value, label]) => ({ value, label })), "service")}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${field(L.amount, "amount", "0", 'type="number"')}${field(L.termDays, "expires_in_days", "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(levels, loyaltyState.ruleExtras.client_level), loyaltyState.ruleExtras.client_level)}${field(L.levelParams, "level_params", loyaltyState.ruleExtras.level_params, 'placeholder="10"')}<button class="primary" disabled>${L.createRule}</button><p data-message></p></form>` : ""}
       <table><tbody>${rows(bonusRules, L.rulesEmpty, (item) => `<tr><td>${editButton("rule", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`)}</tbody></table>
     </div>
-    ${transitionRulesSection(ctx, rules, levels)}`;
+    ${transitionRulesSection(ctx, rules, levels, selectedClient)}`;
 }
 
 function isTransitionRule(item) {
   return item?.rule_type === "level_transition" || item?.target_type === "level_transition" || item?.usage_restrictions?.transition_rule === true;
 }
 
-function transitionRulesSection(ctx, rules, levels) {
+function transitionRulesSection(ctx, rules, levels, selectedClient) {
   const transitionRules = (rules || []).filter(isTransitionRule);
   return `
     <div class="subpanel">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-transition-rule-create>
-        ${field("Прибыль от клиента больше", "profit_threshold", "0", 'type="number" step="0.01" min="0"')}
-        ${select("Перейти на уровень", "client_level", levelOptions(levels), "")}
+        ${field("Сумма покупок клиента больше", "purchase_threshold", "0", 'type="number" step="0.01" min="0"')}
+        <input type="hidden" name="client_level" value="">
         <button class="primary" disabled>Создать правило</button>
         <p data-message></p>
       </form>` : ""}
       <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
-        const threshold = item.usage_restrictions?.profit_amount_gt ?? item.usage_restrictions?.conditions?.[0]?.value ?? "";
-        return `<tr><td>${escapeHtml(`Прибыль от клиента > ${threshold}`)}</td><td>${escapeHtml(item.client_level || L.notSet)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
+        const threshold = item.usage_restrictions?.purchase_amount_gt ?? item.usage_restrictions?.profit_amount_gt ?? item.usage_restrictions?.conditions?.[0]?.value ?? "";
+        const apply = selectedClient ? `<button type="button" class="ghost" data-apply-rule="${escapeHtml(item.id)}" data-transition-rule="1">${L.apply}</button>` : "";
+        return `<tr><td>${escapeHtml(`Сумма покупок > ${threshold}`)}</td><td>Следующий уровень</td><td class="actions">${apply}${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
       })}</tbody></table>
     </div>`;
 }
@@ -773,11 +812,12 @@ export async function loyalty(ctx, tab = "rules") {
   const visibleTabs = loyaltyTabs.filter(([key]) => !ctx.can || ctx.can(permissions[key]));
   const activeTab = visibleTabs.some(([key]) => key === tab) ? tab : (visibleTabs[0]?.[0] || "rules");
   const data = await loadClientContext(ctx.org.id);
-  const { clients, selectedClient, rules, levels, bonusTypes, balance, history, subscriptions, certificates, referralStats, referrals, promotions } = data;
+  const { clients, selectedClient, rules, levels, bonusTypes, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric, filters, hasNextPage } = data;
   loyaltyState.clients = clients;
   loyaltyState.bonusTypes = bonusTypes;
   loyaltyState.levels = levels;
   loyaltyState.referrals = referrals;
+  loyaltyState.selectedClientMetric = metric;
 
   let body = "";
   if (activeTab === "rules") body = rulesSection(ctx, rules, selectedClient, bonusTypes, levels);
@@ -796,7 +836,7 @@ export async function loyalty(ctx, tab = "rules") {
           ? `<span class="tab-disabled">${escapeHtml(title)}</span>`
           : `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
       </nav>
-      ${clientSelector(clients, selectedClient)}
+      ${clientSelector(ctx.org.id, activeTab, clients, selectedClient, filters, hasNextPage)}
       ${selectedClientBanner(selectedClient)}
       ${body}
     </section>
@@ -869,7 +909,10 @@ export function bindLoyalty(root, ctx) {
 
     try {
       if (form.matches("[data-loyalty-client-search]")) {
-        loyaltyState.clientQuery = data.q || "";
+        const tab = location.pathname.split("/").filter(Boolean)[3] || "rules";
+        const params = new URLSearchParams();
+        if (data.q) params.set("q", data.q);
+        history.pushState(null, "", `/organizations/${ctx.org.id}/loyalty/${tab}${params.toString() ? `?${params}` : ""}`);
         ctx.reload();
         return;
       }
@@ -916,7 +959,7 @@ export function bindLoyalty(root, ctx) {
       } else if (form.matches("[data-loyalty-transition-rule-create]")) {
         await api.createRule({
           organization_id: ctx.org.id,
-          name: `Переход на уровень: ${data.client_level}`,
+          name: "Переход на следующий уровень",
           rule_type: "service",
           bonus_type: "cashback",
           amount: 0,
@@ -925,12 +968,12 @@ export function bindLoyalty(root, ctx) {
           client_level: optional(data.client_level),
           usage_restrictions: {
             transition_rule: true,
-            profit_amount_gt: Number(data.profit_threshold || 0),
+            purchase_amount_gt: Number(data.purchase_threshold || 0),
             conditions: [
               {
-                field: "profit_amount",
+                field: "purchase_amount",
                 operator: "gt",
-                value: Number(data.profit_threshold || 0),
+                value: Number(data.purchase_threshold || 0),
               },
             ],
           },
@@ -1102,7 +1145,14 @@ export function bindLoyalty(root, ctx) {
 
       const applyRuleButton = event.target.closest("[data-apply-rule]");
       if (applyRuleButton && loyaltyState.selectedClientId) {
-        await api.applyRule(Number(applyRuleButton.dataset.applyRule), loyaltyState.selectedClientId, ctx.org.id);
+        const metric = loyaltyState.selectedClientMetric || {};
+        const purchaseAmount = Math.max(
+          Number(metric.sold_amount || 0),
+          Number(metric.ltv || 0),
+          Number(metric.paid_amount || 0),
+        );
+        const extra = purchaseAmount > 0 ? { purchase_amount: purchaseAmount } : {};
+        await api.applyRule(Number(applyRuleButton.dataset.applyRule), loyaltyState.selectedClientId, ctx.org.id, extra);
         ctx.reload();
         return;
       }

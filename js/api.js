@@ -87,7 +87,7 @@ export const api = {
   updateProductCategory: (id, body) => request(`/organizations/product-categories/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteProductCategory: (id) => request(`/organizations/product-categories/${id}`, { method: "DELETE" }),
 
-  productItems: (orgId, categoryId = "") => request(`/organizations/${orgId}/product-items${categoryId ? `?category_id=${categoryId}` : ""}`),
+  productItems: (orgId, categoryId = "") => request(`/organizations/${orgId}/product-items?limit=500${categoryId ? `&category_id=${categoryId}` : ""}`),
   createProductItem: (body) => request("/organizations/product-items", { method: "POST", body: JSON.stringify(body) }),
   updateProductItem: (id, body) => request(`/organizations/product-items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteProductItem: (id) => request(`/organizations/product-items/${id}`, { method: "DELETE" }),
@@ -143,9 +143,16 @@ export const api = {
   auditLogs: (orgId) => request(`/audit${orgId ? `?organization_id=${orgId}` : ""}`),
   events: (orgId) => request(`/events${orgId ? `?organization_id=${orgId}` : ""}`),
 
-  clients: (orgId, search = "") => {
-    const qs = search ? `?search=${encodeURIComponent(search)}` : "";
-    return request(`/crm-api/clients/organizations/${orgId}/clients${qs}`);
+  clients: (orgId, filters = {}) => {
+    const params = new URLSearchParams({ organization_id: orgId });
+    if (typeof filters === "string") {
+      if (filters) params.set("query", filters);
+    } else {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== "" && value !== undefined && value !== null) params.set(key, value);
+      });
+    }
+    return request(`/crm-api/clients-core/clients/search?${params}`);
   },
   createClient: (body) => request("/crm-api/clients", { method: "POST", body: JSON.stringify(body) }),
   updateClient: (id, body) => request(`/crm-api/clients-core/clients/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -171,7 +178,7 @@ export const api = {
   createRule: (body) => request("/loyalty-api/client-bonuses/rules", { method: "POST", body: JSON.stringify(body) }),
   updateRule: (id, body) => request(`/loyalty-api/client-bonuses/rules/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteRule: (id) => request(`/loyalty-api/client-bonuses/rules/${id}`, { method: "DELETE" }),
-  applyRule: (ruleId, clientId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply`, { method: "POST", body: JSON.stringify({ client_id: clientId, organization_id: organizationId }) }),
+  applyRule: (ruleId, clientId, organizationId, extra = {}) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply`, { method: "POST", body: JSON.stringify({ client_id: clientId, organization_id: organizationId, ...extra }) }),
   bonusLevels: (orgId) => request(`/loyalty-api/organizations/${orgId}/bonus-levels`),
   createBonusLevel: (body) => request("/loyalty-api/client-bonuses/levels", { method: "POST", body: JSON.stringify(body) }),
   updateBonusLevel: (id, body) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
