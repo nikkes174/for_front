@@ -1,7 +1,8 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
 
-const CLIENTS_PAGE_SIZE = 10;
+const CLIENTS_PAGE_SIZE_OPTIONS = [10, 20, 50];
+const DEFAULT_CLIENTS_PAGE_SIZE = 10;
 
 let state = {
   clients: [],
@@ -50,15 +51,112 @@ function statusLabel(status) {
   return "Статус не указан";
 }
 
-function clientRow(item) {
+function clientFullName(client) {
+  return [
+    [client.first_name, client.middle_name].filter(Boolean).join(" "),
+    client.last_name,
+  ].filter(Boolean).join(" ") || name(client);
+}
+
+function clientLastVisitAt(client) {
+  return client.last_visit_at
+    || client.last_visit
+    || client.last_visit_date
+    || client.metric?.last_visit_at
+    || client.profile?.metrics?.last_visit_at
+    || "";
+}
+
+function parseDateValue(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function birthdayDistance(value) {
+  const parsed = parseDateValue(value);
+  if (!parsed) return Number.POSITIVE_INFINITY;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const birthday = new Date(currentYear, parsed.getMonth(), parsed.getDate());
+  if (birthday < new Date(currentYear, today.getMonth(), today.getDate())) {
+    birthday.setFullYear(currentYear + 1);
+  }
+  return Math.abs(birthday.getTime() - today.getTime());
+}
+
+function dateDistance(value) {
+  const parsed = parseDateValue(value);
+  return parsed ? Math.abs(parsed.getTime() - Date.now()) : Number.POSITIVE_INFINITY;
+}
+
+function clientSortValue(client, sort) {
+  if (sort === "name") return String(client.last_name || client.full_name || name(client)).toLocaleLowerCase("ru-RU");
+  if (sort === "birth_date") return birthdayDistance(client.birth_date);
+  if (sort === "status") return statusLabel(client.status);
+  if (sort === "last_visit") return dateDistance(clientLastVisitAt(client));
+  return 0;
+}
+
+function sortClients(items, sort, direction) {
+  const multiplier = direction === "desc" ? -1 : 1;
+  return [...items].sort((left, right) => {
+    const leftValue = clientSortValue(left, sort);
+    const rightValue = clientSortValue(right, sort);
+    if (typeof leftValue === "number" && typeof rightValue === "number") {
+      return (leftValue - rightValue) * multiplier;
+    }
+    return String(leftValue).localeCompare(String(rightValue), "ru-RU") * multiplier;
+  });
+}
+
+function clientSortUrl(ctx, search, pageSize, sort, currentSort, currentDirection) {
+  const params = new URLSearchParams();
+  if (search) params.set("q", search);
+  params.set("sort", sort);
+  params.set("dir", currentSort === sort && currentDirection === "asc" ? "desc" : "asc");
+  if (pageSize !== DEFAULT_CLIENTS_PAGE_SIZE) params.set("page_size", pageSize);
+  const qs = params.toString();
+  return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
+}
+
+function clientTableHeader(ctx, search, pageSize, sort, direction, key, label) {
+  const marker = sort === key ? (direction === "asc" ? " ↑" : " ↓") : "";
+  return `<a class="pagination-link" href="${clientSortUrl(ctx, search, pageSize, key, sort, direction)}">${escapeHtml(label + marker)}</a>`;
+}
+
+function clientTable(items, ctx, search, pageSize, sort, direction) {
   return `
-    <div style="display:flex; gap:8px; align-items:stretch;">
-      <button type="button" class="entity-card" data-open-client="${escapeHtml(item.id)}" style="flex:1; min-width:0;">
-        <b>${escapeHtml(name(item))}</b>
-        <span>${escapeHtml(statusLabel(item.status))} В· ${escapeHtml(date(item.created_at))}</span>
-      </button>
-      <button type="button" class="ghost" data-delete-client="${escapeHtml(item.id)}">Удалить</button>
-    </div>
+    <table>
+      <thead><tr>
+        <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "name", "Имя Отчество Фамилия")}</th>
+        <th>Телефон</th>
+        <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "birth_date", "Дата рождения")}</th>
+        <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "status", "Статус")}</th>
+        <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "last_visit", "Дата последнего визита")}</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${rows(items, "Клиентов пока нет.", (item) => `
+          <tr>
+            <td><button type="button" class="ghost" data-open-client="${escapeHtml(item.id)}">${escapeHtml(clientFullName(item))}</button></td>
+            <td>${escapeHtml(item.primary_phone || no)}</td>
+            <td>${escapeHtml(date(item.birth_date) || no)}</td>
+            <td>${escapeHtml(statusLabel(item.status))}</td>
+            <td>${escapeHtml(date(clientLastVisitAt(item)) || no)}</td>
+            <td><button type="button" class="ghost" data-delete-client="${escapeHtml(item.id)}">Удалить</button></td>
+          </tr>
+        `)}
+      </tbody>
+    </table>
+  `;
+}
+
+function clientPageSizeControl(pageSize) {
+  return `
+    <label><span>Отображать клиентов</span><select data-client-page-size>
+      ${CLIENTS_PAGE_SIZE_OPTIONS.map((size) => `<option value="${size}" ${pageSize === size ? "selected" : ""}>${size}</option>`).join("")}
+    </select></label>
   `;
 }
 
@@ -353,9 +451,7 @@ function calculatePaidAmount(totalCost, discountAmount, discountType = "amount")
   return String(Math.max(total - resolvedDiscount, 0));
 }
 
-function masterOptions(branchId = "", workplaceId = "") {
-  const workplace = state.workplaces.find((item) => String(item.id) === String(workplaceId));
-  const departmentId = workplace?.department_id ? String(workplace.department_id) : "";
+function masterOptions(branchId = "", departmentId = "", workplaceId = "") {
   const masterRoleIds = new Set(
     state.roles
       .filter((item) => {
@@ -372,7 +468,8 @@ function masterOptions(branchId = "", workplaceId = "") {
   const branchUserIds = new Set(
     state.branchMemberships
       .filter((item) => !branchId || String(item.branch_id) === String(branchId))
-      .filter((item) => !departmentId || !item.department_id || String(item.department_id) === departmentId)
+      .filter((item) => !departmentId || String(item.department_id) === String(departmentId))
+      .filter((item) => !workplaceId || String(item.workplace_id) === String(workplaceId))
       .filter((item) => !masterRoleIds.size || masterRoleIds.has(String(item.role_id)))
       .map((item) => String(item.user_id)),
   );
@@ -387,8 +484,6 @@ function validateVisitData(data) {
   const errors = {};
   if (!String(data.visit_at || "").trim()) errors.visit_at = "Заполните дату и время.";
   if (!String(data.branch_id || "").trim()) errors.branch_id = "Выберите филиал.";
-  if (!String(data.department_id || "").trim()) errors.department_id = "Выберите подразделение.";
-  if (!String(data.workplace_id || "").trim()) errors.workplace_id = "Выберите рабочее место.";
   if (!String(data.employee_id || "").trim()) errors.employee_id = "Выберите сотрудника.";
   if (!String(data.visit_status || "").trim()) errors.visit_status = "Выберите статус.";
   if (!String(data.total_cost || "").trim()) errors.total_cost = "Укажите стоимость.";
@@ -429,7 +524,7 @@ function visitCreateFormMarkup() {
   const branches = state.branches;
   const departments = departmentOptions(visitDraft.branch_id);
   const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
-  const masters = masterOptions(visitDraft.branch_id, visitDraft.workplace_id);
+  const masters = masterOptions(visitDraft.branch_id);
   const errors = state.visitErrors || {};
 
   return `
@@ -437,7 +532,7 @@ function visitCreateFormMarkup() {
     ${visitSelectField("Филиал", "branch_id", branches, visitDraft.branch_id, "Выберите филиал", errors.branch_id)}
     ${visitSelectField("Подразделение", "department_id", departments, visitDraft.department_id, "Выберите подразделение", errors.department_id, visitDraft.branch_id ? "" : "disabled")}
     ${visitSelectField("Рабочее место", "workplace_id", workplaces, visitDraft.workplace_id, "Выберите рабочее место", errors.workplace_id, visitDraft.department_id ? "" : "disabled")}
-    ${visitSelectField("Сотрудник", "employee_id", masters, visitDraft.employee_id, "Выберите сотрудника", errors.employee_id, visitDraft.workplace_id ? "" : "disabled")}
+    ${visitSelectField("Сотрудник", "employee_id", masters, visitDraft.employee_id, "Выберите сотрудника", errors.employee_id, visitDraft.branch_id ? "" : "disabled")}
     ${visitField("Статус", `<select name="visit_status">
       <option value="completed" ${visitDraft.visit_status === "completed" ? "selected" : ""}>Завершен</option>
       <option value="scheduled" ${visitDraft.visit_status === "scheduled" ? "selected" : ""}>Запланирован</option>
@@ -543,11 +638,6 @@ function modal(client) {
   const metric = client.metric;
   const accounts = client.accounts;
   const branches = state.branches;
-  const visitDraft = { ...visitDraftDefaults(), ...state.visitDraft };
-  const departments = departmentOptions(visitDraft.branch_id);
-  const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
-  const masters = masterOptions(visitDraft.branch_id, visitDraft.workplace_id);
-  const errors = state.visitErrors || {};
   const card = client.card;
   const loyaltyLevel = currentLoyaltyLevel(client.bonusHistory);
   const loyaltyBonusType = client.bonusBalance?.bonus_type || client.bonusTypes?.[0]?.code || "";
@@ -601,24 +691,7 @@ function modal(client) {
         <div class="subpanel">
           <h3>Сервис истории</h3>
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
-            <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(visitDraft.visit_at)}"></label>
-            ${selectField("Филиал", "branch_id", branches, visitDraft.branch_id, "Выберите филиал")}
-            ${selectField("Сотрудник", "employee_id", masters, visitDraft.employee_id, "Выберите мастера")}
-            <label><span>Статус</span><select name="visit_status">
-              <option value="completed" ${visitDraft.visit_status === "completed" ? "selected" : ""}>Завершен</option>
-              <option value="scheduled" ${visitDraft.visit_status === "scheduled" ? "selected" : ""}>Запланирован</option>
-              <option value="cancelled" ${visitDraft.visit_status === "cancelled" ? "selected" : ""}>Отменен</option>
-              <option value="no_show" ${visitDraft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
-            </select></label>
-            <label><span>Стоимость</span><input name="total_cost" type="number" value="${escapeHtml(visitDraft.total_cost)}"></label>
-            <label><span>Скидка</span><div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
-            <label><span>Оплачено</span><input name="paid_amount" type="number" value="${escapeHtml(visitDraft.paid_amount)}" readonly></label>
-            ${visitProductInputField("Услуги", "service_names", visitDraft.branch_id, "service", visitDraft.service_names, "", "visit-panel-services")}
-            ${visitProductInputField("Товары", "product_names", visitDraft.branch_id, "product", visitDraft.product_names, "", "visit-panel-products")}
-            <label><span>Источник</span><input name="source" value="${escapeHtml(visitDraft.source)}"></label>
-            <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visitDraft.comment)}"></label>
-            <button class="primary">Добавить визит</button>
-            <p data-message></p>
+            ${visitCreateFormMarkup()}
           </form>
           <table><tbody>
             ${rows(client.visits || [], "Истории визитов пока нет.", (item) => {
@@ -712,8 +785,8 @@ function editableVisitModal(client) {
   if (!selected) return "";
   const visit = selected.visit || selected;
   const branches = state.branches;
-  const masters = masterOptions();
   const draft = { ...visitEditDraftDefaults(selected), ...state.selectedVisitDraft };
+  const masters = masterOptions(draft.branch_id, draft.department_id, draft.workplace_id);
   return `
     <div class="modal-backdrop" data-visit-modal>
       <div class="modal-card">
@@ -750,11 +823,14 @@ function editableVisitModal(client) {
 export async function clients(ctx) {
   const params = new URLSearchParams(location.search);
   const search = params.get("q") || "";
+  const sort = params.get("sort") || "name";
+  const direction = params.get("dir") === "desc" ? "desc" : "asc";
+  const requestedPageSize = Number(params.get("page_size") || DEFAULT_CLIENTS_PAGE_SIZE);
+  const pageSize = CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE;
   const requestedPage = Number(params.get("page") || 1);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
-  const offset = (page - 1) * CLIENTS_PAGE_SIZE;
   const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems] = await Promise.all([
-    api.clients(ctx.org.id, { query: search, offset, limit: CLIENTS_PAGE_SIZE + 1 }).catch(() => []),
+    api.clients(ctx.org.id, { query: search, offset: 0, limit: 1000 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
@@ -767,11 +843,18 @@ export async function clients(ctx) {
     (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
   ]);
 
-  const pageItems = items.slice(0, CLIENTS_PAGE_SIZE);
-  const hasNextPage = items.length > CLIENTS_PAGE_SIZE;
+  const sortedItems = sortClients(items, sort, direction);
+  const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const offset = (currentPage - 1) * pageSize;
+  const pageItems = sortedItems.slice(offset, offset + pageSize);
+  const hasNextPage = currentPage < pageCount;
   const pageUrl = (nextPage) => {
     const nextParams = new URLSearchParams();
     if (search) nextParams.set("q", search);
+    if (sort) nextParams.set("sort", sort);
+    if (direction !== "asc") nextParams.set("dir", direction);
+    if (pageSize !== DEFAULT_CLIENTS_PAGE_SIZE) nextParams.set("page_size", pageSize);
     if (nextPage > 1) nextParams.set("page", nextPage);
     const qs = nextParams.toString();
     return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
@@ -798,14 +881,13 @@ export async function clients(ctx) {
         <button class="primary">Найти</button>
         ${search ? `<a class="ghost pagination-link" href="/organizations/${ctx.org.id}/clients">Сбросить</a>` : ""}
       </form>
-      <div class="entity-list">
-          ${rows(pageItems, "Клиентов пока нет.", clientRow)}
-      </div>
+      ${clientTable(pageItems, ctx, search, pageSize, sort, direction)}
       <div class="pagination">
-        <span>Страница ${escapeHtml(page)}</span>
+        <span>Страница ${escapeHtml(currentPage)} из ${escapeHtml(pageCount)}</span>
         <div>
-          ${page > 1 ? `<a class="ghost pagination-link" href="${pageUrl(page - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
-          ${hasNextPage ? `<a class="ghost pagination-link" href="${pageUrl(page + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
+          ${clientPageSizeControl(pageSize)}
+          ${currentPage > 1 ? `<a class="ghost pagination-link" href="${pageUrl(currentPage - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
+          ${hasNextPage ? `<a class="ghost pagination-link" href="${pageUrl(currentPage + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
         </div>
       </div>
       <div class="subpanel">
@@ -873,14 +955,11 @@ export function bindClients(root, ctx) {
       }
       if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
         state.visitDraft.workplace_id = "";
-        state.visitDraft.employee_id = "";
-        state.visitErrors = { ...state.visitErrors, workplace_id: "", employee_id: "" };
+        state.visitErrors = { ...state.visitErrors, workplace_id: "" };
         syncVisitCreateForm(root);
         return;
       }
       if (event.target.name === "workplace_id" && form.matches("[data-visit-create]")) {
-        state.visitDraft.employee_id = "";
-        state.visitErrors = { ...state.visitErrors, employee_id: "" };
         syncVisitCreateForm(root);
         return;
       }
@@ -899,6 +978,14 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.matches("[data-client-page-size]")) {
+      const params = new URLSearchParams(location.search);
+      params.set("page_size", event.target.value);
+      params.delete("page");
+      const qs = params.toString();
+      ctx.navigate(`/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`);
+      return;
+    }
     if (event.target.closest("[data-client-create]")) {
       syncClientCreateForm(root);
     }
@@ -939,10 +1026,8 @@ export function bindClients(root, ctx) {
       ctx.reload();
     } else if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
       state.visitDraft.workplace_id = "";
-      state.visitDraft.employee_id = "";
       syncVisitCreateForm(root);
     } else if (event.target.name === "workplace_id" && form.matches("[data-visit-create]")) {
-      state.visitDraft.employee_id = "";
       syncVisitCreateForm(root);
     }
   });
@@ -954,6 +1039,10 @@ export function bindClients(root, ctx) {
       const data = formData(search);
       const params = new URLSearchParams();
       if (data.q) params.set("q", data.q);
+      const currentParams = new URLSearchParams(location.search);
+      if (currentParams.get("sort")) params.set("sort", currentParams.get("sort"));
+      if (currentParams.get("dir")) params.set("dir", currentParams.get("dir"));
+      if (currentParams.get("page_size")) params.set("page_size", currentParams.get("page_size"));
       const qs = params.toString();
       ctx.navigate(`/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`);
       return;

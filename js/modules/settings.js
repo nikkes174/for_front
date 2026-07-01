@@ -10,6 +10,12 @@ let departmentFilterBranchId = "";
 let workplaceFilterBranchId = "";
 let productFilterCategoryId = "";
 let serviceFilterCategoryId = "";
+let userFilterBranchId = "";
+let userFilterRoleId = "";
+let userFilterDepartmentId = "";
+let userFilterWorkplaceId = "";
+let userPage = 1;
+const USER_PAGE_SIZE = 20;
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
   { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
@@ -389,6 +395,25 @@ function syncBranchProductItemSummary(control) {
     : "Не выбрано";
 }
 
+function syncProductBranchSummary(control) {
+  const root = control.closest("[data-product-branch-select]");
+  if (!root) return;
+  const all = root.querySelector('[name="product_branch_all"]');
+  const branches = [...root.querySelectorAll('[name="product_branch_ids"]')];
+  const checked = branches.filter((input) => input.checked);
+  if (all) all.checked = branches.length > 0 && checked.length === branches.length;
+  const summary = root.querySelector("[data-product-branch-summary]");
+  if (!summary) return;
+  const names = checked
+    .map((input) => input.closest("label")?.textContent?.trim())
+    .filter(Boolean);
+  summary.textContent = names.length
+    ? names.length > 2
+      ? `Выбрано: ${names.length}`
+      : names.join(", ")
+    : "Не выбрано";
+}
+
 function productItemDetails(item) {
   const category = (cache.categories || []).find((categoryItem) => String(categoryItem.id) === String(item.category_id));
   const categoryLabel = category ? `${category.name} (${categoryTypeLabel(category.type)})` : no;
@@ -501,6 +526,23 @@ function parseActualAmounts(form) {
   return result.length ? result : null;
 }
 
+async function syncProductItemBranchAvailability(productItemId, branchIds = []) {
+  const selected = new Set(branchIds.map((id) => String(id)));
+  const updates = (cache.branches || []).map((branch) => {
+    const current = (branch.product_item_ids || []).map((id) => String(id));
+    const hasItem = current.includes(String(productItemId));
+    const shouldHaveItem = selected.has(String(branch.id));
+    if (hasItem === shouldHaveItem) return null;
+    const next = shouldHaveItem
+      ? [...current, String(productItemId)]
+      : current.filter((id) => id !== String(productItemId));
+    return api.updateBranch(branch.id, {
+      product_item_ids: next.map((id) => Number(id)).filter((id) => Number.isFinite(id)),
+    });
+  }).filter(Boolean);
+  await Promise.all(updates);
+}
+
 function branchProductItemFields(branch) {
   const selected = new Set((branch.product_item_ids || []).map((id) => String(id)));
   const productItems = cache.productItems || [];
@@ -535,6 +577,42 @@ function branchProductItemSelect(label, name, items, selected, summary) {
               ${escapeHtml(item.title)}
             </label>
           `).join("") : `<p class="empty">Нет доступных вариантов</p>`}
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+function productBranchAvailabilityFields(item) {
+  const branches = cache.branches || [];
+  if (!branches.length) return "";
+  const selected = new Set(branches
+    .filter((branch) => (branch.product_item_ids || []).some((id) => String(id) === String(item.id)))
+    .map((branch) => String(branch.id)));
+  const selectedNames = branches
+    .filter((branch) => selected.has(String(branch.id)))
+    .map((branch) => branch.name);
+  const summary = selectedNames.length
+    ? selectedNames.length > 2
+      ? `Выбрано: ${selectedNames.length}`
+      : selectedNames.join(", ")
+    : "Не выбрано";
+  return `
+    <div class="branch-multiselect modal-full" data-product-branch-select>
+      <span>Доступность в филиалах</span>
+      <details class="branch-multiselect-dropdown">
+        <summary><span data-product-branch-summary>${escapeHtml(summary)}</span></summary>
+        <div class="branch-multiselect-options">
+          <label class="checkbox">
+            <input type="checkbox" name="product_branch_all" ${selected.size === branches.length ? "checked" : ""}>
+            Выбрать все филиалы
+          </label>
+          ${branches.map((branch) => `
+            <label class="checkbox">
+              <input type="checkbox" name="product_branch_ids" value="${escapeHtml(branch.id)}" ${selected.has(String(branch.id)) ? "checked" : ""}>
+              ${escapeHtml(branch.name)}
+            </label>
+          `).join("")}
         </div>
       </details>
     </div>
@@ -1060,6 +1138,122 @@ function workplaceFilterOptions(branches, selected = "") {
   `;
 }
 
+function userMemberships(user, branchMemberships = []) {
+  return branchMemberships.filter((item) => String(item.user_id) === String(user.id));
+}
+
+function userRoleIds(user, memberships = [], branchMemberships = []) {
+  return [
+    ...memberships.filter((item) => String(item.user_id) === String(user.id)).map((item) => item.role_id),
+    ...userMemberships(user, branchMemberships).map((item) => item.role_id),
+  ].filter((item) => item !== undefined && item !== null);
+}
+
+function userMatchesFilters(user, memberships = [], branchMemberships = []) {
+  const branches = userMemberships(user, branchMemberships);
+  const roleIds = userRoleIds(user, memberships, branchMemberships).map((item) => String(item));
+  if (userFilterBranchId && !branches.some((item) => String(item.branch_id) === String(userFilterBranchId))) return false;
+  if (userFilterRoleId && !roleIds.includes(String(userFilterRoleId))) return false;
+  if (userFilterDepartmentId && !branches.some((item) => String(item.department_id) === String(userFilterDepartmentId))) return false;
+  if (userFilterWorkplaceId && !branches.some((item) => String(item.workplace_id) === String(userFilterWorkplaceId))) return false;
+  return true;
+}
+
+function userFilterOptions(branches, roles, departments, workplaces) {
+  const filteredDepartments = userFilterBranchId
+    ? departments.filter((item) => String(item.branch_id) === String(userFilterBranchId))
+    : departments;
+  const filteredWorkplaces = workplaces
+    .filter((item) => !userFilterBranchId || String(item.branch_id) === String(userFilterBranchId))
+    .filter((item) => !userFilterDepartmentId || String(item.department_id) === String(userFilterDepartmentId));
+  return `
+    <form class="inline-form compact">
+      <label><span>Филиал</span><select data-user-filter-branch>
+        <option value="" ${!userFilterBranchId ? "selected" : ""}>Все филиалы</option>
+        ${branches.map((item) => `<option value="${escapeHtml(item.id)}" ${String(userFilterBranchId) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+      </select></label>
+      <label><span>Роль</span><select data-user-filter-role>
+        <option value="" ${!userFilterRoleId ? "selected" : ""}>Все роли</option>
+        ${roles.map((item) => `<option value="${escapeHtml(item.id)}" ${String(userFilterRoleId) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+      </select></label>
+      <label><span>Должность</span><select data-user-filter-department>
+        <option value="" ${!userFilterDepartmentId ? "selected" : ""}>Все должности</option>
+        ${filteredDepartments.map((item) => `<option value="${escapeHtml(item.id)}" ${String(userFilterDepartmentId) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+      </select></label>
+      <label><span>Рабочее место</span><select data-user-filter-workplace>
+        <option value="" ${!userFilterWorkplaceId ? "selected" : ""}>Все рабочие места</option>
+        ${filteredWorkplaces.map((item) => `<option value="${escapeHtml(item.id)}" ${String(userFilterWorkplaceId) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+      </select></label>
+    </form>
+  `;
+}
+
+function uniqueNames(values) {
+  const names = [...new Set(values.filter((value) => value && value !== no).map((value) => String(value)))];
+  return names.length ? names.join(", ") : no;
+}
+
+function userAccessTable(users, empty, memberships, branchMemberships, branches, departments, workplaces, roles) {
+  if (!users.length) return `<p class="empty">${escapeHtml(empty)}</p>`;
+  return `
+    <table>
+      <thead><tr>
+        <th>Сотрудник</th>
+        <th>Филиал</th>
+        <th>Подразделение</th>
+        <th>Рабочее место</th>
+        <th>Роль</th>
+        <th>Статус</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${users.map((user) => {
+          const userBranches = userMemberships(user, branchMemberships);
+          const orgMemberships = memberships.filter((item) => String(item.user_id) === String(user.id));
+          const roleIds = [
+            ...orgMemberships.map((item) => item.role_id),
+            ...userBranches.map((item) => item.role_id),
+          ];
+          const title = [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") || `#${user.id}`;
+          const status = user.is_blocked ? "Заблокирован" : user.is_active ? "Активен" : "Неактивен";
+          return `
+            <tr>
+              <td><button type="button" class="ghost" data-edit-entity="user" data-id="${escapeHtml(user.id)}">${escapeHtml(title)}</button></td>
+              <td>${escapeHtml(uniqueNames(userBranches.map((item) => nameById(branches, item.branch_id))))}</td>
+              <td>${escapeHtml(uniqueNames(userBranches.map((item) => nameById(departments, item.department_id))))}</td>
+              <td>${escapeHtml(uniqueNames(userBranches.map((item) => nameById(workplaces, item.workplace_id))))}</td>
+              <td>${escapeHtml(uniqueNames(roleIds.map((id) => nameById(roles, id))))}</td>
+              <td>${escapeHtml(status)}</td>
+              <td><button type="button" class="ghost" data-delete-entity="userAccess" data-id="${escapeHtml(user.id)}">Удалить</button></td>
+            </tr>
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function paginate(items, page, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  return {
+    currentPage,
+    totalPages,
+    pageItems: items.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+  };
+}
+
+function paginationControls(currentPage, totalPages, totalItems) {
+  if (totalPages <= 1) return "";
+  return `
+    <div class="inline-form compact" style="align-items:center;">
+      <button type="button" class="ghost" data-user-page="${escapeHtml(currentPage - 1)}" ${currentPage <= 1 ? "disabled" : ""}>Назад</button>
+      <span>${escapeHtml(`Страница ${currentPage} из ${totalPages} · ${totalItems}`)}</span>
+      <button type="button" class="ghost" data-user-page="${escapeHtml(currentPage + 1)}" ${currentPage >= totalPages ? "disabled" : ""}>Вперёд</button>
+    </div>
+  `;
+}
+
 function productItemCategoryFilterOptions(categories, selected = "", attr = "data-product-item-filter-category") {
   return `
     <label><span>Фильтр по категории</span><select ${attr}>
@@ -1147,6 +1341,7 @@ function modalFields(type, item) {
     <label><span>Название</span><input name="title" value="${escapeHtml(item.title)}" required></label>
     <label><span>Цена</span><input name="price" type="number" step="0.01" min="0" value="${escapeHtml(item.price ?? "")}"></label>
     ${productItemExtraFields(item)}
+    ${productBranchAvailabilityFields(item)}
     <label><span>Активен</span><select name="active">
       <option value="true" ${item.active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.active ? "selected" : ""}>Нет</option>
@@ -1189,7 +1384,6 @@ function modalFields(type, item) {
     <label><span>Email</span><input name="email" value="${escapeHtml(item.email || "")}"></label>
     <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
     <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
-    ${selectField("Роль в организации", "role_id", cache.roles, cache.memberships.find((membership) => membership.user_id === item.id)?.role_id)}
     <label><span>Активен</span><select name="is_active">
       <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
@@ -1250,13 +1444,24 @@ function openEntityModal(type, item) {
     permission: "Право",
     branchMembership: "Доступ к филиалу",
   };
-  const modalTitle = item.name
+  const modalBaseTitle = item.name
     || item.title
     || item.module_name
     || [item.last_name, item.first_name, item.middle_name].filter(Boolean).join(" ")
     || item.email
     || item.phone
     || `${titles[type] || "Сущность"} #${item.id}`;
+  const userAccessTitle = type === "user"
+    ? userMemberships(item, cache.branchMemberships || [])
+      .map((membership) => {
+        const branchName = nameById(cache.branches || [], membership.branch_id);
+        const departmentName = nameById(cache.departments || [], membership.department_id);
+        return [branchName, departmentName].filter(Boolean).join(" / ");
+      })
+      .filter(Boolean)
+      .join("; ")
+    : "";
+  const modalTitle = userAccessTitle ? `${modalBaseTitle} - ${userAccessTitle}` : modalBaseTitle;
 
   document.body.insertAdjacentHTML("beforeend", `
     <div class="modal-backdrop" data-settings-modal>
@@ -1319,6 +1524,9 @@ async function saveEntity(type, id, data, form = null) {
       staff: categoryType === "service" ? serviceStaffPayload(form) : null,
       image_group: categoryType === "service" ? serviceImageGroupPayload(data) : null,
       active: data.active === "true",
+    }).then(async (updated) => {
+      await syncProductItemBranchAvailability(id, data.product_branch_ids || []);
+      return updated;
     });
   }
   if (type === "achievement") {
@@ -1480,6 +1688,9 @@ export async function settings(ctx) {
   const services = productItems
     .filter((item) => categoryTypeById(item.category_id) === "service")
     .filter((item) => !serviceFilterCategoryId || String(item.category_id) === String(serviceFilterCategoryId));
+  const filteredUsers = users.filter((user) => userMatchesFilters(user, memberships, branchMemberships));
+  const pagedUsersData = paginate(filteredUsers, userPage, USER_PAGE_SIZE);
+  userPage = pagedUsersData.currentPage;
 
   return `
     <section class="panel" data-settings>
@@ -1672,15 +1883,18 @@ export async function settings(ctx) {
             <p data-message></p>
           </form>
 
-          ${entityList(users, "Пользователей пока нет", "user", (user) => [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") || `#${user.id}`, (user) => {
-              const membership = memberships.find((item) => item.user_id === user.id);
-              const status = user.is_blocked ? "заблокирован" : user.is_active ? "активен" : "неактивен";
-              return `${[user.phone, user.email].filter(Boolean).join(" / ") || no} · ${nameById(roles, membership?.role_id)} · ${status}`;
-            }, {
-              deleteType: "userAccess",
-              deleteId: (user) => user.id,
-              deleteLabel: "Удалить",
-            })}
+          ${userFilterOptions(branches, roles, departments, workplaces)}
+          ${userAccessTable(
+            pagedUsersData.pageItems,
+            users.length ? "Пользователи не найдены" : "Пользователей пока нет",
+            memberships,
+            branchMemberships,
+            branches,
+            departments,
+            workplaces,
+            roles,
+          )}
+          ${paginationControls(pagedUsersData.currentPage, pagedUsersData.totalPages, filteredUsers.length)}
         `, "Пользователи и доступ — это сотрудники и их роли в организации или филиалах.")}
       </div>
 
@@ -1745,6 +1959,33 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.matches("[data-service-filter-category]")) {
       serviceFilterCategoryId = event.target.value || "";
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-user-filter-branch]")) {
+      userFilterBranchId = event.target.value || "";
+      userFilterDepartmentId = "";
+      userFilterWorkplaceId = "";
+      userPage = 1;
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-user-filter-role]")) {
+      userFilterRoleId = event.target.value || "";
+      userPage = 1;
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-user-filter-department]")) {
+      userFilterDepartmentId = event.target.value || "";
+      userFilterWorkplaceId = "";
+      userPage = 1;
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-user-filter-workplace]")) {
+      userFilterWorkplaceId = event.target.value || "";
+      userPage = 1;
       ctx.reload();
       return;
     }
@@ -1856,8 +2097,6 @@ export function bindSettings(root, ctx) {
           name: data.name,
         });
       } else if (form.matches("[data-user-create]")) {
-        if (!data.department_id) throw new Error("Сначала выберите подразделение.");
-        if (!data.workplace_id) throw new Error("Сначала выберите рабочее место.");
         const created = await api.createUser({
           first_name: data.first_name,
           middle_name: optional(data.middle_name),
@@ -1918,6 +2157,13 @@ export function bindSettings(root, ctx) {
     const closeVisitButton = event.target.closest("[data-close-event-visit]");
     if (closeVisitButton) {
       selectedEventVisit = null;
+      ctx.reload();
+      return;
+    }
+
+    const userPageButton = event.target.closest("[data-user-page]");
+    if (userPageButton && !userPageButton.disabled) {
+      userPage = Number(userPageButton.dataset.userPage) || 1;
       ctx.reload();
       return;
     }
@@ -2002,6 +2248,7 @@ export function bindSettings(root, ctx) {
       }
       if (form.dataset.type === "productItem") {
         payload.staff_user_ids = new FormData(form).getAll("staff_user_ids");
+        payload.product_branch_ids = new FormData(form).getAll("product_branch_ids");
       }
       if (form.dataset.type === "branch") {
         payload.product_item_ids = [
@@ -2038,6 +2285,16 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.matches('[name="branch_service_item_ids"], [name="branch_product_item_ids"]')) {
       syncBranchProductItemSummary(event.target);
+    }
+    if (event.target.matches('[name="product_branch_all"]')) {
+      const root = event.target.closest("[data-product-branch-select]");
+      root?.querySelectorAll('[name="product_branch_ids"]').forEach((input) => {
+        input.checked = event.target.checked;
+      });
+      syncProductBranchSummary(event.target);
+    }
+    if (event.target.matches('[name="product_branch_ids"]')) {
+      syncProductBranchSummary(event.target);
     }
   });
 }

@@ -716,15 +716,18 @@ function transitionRulesSection(ctx, rules, levels, selectedClient) {
     <div class="subpanel">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-transition-rule-create>
         ${field("Сумма покупок клиента больше", "purchase_threshold", "0", 'type="number" step="0.01" min="0"')}
-        <input type="hidden" name="client_level" value="">
+        ${select("Перевести на уровень", "client_level", levelOptions(levels), "")}
         <button class="primary" disabled>Создать правило</button>
         <p data-message></p>
       </form>` : ""}
       <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
         const threshold = item.usage_restrictions?.purchase_amount_gt ?? item.usage_restrictions?.profit_amount_gt ?? item.usage_restrictions?.conditions?.[0]?.value ?? "";
+        const targetLevel = item.client_level || "Следующий уровень";
         const apply = selectedClient ? `<button type="button" class="ghost" data-apply-rule="${escapeHtml(item.id)}" data-transition-rule="1">${L.apply}</button>` : "";
-        return `<tr><td>${escapeHtml(`Сумма покупок > ${threshold}`)}</td><td>Следующий уровень</td><td class="actions">${apply}${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
+        const applyAll = canCreate(ctx, "rules") ? `<button type="button" class="ghost" data-apply-rule-all="${escapeHtml(item.id)}">Применить ко всем</button>` : "";
+        return `<tr><td>${escapeHtml(`Сумма покупок > ${threshold}`)}</td><td>${escapeHtml(targetLevel)}</td><td class="actions">${apply}${applyAll}${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
       })}</tbody></table>
+      ${loyaltyState.actionResult ? `<p class="empty">${escapeHtml(loyaltyState.actionResult)}</p>` : ""}
     </div>`;
 }
 
@@ -957,15 +960,16 @@ export function bindLoyalty(root, ctx) {
           await api.applyRule(rule.id, loyaltyState.selectedClientId, ctx.org.id);
         }
       } else if (form.matches("[data-loyalty-transition-rule-create]")) {
+        const targetLevel = optional(data.client_level);
         await api.createRule({
           organization_id: ctx.org.id,
-          name: "Переход на следующий уровень",
+          name: targetLevel ? `Переход на уровень ${targetLevel}` : "Переход на следующий уровень",
           rule_type: "service",
           bonus_type: "cashback",
           amount: 0,
           target_type: "level_transition",
           is_active: true,
-          client_level: optional(data.client_level),
+          client_level: targetLevel,
           usage_restrictions: {
             transition_rule: true,
             purchase_amount_gt: Number(data.purchase_threshold || 0),
@@ -1108,6 +1112,7 @@ export function bindLoyalty(root, ctx) {
         ["[data-subscription-visit], [data-subscription-renew], [data-subscription-transfer], [data-subscription-freeze]", createPermissions.subscriptions, "Недостаточно прав для операций с абонементами."],
         ["[data-certificate-use], [data-certificate-transfer], [data-certificate-refund], [data-certificate-deposit]", createPermissions.certificates, "Недостаточно прав для операций с сертификатами."],
         ["[data-referral-assign], [data-referral-first-visit], [data-referral-reward], [data-referral-cancel]", createPermissions.referrals, "Недостаточно прав для операций с рефералами."],
+        ["[data-apply-rule-all]", createPermissions.rules, "Недостаточно прав для применения правил."],
         ["[data-subscription-expire]", deletePermissions.subscription, "Недостаточно прав для удаления абонементов."],
         ["[data-certificate-expire]", deletePermissions.certificate, "Недостаточно прав для удаления сертификатов."],
       ];
@@ -1139,6 +1144,14 @@ export function bindLoyalty(root, ctx) {
         else if (kind === "bonus") await api.deleteBonus(id);
         else if (kind === "referral") await api.deleteReferralSource(id);
         else if (kind === "promotion") await api.deletePromotion(id);
+        ctx.reload();
+        return;
+      }
+
+      const applyRuleAllButton = event.target.closest("[data-apply-rule-all]");
+      if (applyRuleAllButton) {
+        const result = await api.applyRuleToAll(Number(applyRuleAllButton.dataset.applyRuleAll), ctx.org.id);
+        loyaltyState.actionResult = `Переведено ${result.applied || 0} из ${result.checked || 0}`;
         ctx.reload();
         return;
       }
