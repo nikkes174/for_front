@@ -5,6 +5,7 @@ import { onboarding, bindOnboarding } from "./modules/onboarding.js";
 import { clients, bindClients } from "./modules/clients.js";
 import { loyalty, bindLoyalty } from "./modules/loyalty.js";
 import { settings, bindSettings } from "./modules/settings.js";
+import { tasks, bindTasks } from "./modules/tasks.js";
 
 const LAST_ORG_KEY = "loyalty.lastOrganizationId";
 
@@ -59,9 +60,11 @@ function navLink(href, label) {
     ? "clients.clients.view"
     : href.includes("/loyalty")
       ? "loyalty.rules.view"
-      : href.includes("/settings")
-        ? "settings.roles.manage"
-        : "overview.view";
+      : href.includes("/tasks")
+        ? "loyalty.rules.view"
+        : href.includes("/settings")
+          ? "settings.roles.manage"
+          : "overview.view";
   if (!can(permission)) return "";
   const active = location.pathname === href || (href.includes("/loyalty") && location.pathname.includes("/loyalty"));
   return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
@@ -85,6 +88,7 @@ function shell(content, title) {
           ${navLink(`/organizations/${org.id}/clients`, "Клиенты")}
           ${navLink(`/organizations/${org.id}/loyalty`, "Лояльность")}
           ${navLink(`/organizations/${org.id}/settings`, "Настройки организации")}
+          ${navLink(`/organizations/${org.id}/tasks`, "Задачи")}
         </nav>
       </aside>
       <main class="content">
@@ -139,9 +143,11 @@ function chooseOrg(routeInfo) {
 async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "clients" && !ctx.can("clients.clients.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "loyalty" && !ctx.can("loyalty.rules.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
+  if (routeInfo.page === "tasks" && !ctx.can("loyalty.rules.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "settings" && !canAny(SETTINGS_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
+  if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
   if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx)];
   return ["Главная", await dashboard(ctx)];
 }
@@ -266,5 +272,6 @@ bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, reload });
 bindSettings(root, { get org() { return state.org; }, reload });
+bindTasks(root, { get org() { return state.org; }, reload });
 
 draw();

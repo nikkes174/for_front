@@ -652,7 +652,6 @@ function branchAchievementFields(branch) {
 function productItemExtraFields(item) {
   const category = productItemCategory(item);
   if (category?.type === "service") return `
-    <label><span>ID услуги организации</span><input name="salon_service_id" type="number" step="1" min="0" value="${escapeHtml(item.salon_service_id ?? "")}"></label>
     <label><span>Мин. цена</span><input name="price_min" type="number" step="0.01" min="0" value="${escapeHtml(item.price_min ?? "")}"></label>
     <label><span>Макс. цена</span><input name="price_max" type="number" step="0.01" min="0" value="${escapeHtml(item.price_max ?? "")}"></label>
     <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
@@ -664,7 +663,6 @@ function productItemExtraFields(item) {
     <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
   `;
   if (category?.type === "product") return `
-    <label><span>ID товара</span><input name="good_id" type="number" step="1" min="0" value="${escapeHtml(item.good_id ?? "")}"></label>
     <label><span>Штрих-код</span><input name="barcode" value="${escapeHtml(item.barcode || "")}"></label>
     <label><span>ID ед. продажи</span><input name="unit_id" type="number" step="1" min="0" value="${escapeHtml(item.unit_id ?? "")}"></label>
     <label><span>Единица измерения</span><select name="unit_short_title">
@@ -910,6 +908,7 @@ function validateRequiredPanelForm(form) {
   const emptyControl = controls.find((control) => {
     const type = String(control.type || "").toLowerCase();
     if (control.disabled || control.readOnly) return false;
+    if (control.dataset.optional === "true") return false;
     if (["button", "submit", "reset", "hidden", "checkbox", "radio"].includes(type)) return false;
     return !String(control.value || "").trim();
   });
@@ -922,6 +921,7 @@ function requiredPanelControls(form) {
   return [...form.querySelectorAll("input, select, textarea")].filter((control) => {
     const type = String(control.type || "").toLowerCase();
     if (control.disabled || control.readOnly) return false;
+    if (control.dataset.optional === "true") return false;
     return !["button", "submit", "reset", "hidden", "checkbox", "radio"].includes(type);
   });
 }
@@ -1140,6 +1140,77 @@ function workplaceFilterOptions(branches, selected = "") {
 
 function userMemberships(user, branchMemberships = []) {
   return branchMemberships.filter((item) => String(item.user_id) === String(user.id));
+}
+
+function userDepartmentEditOptions(branchIds = [], selectedDepartmentId = "") {
+  const selectedBranches = new Set((branchIds || []).map((id) => String(id)));
+  const departments = (cache.departments || []).filter((item) => !selectedBranches.size || selectedBranches.has(String(item.branch_id)));
+  return [
+    `<option value="">Не выбрано</option>`,
+    ...departments.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selectedDepartmentId) === String(item.id) ? "selected" : ""}>${escapeHtml(`${nameById(cache.branches || [], item.branch_id)} - ${item.name}`)}</option>`),
+  ].join("");
+}
+
+function userWorkplaceEditOptions(branchIds = [], departmentId = "", selectedWorkplaceId = "") {
+  const selectedBranches = new Set((branchIds || []).map((id) => String(id)));
+  const workplaces = (cache.workplaces || [])
+    .filter((item) => !selectedBranches.size || selectedBranches.has(String(item.branch_id)))
+    .filter((item) => !departmentId || String(item.department_id) === String(departmentId));
+  return [
+    `<option value="">Не выбрано</option>`,
+    ...workplaces.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selectedWorkplaceId) === String(item.id) ? "selected" : ""}>${escapeHtml(`${nameById(cache.branches || [], item.branch_id)} - ${item.name}`)}</option>`),
+  ].join("");
+}
+
+function userBranchAccessSummary(branchIds = []) {
+  const selected = new Set((branchIds || []).map((id) => String(id)));
+  const names = (cache.branches || []).filter((branch) => selected.has(String(branch.id))).map((branch) => branch.name);
+  if (!names.length) return "Не выбрано";
+  return names.length > 2 ? `Выбрано: ${names.length}` : names.join(", ");
+}
+
+function userBranchAccessFields(user) {
+  const memberships = userMemberships(user, cache.branchMemberships || []);
+  const selectedBranchIds = [...new Set(memberships.map((item) => String(item.branch_id)).filter(Boolean))];
+  const selectedDepartmentId = memberships.find((item) => item.department_id)?.department_id || "";
+  const selectedWorkplaceId = memberships.find((item) => item.workplace_id)?.workplace_id || "";
+  return `
+    <div class="branch-multiselect modal-full" data-user-branch-select>
+      <span>Филиалы</span>
+      <details class="branch-multiselect-dropdown">
+        <summary><span data-user-branch-summary>${escapeHtml(userBranchAccessSummary(selectedBranchIds))}</span></summary>
+        <div class="branch-multiselect-options">
+          ${(cache.branches || []).map((branch) => `
+            <label class="checkbox">
+              <input type="checkbox" name="user_branch_ids" value="${escapeHtml(branch.id)}" ${selectedBranchIds.includes(String(branch.id)) ? "checked" : ""}>
+              ${escapeHtml(branch.name)}
+            </label>
+          `).join("")}
+        </div>
+      </details>
+    </div>
+    <label class="modal-full"><span>Подразделение</span><select name="department_id">${userDepartmentEditOptions(selectedBranchIds, selectedDepartmentId)}</select></label>
+    <label class="modal-full"><span>Рабочее место</span><select name="workplace_id">${userWorkplaceEditOptions(selectedBranchIds, selectedDepartmentId, selectedWorkplaceId)}</select></label>
+  `;
+}
+
+function syncUserBranchEditForm(scope) {
+  const form = scope.closest("[data-entity-edit]") || scope;
+  const branchIds = new FormData(form).getAll("user_branch_ids");
+  const summary = form.querySelector("[data-user-branch-summary]");
+  const department = form.querySelector('[name="department_id"]');
+  const workplace = form.querySelector('[name="workplace_id"]');
+  const currentDepartment = department?.value || "";
+  const currentWorkplace = workplace?.value || "";
+  if (summary) summary.textContent = userBranchAccessSummary(branchIds);
+  if (department) {
+    department.innerHTML = userDepartmentEditOptions(branchIds, currentDepartment);
+    if (![...department.options].some((option) => option.value === currentDepartment)) department.value = "";
+  }
+  if (workplace) {
+    workplace.innerHTML = userWorkplaceEditOptions(branchIds, department?.value || "", currentWorkplace);
+    if (![...workplace.options].some((option) => option.value === currentWorkplace)) workplace.value = "";
+  }
 }
 
 function userRoleIds(user, memberships = [], branchMemberships = []) {
@@ -1384,6 +1455,7 @@ function modalFields(type, item) {
     <label><span>Email</span><input name="email" value="${escapeHtml(item.email || "")}"></label>
     <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
     <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
+    ${userBranchAccessFields(item)}
     <label><span>Активен</span><select name="is_active">
       <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
@@ -1480,6 +1552,41 @@ function openEntityModal(type, item) {
   `);
 }
 
+async function syncUserBranchAccess(userId, branchIds = [], departmentId = "", workplaceId = "") {
+  const selected = new Set((Array.isArray(branchIds) ? branchIds : [branchIds]).map((id) => String(id)).filter(Boolean));
+  const existing = userMemberships({ id: userId }, cache.branchMemberships || []);
+  const department = (cache.departments || []).find((item) => String(item.id) === String(departmentId));
+  const workplace = (cache.workplaces || []).find((item) => String(item.id) === String(workplaceId));
+  const fallbackRoleId = existing.find((item) => item.role_id)?.role_id
+    || cache.memberships.find((item) => String(item.user_id) === String(userId))?.role_id
+    || cache.roles?.[0]?.id;
+
+  await Promise.all(existing
+    .filter((membership) => !selected.has(String(membership.branch_id)))
+    .map((membership) => api.deleteBranchMembership(membership.id)));
+
+  for (const branchId of selected) {
+    const membership = existing.find((item) => String(item.branch_id) === String(branchId));
+    const nextDepartmentId = department && String(department.branch_id) === String(branchId) ? Number(department.id) : null;
+    const nextWorkplaceId = workplace && String(workplace.branch_id) === String(branchId) && (!nextDepartmentId || String(workplace.department_id) === String(nextDepartmentId)) ? Number(workplace.id) : null;
+    if (membership) {
+      if (String(membership.department_id || "") !== String(nextDepartmentId || "") || String(membership.workplace_id || "") !== String(nextWorkplaceId || "")) {
+        await api.updateBranchMembership(membership.id, { department_id: nextDepartmentId, workplace_id: nextWorkplaceId });
+      }
+    } else {
+      if (!fallbackRoleId) throw new Error("Сначала назначьте сотруднику роль.");
+      await api.assignUserToBranch({
+        organization_id: cache.organizationId,
+        user_id: Number(userId),
+        branch_id: Number(branchId),
+        department_id: nextDepartmentId,
+        workplace_id: nextWorkplaceId,
+        role_id: Number(fallbackRoleId),
+      });
+    }
+  }
+}
+
 async function saveEntity(type, id, data, form = null) {
   if (type === "brand") return api.updateBrand(id, { name: data.name });
   if (type === "legal") return api.updateLegalEntity(id, {
@@ -1499,18 +1606,19 @@ async function saveEntity(type, id, data, form = null) {
   if (type === "productItem") {
     if (!api.updateProductItem) throw new Error("API товаров и услуг не подключен.");
     const categoryType = categoryTypeById(data.category_id);
+    const currentItem = findEntity("productItem", id) || {};
     return api.updateProductItem(id, {
       category_id: Number(data.category_id),
       title: data.title,
       price: numberOrNull(data.price),
-      salon_service_id: categoryType === "service" ? numberOrNull(data.salon_service_id) : null,
+      salon_service_id: categoryType === "service" ? numberOrNull(currentItem.salon_service_id) : null,
       price_min: categoryType === "service" ? numberOrNull(data.price_min) : null,
       price_max: categoryType === "service" ? numberOrNull(data.price_max) : null,
       discount: categoryType === "service" ? numberOrNull(data.discount) : null,
       comment: optional(data.comment),
       weight: categoryType === "service" ? numberOrNull(data.weight) : null,
       api_id: categoryType === "service" ? optional(data.api_id) : null,
-      good_id: categoryType === "product" ? numberOrNull(data.good_id) : null,
+      good_id: categoryType === "product" ? numberOrNull(currentItem.good_id) : null,
       barcode: categoryType === "product" ? optional(data.barcode) : null,
       unit_id: categoryType === "product" ? numberOrNull(data.unit_id) : null,
       unit_short_title: categoryType === "product" ? optional(data.unit_short_title) : null,
@@ -1567,6 +1675,7 @@ async function saveEntity(type, id, data, form = null) {
     } else if (roleId) {
       await api.assignUser({ user_id: Number(id), organization_id: cache.organizationId, role_id: roleId });
     }
+    await syncUserBranchAccess(id, data.user_branch_ids || [], data.department_id, data.workplace_id);
     return updated;
   });
   if (type === "role") return api.updateRole(id, { name: data.name }).then(async (updated) => {
@@ -1617,7 +1726,12 @@ async function deleteEntity(type, id) {
   if (type === "workplace") return api.deleteWorkplace(id);
   if (type === "role") return api.deleteRole(id);
   if (type === "permission") return api.deletePermission(id);
-  if (type === "userAccess") return api.deleteMembership(cache.organizationId, id);
+  if (type === "userAccess") {
+    await Promise.all(userMemberships({ id }, cache.branchMemberships || []).map((membership) => api.deleteBranchMembership(membership.id)));
+    return api.deleteMembership(cache.organizationId, id).catch((error) => {
+      if (error.status !== 404) throw error;
+    });
+  }
   if (type === "branchMembership") return api.deleteBranchMembership(id);
   throw new Error("Неизвестная сущность");
 }
@@ -1860,13 +1974,13 @@ export async function settings(ctx) {
             <label><span>Телефон</span><input name="phone"></label>
             <label><span>Email</span><input name="email"></label>
             <label><span>Пароль/хеш</span><input name="password" type="password" required></label>
-            ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
-            <label><span>Подразделение</span><select name="department_id" disabled>${workplaceDepartmentOptions()}</select></label>
-            <label><span>Роль</span><select name="role_id" disabled>
+            ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал").replace('name="branch_id"', 'name="branch_id" data-optional="true"')}
+            <label><span>Подразделение</span><select name="department_id" data-optional="true" disabled>${workplaceDepartmentOptions()}</select></label>
+            <label><span>Роль</span><select name="role_id" data-optional="true" disabled>
               <option value="">Не выбрано</option>
               ${roles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
             </select></label>
-            <label><span>Рабочее место</span><select name="workplace_id" disabled>${userWorkplaceOptions()}</select></label>
+            <label><span>Рабочее место</span><select name="workplace_id" data-optional="true" disabled>${userWorkplaceOptions()}</select></label>
             <button class="primary" disabled>Создать пользователя</button>
             <p data-message></p>
           </form>
@@ -2231,6 +2345,11 @@ export function bindSettings(root, ctx) {
         item.removeAttribute("open");
       });
     }
+    if (!event.target.closest("[data-user-branch-select]")) {
+      document.querySelectorAll("[data-user-branch-select] details[open]").forEach((item) => {
+        item.removeAttribute("open");
+      });
+    }
     if (event.target.matches("[data-settings-modal]")) {
       event.target.remove();
     }
@@ -2249,6 +2368,9 @@ export function bindSettings(root, ctx) {
       if (form.dataset.type === "productItem") {
         payload.staff_user_ids = new FormData(form).getAll("staff_user_ids");
         payload.product_branch_ids = new FormData(form).getAll("product_branch_ids");
+      }
+      if (form.dataset.type === "user") {
+        payload.user_branch_ids = new FormData(form).getAll("user_branch_ids");
       }
       if (form.dataset.type === "branch") {
         payload.product_item_ids = [
@@ -2271,6 +2393,12 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target.matches('[name="user_branch_ids"]')) {
+      syncUserBranchEditForm(event.target);
+    }
+    if (event.target.closest("[data-entity-edit][data-type='user']") && event.target.matches('[name="department_id"]')) {
+      syncUserBranchEditForm(event.target);
+    }
     if (event.target.matches('[name="vat_enabled"]')) {
       syncVatFields(event.target);
     }

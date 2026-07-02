@@ -611,6 +611,16 @@ table { width: 100%; border-collapse: collapse; min-width: 620px; }
 th, td { padding: 12px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
 tr:last-child td { border-bottom: 0; }
 td small { display: block; color: #667085; margin-top: 4px; }
+.task-progress {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+}
+.task-progress progress {
+  width: 100%;
+}
 .empty, .skeleton {
   padding: 18px;
   border: 1px dashed #cfd7e6;

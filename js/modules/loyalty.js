@@ -997,6 +997,7 @@ export function bindLoyalty(root, ctx) {
         if (!clientId && data.transaction_type !== "accrual") throw new Error("Client is required for this operation");
         const body = {
           client_id: clientId,
+          organization_id: ctx.org.id,
           bonus_type: data.bonus_type,
           amount: Number(data.amount),
           reason: data.reason,
@@ -1150,8 +1151,8 @@ export function bindLoyalty(root, ctx) {
 
       const applyRuleAllButton = event.target.closest("[data-apply-rule-all]");
       if (applyRuleAllButton) {
-        const result = await api.applyRuleToAll(Number(applyRuleAllButton.dataset.applyRuleAll), ctx.org.id);
-        loyaltyState.actionResult = `Переведено ${result.applied || 0} из ${result.checked || 0}`;
+        await api.startApplyRuleToAllJob(Number(applyRuleAllButton.dataset.applyRuleAll), ctx.org.id);
+        loyaltyState.actionResult = "Задача запущена. Прогресс во вкладке «Задачи».";
         ctx.reload();
         return;
       }

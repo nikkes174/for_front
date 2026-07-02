@@ -27,6 +27,7 @@ let state = {
 };
 
 const no = "Без фото";
+const notSpecified = "Не указано";
 const bonusTransactionTypes = {
   accrual: "Начисление",
   write_off: "Списание",
@@ -141,7 +142,7 @@ function clientTable(items, ctx, search, pageSize, sort, direction) {
           <tr>
             <td><button type="button" class="ghost" data-open-client="${escapeHtml(item.id)}">${escapeHtml(clientFullName(item))}</button></td>
             <td>${escapeHtml(item.primary_phone || no)}</td>
-            <td>${escapeHtml(date(item.birth_date) || no)}</td>
+            <td>${escapeHtml(date(item.birth_date) || notSpecified)}</td>
             <td>${escapeHtml(statusLabel(item.status))}</td>
             <td>${escapeHtml(date(clientLastVisitAt(item)) || no)}</td>
             <td><button type="button" class="ghost" data-delete-client="${escapeHtml(item.id)}">Удалить</button></td>
@@ -470,12 +471,10 @@ function masterOptions(branchId = "", departmentId = "", workplaceId = "") {
       .filter((item) => !branchId || String(item.branch_id) === String(branchId))
       .filter((item) => !departmentId || String(item.department_id) === String(departmentId))
       .filter((item) => !workplaceId || String(item.workplace_id) === String(workplaceId))
-      .filter((item) => !masterRoleIds.size || masterRoleIds.has(String(item.role_id)))
       .map((item) => String(item.user_id)),
   );
 
   return state.users
-    .filter((item) => item.is_active && !item.is_blocked)
     .filter((item) => branchId ? branchUserIds.has(String(item.id)) : orgMasterUserIds.has(String(item.id)))
     .map((item) => ({ id: item.id, name: displayUser(item) }));
 }
@@ -524,7 +523,7 @@ function visitCreateFormMarkup() {
   const branches = state.branches;
   const departments = departmentOptions(visitDraft.branch_id);
   const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
-  const masters = masterOptions(visitDraft.branch_id);
+  const masters = masterOptions(visitDraft.branch_id, visitDraft.department_id, visitDraft.workplace_id);
   const errors = state.visitErrors || {};
 
   return `
@@ -834,7 +833,7 @@ export async function clients(ctx) {
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
-    api.users(ctx.org.id).catch(() => []),
+    api.users(ctx.org.id, 500).catch(() => []),
     api.memberships(ctx.org.id).catch(() => []),
     api.branchMemberships(ctx.org.id).catch(() => []),
     api.roles(ctx.org.id).catch(() => []),
@@ -955,11 +954,13 @@ export function bindClients(root, ctx) {
       }
       if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
         state.visitDraft.workplace_id = "";
+        state.visitDraft.employee_id = "";
         state.visitErrors = { ...state.visitErrors, workplace_id: "" };
         syncVisitCreateForm(root);
         return;
       }
       if (event.target.name === "workplace_id" && form.matches("[data-visit-create]")) {
+        state.visitDraft.employee_id = "";
         syncVisitCreateForm(root);
         return;
       }
@@ -1026,8 +1027,10 @@ export function bindClients(root, ctx) {
       ctx.reload();
     } else if (event.target.name === "department_id" && form.matches("[data-visit-create]")) {
       state.visitDraft.workplace_id = "";
+      state.visitDraft.employee_id = "";
       syncVisitCreateForm(root);
     } else if (event.target.name === "workplace_id" && form.matches("[data-visit-create]")) {
+      state.visitDraft.employee_id = "";
       syncVisitCreateForm(root);
     }
   });

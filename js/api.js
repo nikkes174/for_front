@@ -180,6 +180,8 @@ export const api = {
   deleteRule: (id) => request(`/loyalty-api/client-bonuses/rules/${id}`, { method: "DELETE" }),
   applyRule: (ruleId, clientId, organizationId, extra = {}) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply`, { method: "POST", body: JSON.stringify({ client_id: clientId, organization_id: organizationId, ...extra }) }),
   applyRuleToAll: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
+  startApplyRuleToAllJob: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all-jobs`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
+  workerJobs: (organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`),
   bonusLevels: (orgId) => request(`/loyalty-api/organizations/${orgId}/bonus-levels`),
   createBonusLevel: (body) => request("/loyalty-api/client-bonuses/levels", { method: "POST", body: JSON.stringify(body) }),
   updateBonusLevel: (id, body) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
