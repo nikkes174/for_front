@@ -56,6 +56,11 @@ const VAT_RATE_OPTIONS = [
   { value: "20%", label: "20%" },
 ];
 const DEFAULT_TIMEZONE = "Europe/Moscow";
+const YCLIENTS_TERMINAL_NAMES = {
+  1061332: "Республики",
+  435801: "Газовиков",
+  505058: "Видный",
+};
 const TIMEZONE_CITY_OPTIONS = [
   { value: "Europe/Kaliningrad", label: "Калининград" },
   { value: "Europe/Moscow", label: "Москва" },
@@ -755,6 +760,14 @@ function formatVisitDateTime(value) {
   return date.toLocaleString("ru-RU");
 }
 
+function dateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function visitStatusLabel(status) {
   if (status === "completed") return "Завершен";
   if (status === "scheduled") return "Запланирован";
@@ -779,6 +792,11 @@ function userShortNameById(id) {
   return [user.last_name, user.first_name].filter(Boolean).join(" ") || userLabelById(id);
 }
 
+function yclientsTerminalLabel(id) {
+  const name = YCLIENTS_TERMINAL_NAMES[String(id)];
+  return name || "";
+}
+
 function compactDetails(value) {
   if (!value || typeof value !== "object") return "";
   if (value.summary) return String(value.summary);
@@ -796,6 +814,9 @@ function compactDetails(value) {
   if (value.visit_status) fields.push(`Статус визита: ${value.visit_status}`);
   if (value.primary_phone) fields.push(`Телефон: ${value.primary_phone}`);
   if (value.branch_id) fields.push(`Филиал: #${value.branch_id}`);
+  if (value.terminal_id) fields.push(`Терминал: ${yclientsTerminalLabel(value.terminal_id) || `#${value.terminal_id}`}`);
+  if (value.yclients_terminal_id) fields.push(`Терминал: ${yclientsTerminalLabel(value.yclients_terminal_id) || `#${value.yclients_terminal_id}`}`);
+  if (value.company_id) fields.push(`Терминал: ${yclientsTerminalLabel(value.company_id) || `#${value.company_id}`}`);
   if (value.employee_id) fields.push(`Сотрудник: #${value.employee_id}`);
   if (value.actor_id) fields.push(`Инициатор: ${userShortNameById(value.actor_id)}`);
   if (value.bonus_type) fields.push(`Тип бонусов: ${value.bonus_type}`);
@@ -857,7 +878,9 @@ function eventDetails(item) {
   }
 
   const entityId = item.entity_id || payload.id || payload.subscription_id || payload.certificate_id || payload.visit_id;
-  if (item.entity_type && entityId) addDetail(fields, `${humanizeCode(item.entity_type)}: #${entityId}`);
+  const terminalLabel = yclientsTerminalLabel(entityId);
+  if (terminalLabel) addDetail(fields, `Терминал: ${terminalLabel}`);
+  else if (item.entity_type && entityId) addDetail(fields, `${humanizeCode(item.entity_type)}: #${entityId}`);
   if (item.client_id || payload.client_id) addDetail(fields, `Клиент: #${item.client_id || payload.client_id}`);
   if (item.branch_id || payload.branch_id) addDetail(fields, `Филиал: #${item.branch_id || payload.branch_id}`);
   if (payload.employee_id) addDetail(fields, `Сотрудник: #${payload.employee_id}`);
@@ -1033,6 +1056,7 @@ function syncUserDepartmentForm(scope) {
   const workplace = form.querySelector('[name="workplace_id"]');
   const submit = form.querySelector('button[type="submit"], button.primary');
   if (!branch || !department) return;
+  const isUserCreate = form.matches("[data-user-create]");
   const hasBranch = !!String(branch.value || "").trim();
   const currentDepartment = hasBranch ? department.value : "";
   department.innerHTML = workplaceDepartmentOptions(branch.value, currentDepartment);
@@ -1040,8 +1064,8 @@ function syncUserDepartmentForm(scope) {
   if (!hasBranch) department.value = "";
   const hasDepartment = !!String(department.value || "").trim();
   if (role) {
-    role.disabled = !hasDepartment;
-    if (!hasDepartment) role.value = "";
+    role.disabled = isUserCreate ? !hasBranch : !hasDepartment;
+    if (role.disabled) role.value = "";
   }
   if (workplace) {
     const currentWorkplace = hasDepartment ? workplace.value : "";
@@ -1049,7 +1073,7 @@ function syncUserDepartmentForm(scope) {
     workplace.disabled = !hasDepartment;
     if (!hasDepartment) workplace.value = "";
   }
-  if (submit) submit.disabled = !hasDepartment;
+  if (submit && !isUserCreate) submit.disabled = !hasDepartment;
 }
 
 function section(title, body, hint = "") {
@@ -1066,9 +1090,40 @@ function eventEntityCell(item) {
   return escapeHtml(humanizeCode(item.entity_type));
 }
 
+function auditEntityCell(item) {
+  const entityType = item.entity_type || item.entity;
+  if (entityType === "client_visit") {
+    return `<button type="button" class="ghost" data-open-event-visit="audit:${escapeHtml(item.id)}">${escapeHtml(humanizeCode(entityType))}</button>`;
+  }
+  return escapeHtml(humanizeCode(entityType));
+}
+
+function eventNameCell(item) {
+  const label = humanizeCode(item.event_type || item.event_name || item.name);
+  if (item.entity_type !== "client_visit") return escapeHtml(label);
+  const visitWord = "Визит";
+  if (!label.startsWith(visitWord)) {
+    return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
+  }
+  return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${visitWord}</button>${escapeHtml(label.slice(visitWord.length))}`;
+}
+
+function eventVisitPayload(item) {
+  if (item?.payload && typeof item.payload === "object") return item.payload;
+  if (item?.new_value && typeof item.new_value === "object") return item.new_value;
+  if (item?.old_value && typeof item.old_value === "object") return item.old_value;
+  return {};
+}
+
+function eventVisitId(item) {
+  const payload = eventVisitPayload(item);
+  return item?.entity_id || payload.id || payload.visit_id;
+}
+
 function eventVisitModal() {
   if (!selectedEventVisit) return "";
-  const visit = selectedEventVisit.payload || {};
+  const visit = eventVisitPayload(selectedEventVisit);
+  const visitId = eventVisitId(selectedEventVisit);
   return `
     <div class="modal-backdrop" data-event-visit-modal>
       <div class="modal-card">
@@ -1076,18 +1131,32 @@ function eventVisitModal() {
           <h3>Визит</h3>
           <button type="button" class="ghost" data-close-event-visit>Закрыть</button>
         </div>
-        <div class="modal-grid">
-          ${readonly("Дата и время", formatVisitDateTime(visit.visit_at))}
-          ${readonly("Филиал", nameById(cache.branches || [], visit.branch_id))}
-          ${readonly("Сотрудник", userLabelById(visit.employee_id))}
+        <form class="modal-grid" data-event-visit-edit data-visit-id="${escapeHtml(visitId || "")}">
+          <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at))}"></label>
+          ${selectField("Филиал", "branch_id", cache.branches || [], visit.branch_id, "Выберите филиал")}
+          ${selectField(
+            "Сотрудник",
+            "employee_id",
+            (cache.users || []).map((user) => ({ id: user.id, name: userLabelById(user.id) })),
+            visit.employee_id,
+            "Выберите сотрудника",
+          )}
           ${readonly("Клиент", visit.full_name || (selectedEventVisit.client_id ? `#${selectedEventVisit.client_id}` : ""))}
-          ${readonly("Статус визита", visitStatusLabel(visit.visit_status))}
-          ${readonly("Стоимость", visit.total_cost)}
-          ${readonly("Скидка", visit.discount_amount)}
-          ${readonly("Оплачено", visit.paid_amount)}
+          <label><span>Статус</span><select name="visit_status">
+            <option value="completed" ${visit.visit_status === "completed" ? "selected" : ""}>Завершен</option>
+            <option value="scheduled" ${visit.visit_status === "scheduled" ? "selected" : ""}>Запланирован</option>
+            <option value="cancelled" ${visit.visit_status === "cancelled" ? "selected" : ""}>Отменен</option>
+            <option value="no_show" ${visit.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
+          </select></label>
+          <label><span>Стоимость</span><input name="total_cost" type="number" step="0.01" min="0" value="${escapeHtml(visit.total_cost ?? "")}"></label>
+          <label><span>Скидка</span><input name="discount_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.discount_amount ?? "")}"></label>
+          <label><span>Оплачено</span><input name="paid_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.paid_amount ?? "")}"></label>
           ${readonly("Задолженность", visit.debt_amount)}
-          ${readonly("Комментарий", visit.comment)}
-        </div>
+          <label><span>Источник</span><input name="source" value="${escapeHtml(visit.source || "")}"></label>
+          <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visit.comment || "")}"></label>
+          <p data-message></p>
+          <button class="primary">Сохранить визит</button>
+        </form>
       </div>
     </div>
   `;
@@ -1267,7 +1336,7 @@ function uniqueNames(values) {
 function userAccessTable(users, empty, memberships, branchMemberships, branches, departments, workplaces, roles) {
   if (!users.length) return `<p class="empty">${escapeHtml(empty)}</p>`;
   return `
-    <table>
+    <table class="centered-list-table">
       <thead><tr>
         <th>Сотрудник</th>
         <th>Филиал</th>
@@ -1534,12 +1603,15 @@ function openEntityModal(type, item) {
       .join("; ")
     : "";
   const modalTitle = userAccessTitle ? `${modalBaseTitle} - ${userAccessTitle}` : modalBaseTitle;
+  const modalTitleId = type === "productItem"
+    ? `<span class="modal-title-id">ID ${escapeHtml(item.id)}</span>`
+    : "";
 
   document.body.insertAdjacentHTML("beforeend", `
     <div class="modal-backdrop" data-settings-modal>
       <div class="modal-card">
         <div class="modal-head">
-          <h3>${escapeHtml(modalTitle)}</h3>
+          <h3>${escapeHtml(modalTitle)}${modalTitleId}</h3>
           <button type="button" class="ghost" data-close-modal>Закрыть</button>
         </div>
         <form class="modal-grid" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
@@ -1793,7 +1865,7 @@ export async function settings(ctx) {
     ? workplaces.filter((item) => String(item.branch_id) === String(workplaceFilterBranchId))
     : workplaces;
 
-  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, categories, productItems, achievements, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, events };
+  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, categories, productItems, achievements, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, auditLogs, events };
   const productCategories = categories.filter((category) => category.type === "product");
   const serviceCategories = categories.filter((category) => category.type === "service");
   const products = productItems
@@ -1969,10 +2041,10 @@ export async function settings(ctx) {
         ${section("Пользователи и доступ", `
           <form class="inline-form compact" data-user-create data-permission="settings.users.create">
             <label><span>Имя</span><input name="first_name" required></label>
-            <label><span>Отчество</span><input name="middle_name"></label>
-            <label><span>Фамилия</span><input name="last_name"></label>
-            <label><span>Телефон</span><input name="phone"></label>
-            <label><span>Email</span><input name="email"></label>
+            <label><span>Отчество</span><input name="middle_name" data-optional="true"></label>
+            <label><span>Фамилия</span><input name="last_name" data-optional="true"></label>
+            <label><span>Телефон</span><input name="phone" data-optional="true"></label>
+            <label><span>Email</span><input name="email" data-optional="true"></label>
             <label><span>Пароль/хеш</span><input name="password" type="password" required></label>
             ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал").replace('name="branch_id"', 'name="branch_id" data-optional="true"')}
             <label><span>Подразделение</span><select name="department_id" data-optional="true" disabled>${workplaceDepartmentOptions()}</select></label>
@@ -2018,7 +2090,7 @@ export async function settings(ctx) {
             ${rows(auditLogs, "Записей аудита пока нет", (item) => `
               <tr>
                 <td>${escapeHtml(humanizeCode(item.action))}</td>
-                <td>${escapeHtml(humanizeCode(item.entity_type || item.entity))}</td>
+                <td>${auditEntityCell(item)}</td>
                 <td>${escapeHtml(auditDetails(item))}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
@@ -2029,11 +2101,10 @@ export async function settings(ctx) {
 
       <div id="events" data-permission="settings.events.view">
         ${section("События", `
-          <table><thead><tr><th>Событие</th><th>Сущность</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
+          <table><thead><tr><th>Событие</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
             ${rows(events, "Событий пока нет", (item) => `
               <tr>
-                <td>${escapeHtml(humanizeCode(item.event_type || item.event_name || item.name))}</td>
-                <td>${eventEntityCell(item)}</td>
+                <td>${eventNameCell(item)}</td>
                 <td>${escapeHtml(eventDetails(item))}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
@@ -2148,6 +2219,25 @@ export function bindSettings(root, ctx) {
     setMessage(form, "");
 
     try {
+      if (form.matches("[data-event-visit-edit]")) {
+        if (!form.dataset.visitId) throw new Error("ID визита не найден.");
+        const data = formData(form);
+        await api.updateClientVisit(form.dataset.visitId, {
+          visit_at: data.visit_at ? new Date(data.visit_at).toISOString() : undefined,
+          branch_id: numberOrNull(data.branch_id),
+          employee_id: numberOrNull(data.employee_id),
+          visit_status: optional(data.visit_status),
+          total_cost: Number(data.total_cost || 0),
+          discount_amount: Number(data.discount_amount || 0),
+          paid_amount: Number(data.paid_amount || 0),
+          source: optional(data.source),
+          comment: optional(data.comment),
+        });
+        selectedEventVisit = null;
+        form.closest("[data-event-visit-modal]")?.remove();
+        ctx.reload();
+        return;
+      }
       validateRequiredPanelForm(form);
       if (!form.reportValidity()) return;
       const data = formData(form);
@@ -2211,7 +2301,9 @@ export function bindSettings(root, ctx) {
           name: data.name,
         });
       } else if (form.matches("[data-user-create]")) {
+        if (!optional(data.phone) && !optional(data.email)) throw new Error("Укажите телефон или email.");
         const created = await api.createUser({
+          organization_id: ctx.org.id,
           first_name: data.first_name,
           middle_name: optional(data.middle_name),
           last_name: optional(data.last_name),
@@ -2263,7 +2355,10 @@ export function bindSettings(root, ctx) {
 
     const openVisitButton = event.target.closest("[data-open-event-visit]");
     if (openVisitButton) {
-      selectedEventVisit = (cache.events || []).find((item) => String(item.id) === String(openVisitButton.dataset.openEventVisit)) || null;
+      const visitRef = String(openVisitButton.dataset.openEventVisit || "");
+      selectedEventVisit = visitRef.startsWith("audit:")
+        ? (cache.auditLogs || []).find((item) => String(item.id) === visitRef.slice(6)) || null
+        : (cache.events || []).find((item) => String(item.id) === visitRef) || null;
       ctx.reload();
       return;
     }

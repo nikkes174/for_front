@@ -53,10 +53,7 @@ function statusLabel(status) {
 }
 
 function clientFullName(client) {
-  return [
-    [client.first_name, client.middle_name].filter(Boolean).join(" "),
-    client.last_name,
-  ].filter(Boolean).join(" ") || name(client);
+  return [client.last_name, client.first_name].filter(Boolean).join(" ") || name(client);
 }
 
 function clientLastVisitAt(client) {
@@ -128,9 +125,9 @@ function clientTableHeader(ctx, search, pageSize, sort, direction, key, label) {
 
 function clientTable(items, ctx, search, pageSize, sort, direction) {
   return `
-    <table>
+    <table class="centered-list-table">
       <thead><tr>
-        <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "name", "Имя Отчество Фамилия")}</th>
+        <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "name", "Фамилия Имя")}</th>
         <th>Телефон</th>
         <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "birth_date", "Дата рождения")}</th>
         <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "status", "Статус")}</th>

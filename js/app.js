@@ -270,7 +270,7 @@ window.addEventListener("ajax:end", () => {
 
 bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
-bindLoyalty(root, { get org() { return state.org; }, reload });
+bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
 bindSettings(root, { get org() { return state.org; }, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
 

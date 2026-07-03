@@ -609,6 +609,8 @@ button:active { transform: translateY(1px); }
 .table-wrap { overflow-x: auto; border: 1px solid #dce3ee; border-radius: 8px; }
 table { width: 100%; border-collapse: collapse; min-width: 620px; }
 th, td { padding: 12px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
+.centered-list-table th,
+.centered-list-table td { text-align: center; vertical-align: middle; }
 tr:last-child td { border-bottom: 0; }
 td small { display: block; color: #667085; margin-top: 4px; }
 .task-progress {
@@ -651,6 +653,14 @@ td small { display: block; color: #667085; margin-top: 4px; }
   gap: 16px;
 }
 
+.task-added-card {
+  width: min(420px, 100%);
+}
+
+.task-added-card .modal-grid {
+  grid-template-columns: 1fr;
+}
+
 .modal-head {
   display: flex;
   align-items: center;
@@ -660,6 +670,15 @@ td small { display: block; color: #667085; margin-top: 4px; }
 
 .modal-head h3 {
   margin: 0;
+}
+
+.modal-title-id {
+  color: #667085;
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 4px;
+  white-space: nowrap;
 }
 
 .modal-grid {
