@@ -207,6 +207,19 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 button:active { transform: translateY(1px); }
 .primary { background: #2563eb; color: #fff; }
 .primary:hover { background: #1d4ed8; }
+.inline-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  align-self: end;
+  min-height: 40px;
+  width: max-content;
+  border-radius: 7px;
+  padding: 8px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
 .auth-2fa-link {
   display: inline-flex;
   align-items: center;
@@ -531,6 +544,22 @@ button:active { transform: translateY(1px); }
   color: #fff;
 }
 
+.tabs button {
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: #eef2f7;
+  color: #172033;
+}
+
+.tabs button.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.compact-tabs {
+  margin: 0;
+}
+
 .tabs .tab-disabled {
   padding: 8px 12px;
   border-radius: 7px;
@@ -578,6 +607,70 @@ button:active { transform: translateY(1px); }
 
 .loyalty-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.card-config-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.card-config-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 14px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.card-config-block h4 {
+  margin: 0 0 8px;
+}
+
+.card-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.card-block-settings {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr);
+  gap: 8px;
+}
+
+.checkbox-select {
+  position: relative;
+  border: 1px solid #d5deec;
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px;
+}
+
+.checkbox-select summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.card-bottom-switch {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.card-bottom-switch button.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.card-visit-items {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.card-visit-details {
+  margin-top: 12px;
 }
 
 .search { max-width: 420px; }
@@ -710,6 +803,19 @@ td small { display: block; color: #667085; margin-top: 4px; }
   line-height: 1.4;
 }
 
+.auth-link-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+}
+
+.auth-link-actions {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  justify-self: end;
+}
+
 .photo-upload-field {
   align-items: start;
 }
@@ -767,6 +873,9 @@ td small { display: block; color: #667085; margin-top: 4px; }
   .client-search { grid-template-columns: 1fr; }
   .permission-matrix { grid-template-columns: 1fr; }
   .loyalty-grid { grid-template-columns: 1fr; }
+  .card-config-block { grid-template-columns: 1fr; }
+  .card-bottom-switch { justify-content: stretch; }
+  .card-bottom-switch button { flex: 1; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .modal-grid { grid-template-columns: 1fr; }
 }

@@ -1,10 +1,12 @@
-import { api } from "./api.js";
+﻿import { api } from "./api.js";
 import { ensureCss, formData, render, root, setMessage } from "./dom.js";
 
 const params = new URLSearchParams(location.search);
 let mode = params.get("mode") === "register" || location.pathname === "/register" ? "register" : "login";
 let twoFactor = null;
 let loginDraft = "";
+let twoFactorTarget = "/";
+let resetPasswordOpen = false;
 
 ensureCss();
 
@@ -18,22 +20,42 @@ function twoFactorHtml() {
   if (!twoFactor) return "";
   const label = channelLabel(twoFactor.channel);
   const statusText = twoFactor.sent
-    ? `Код отправлен в ${label}.`
+    ? `\u041a\u043e\u0434 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u0432 ${label}.`
     : twoFactor.waiting_for_bot_start
-      ? `Откройте бота ${label}, чтобы получить код.`
-      : `Код не удалось отправить в ${label}. Попробуйте запросить его ещё раз.`;
+      ? `\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u0435 \u0431\u043e\u0442\u0430 ${label}, \u043f\u043e\u0441\u043b\u0435 \u044d\u0442\u043e\u0433\u043e \u043a\u043e\u0434 \u043f\u0440\u0438\u0434\u0435\u0442 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438.`
+      : `\u041a\u043e\u0434 \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0432 ${label}.`;
   return `
     <div class="modal-backdrop" data-2fa-modal>
       <div class="modal-card auth-2fa-card">
         <div class="modal-head">
-          <h3>Код входа через ${label}</h3>
-          <button type="button" class="ghost" data-2fa-cancel>Закрыть</button>
+          <h3>\u041a\u043e\u0434 \u0432\u0445\u043e\u0434\u0430 \u0447\u0435\u0440\u0435\u0437 ${label}</h3>
+          <button type="button" class="ghost" data-2fa-cancel>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
         </div>
         <form class="modal-grid" data-2fa-form>
           <p class="modal-full">${statusText}</p>
-          ${twoFactor.waiting_for_bot_start && twoFactor.link ? `<a class="primary modal-full auth-2fa-link" href="${twoFactor.link}" target="_blank" rel="noreferrer">Получить код через ${label}</a>` : ""}
-          <label class="modal-full"><span>Код</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus></label>
-          <button class="primary modal-full">Подтвердить вход</button>
+          ${twoFactor.waiting_for_bot_start && twoFactor.link ? `<a class="primary modal-full auth-2fa-link" href="${twoFactor.link}" target="_blank" rel="noreferrer">\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u0431\u043e\u0442\u0430 ${label}</a>` : ""}
+          <label class="modal-full"><span>\u041a\u043e\u0434</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus></label>
+          <button class="primary modal-full">\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c \u0432\u0445\u043e\u0434</button>
+          <p class="modal-full" data-message></p>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function resetPasswordHtml() {
+  if (!resetPasswordOpen) return "";
+  return `
+    <div class="modal-backdrop" data-reset-password-modal>
+      <div class="modal-card auth-2fa-card">
+        <div class="modal-head">
+          <h3>\u0421\u0431\u0440\u043e\u0441 \u043f\u0430\u0440\u043e\u043b\u044f</h3>
+          <button type="button" class="ghost" data-reset-password-cancel>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
+        </div>
+        <form class="modal-grid" data-reset-password-form>
+          <label class="modal-full"><span>ID \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438</span><input name="organization_id" inputmode="numeric" required autofocus></label>
+          <label class="modal-full"><span>\u041d\u043e\u0432\u044b\u0439 \u043f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" required minlength="8"></label>
+          <button class="primary modal-full">\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u0438 \u043d\u0430\u0437\u043d\u0430\u0447\u0438\u0442\u044c</button>
           <p class="modal-full" data-message></p>
         </form>
       </div>
@@ -46,20 +68,23 @@ function authHtml() {
   return `
     <main class="auth-page">
       <form class="auth-card ${isRegister ? "wide" : ""}" data-auth-form>
-        <h1>${isRegister ? "Регистрация" : "Вход"}</h1>
+        <h1>${isRegister ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f" : "\u0412\u0445\u043e\u0434"}</h1>
         <div class="auth-tabs">
-          <button type="button" class="${!isRegister ? "primary" : "ghost"}" data-mode="login">Войти</button>
-          <button type="button" class="${isRegister ? "primary" : "ghost"}" data-mode="register">Создать аккаунт</button>
+          <button type="button" class="${!isRegister ? "primary" : "ghost"}" data-mode="login">\u0412\u043e\u0439\u0442\u0438</button>
+          <button type="button" class="${isRegister ? "primary" : "ghost"}" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
         </div>
-        ${isRegister ? '<label><span>Имя</span><input name="name" required></label>' : ""}
-        <label><span>${isRegister ? "Email" : "Email или телефон"}</span><input name="${isRegister ? "email" : "login"}" required></label>
-        ${isRegister ? '<label><span>Телефон</span><input name="phone"></label>' : ""}
-        <label><span>Пароль</span><input name="password" type="password" required></label>
-        ${isRegister ? '<label><span>Повтор пароля</span><input name="confirm" type="password" required></label>' : ""}
+        ${isRegister ? '<label><span>\u0418\u043c\u044f</span><input name="name" required></label>' : ""}
+        <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" required></label>
+        ${isRegister ? '<label><span>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</span><input name="phone"></label>' : ""}
+        <label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" ${isRegister ? "required" : ""}></label>
+        ${isRegister ? '<label><span>\u041f\u043e\u0432\u0442\u043e\u0440 \u043f\u0430\u0440\u043e\u043b\u044f</span><input name="confirm" type="password" required></label>' : ""}
         <p data-message></p>
-        <button class="primary">${isRegister ? "Создать аккаунт" : "Войти"}</button>
+        <button class="primary">${isRegister ? "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442" : "\u0412\u043e\u0439\u0442\u0438"}</button>
+        ${!isRegister ? '<button type="button" class="ghost" data-client-max-login>\u0412\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 MAX</button>' : ""}
+        ${!isRegister ? '<button type="button" class="ghost" data-reset-password-open>\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c</button>' : ""}
       </form>
       ${twoFactorHtml()}
+      ${resetPasswordHtml()}
     </main>
   `;
 }
@@ -75,10 +100,39 @@ root.addEventListener("input", (event) => {
   root.querySelector("[data-2fa-modal]")?.remove();
 });
 
-root.addEventListener("click", (event) => {
+root.addEventListener("click", async (event) => {
   if (event.target.closest("[data-2fa-cancel]")) {
     twoFactor = null;
     root.querySelector("[data-2fa-modal]")?.remove();
+    return;
+  }
+
+  if (event.target.closest("[data-reset-password-cancel]")) {
+    resetPasswordOpen = false;
+    root.querySelector("[data-reset-password-modal]")?.remove();
+    return;
+  }
+
+  if (event.target.closest("[data-reset-password-open]")) {
+    resetPasswordOpen = true;
+    draw();
+    return;
+  }
+
+  const maxLogin = event.target.closest("[data-client-max-login]");
+  if (maxLogin) {
+    const form = maxLogin.closest("[data-auth-form]");
+    const data = formData(form);
+    const phone = data.login || loginDraft;
+    setMessage(form, "");
+    try {
+      if (!phone) throw new Error("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
+      twoFactor = await api.startClientMaxAuth({ phone });
+      twoFactorTarget = "/cabinet.html";
+      draw();
+    } catch (error) {
+      setMessage(form, error.message);
+    }
     return;
   }
 
@@ -86,6 +140,7 @@ root.addEventListener("click", (event) => {
   if (!button) return;
   mode = button.dataset.mode;
   twoFactor = null;
+  twoFactorTarget = "/";
   history.replaceState(null, "", `/auth.html?mode=${mode}`);
   draw();
 });
@@ -98,9 +153,26 @@ root.addEventListener("submit", async (event) => {
     const data = formData(twoFactorForm);
     try {
       await api.verify2fa({ ticket: twoFactor.ticket, code: data.code });
-      location.href = "/";
+      location.href = twoFactorTarget;
     } catch (error) {
       setMessage(twoFactorForm, error.message);
+    }
+    return;
+  }
+
+  const resetPasswordForm = event.target.closest("[data-reset-password-form]");
+  if (resetPasswordForm) {
+    event.preventDefault();
+    setMessage(resetPasswordForm, "");
+    const data = formData(resetPasswordForm);
+    try {
+      const result = await api.testResetPassword({
+        organization_id: Number(data.organization_id),
+        password: data.password,
+      });
+      setMessage(resetPasswordForm, `\u041f\u0430\u0440\u043e\u043b\u044c \u0441\u0431\u0440\u043e\u0448\u0435\u043d. \u041b\u043e\u0433\u0438\u043d: ${result.login || `user #${result.user_id}`}`);
+    } catch (error) {
+      setMessage(resetPasswordForm, error.message);
     }
     return;
   }
@@ -113,7 +185,7 @@ root.addEventListener("submit", async (event) => {
   const data = formData(form);
   try {
     if (mode === "register") {
-      if (data.password !== data.confirm) throw new Error("Пароли не совпадают");
+      if (data.password !== data.confirm) throw new Error("\u041f\u0430\u0440\u043e\u043b\u0438 \u043d\u0435 \u0441\u043e\u0432\u043f\u0430\u0434\u0430\u044e\u0442");
       await api.register({
         name: data.name,
         email: data.email || undefined,
@@ -130,3 +202,6 @@ root.addEventListener("submit", async (event) => {
 });
 
 draw();
+
+
+

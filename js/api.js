@@ -60,10 +60,13 @@ export async function upload(path, formData) {
 export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  testResetPassword: (body) => request("/auth/test-reset-password", { method: "POST", body: JSON.stringify(body) }),
+  startClientMaxAuth: (body) => request("/auth/client-max/start", { method: "POST", body: JSON.stringify(body) }),
   start2fa: (body) => request("/auth/2fa/start", { method: "POST", body: JSON.stringify(body) }),
   verify2fa: (body) => request("/auth/2fa/verify", { method: "POST", body: JSON.stringify(body) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
+  cabinet: () => request("/auth/cabinet"),
 
   organizations: () => request("/organizations"),
   createOrganization: (body) => request("/organizations", { method: "POST", body: JSON.stringify(body) }),
@@ -154,6 +157,7 @@ export const api = {
     }
     return request(`/crm-api/clients-core/clients/search?${params}`);
   },
+  client: (id, orgId) => request(`/crm-api/clients-core/clients/${id}${orgId ? `?organization_id=${orgId}` : ""}`),
   createClient: (body) => request("/crm-api/clients", { method: "POST", body: JSON.stringify(body) }),
   updateClient: (id, body) => request(`/crm-api/clients-core/clients/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   uploadClientPhoto: (id, file) => {
@@ -162,6 +166,13 @@ export const api = {
     return upload(`/crm-api/clients-core/clients/${id}/photo`, data);
   },
   deleteClient: (id) => request(`/crm-api/clients-core/clients/${id}`, { method: "DELETE" }),
+  createClientAuthLink: (body) => request("/auth/client-auth-links", { method: "POST", body: JSON.stringify(body) }),
+  clientAuthLinks: (organizationId) => request(`/auth/client-auth-links?organization_id=${organizationId}`),
+  deleteClientAuthLink: (id) => request(`/auth/client-auth-links/${id}`, { method: "DELETE" }),
+  clientRegistrationFields: (organizationId) => request(`/auth/client-registration-fields?organization_id=${organizationId}`),
+  updateClientRegistrationFields: (organizationId, fields) => request("/auth/client-registration-fields", { method: "PUT", body: JSON.stringify({ organization_id: organizationId, fields }) }),
+  clientCardSections: (organizationId) => request(`/auth/client-card-sections?organization_id=${organizationId}`),
+  updateClientCardSections: (organizationId, sections) => request("/auth/client-card-sections", { method: "PUT", body: JSON.stringify({ organization_id: organizationId, sections }) }),
   clientProfile: (id, orgId) => request(`/crm-api/client-profile/clients/${id}?organization_id=${orgId}`),
   clientProfileMetric: (id) => request(`/crm-api/client-profile/clients/${id}/metrics`),
   clientHistoryVisits: (id) => request(`/crm-api/client-history/visits?client_id=${id}&include_services=true&include_products=true`),

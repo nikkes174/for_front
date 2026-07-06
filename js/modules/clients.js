@@ -3,6 +3,18 @@ import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMes
 
 const CLIENTS_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_CLIENTS_PAGE_SIZE = 10;
+const REGISTRATION_FIELDS_STORAGE_PREFIX = "loyalty.registrationFields.";
+const REGISTRATION_FIELD_NAMES = [
+  "last_name",
+  "first_name",
+  "middle_name",
+  "phone",
+  "gender",
+  "telegram_id",
+  "max_id",
+  "vk_id",
+  "email",
+];
 
 let state = {
   clients: [],
@@ -24,6 +36,8 @@ let state = {
   selectedVisitDraft: {},
   photoPreviewUrl: "",
   photoFile: null,
+  authLink: null,
+  authLinks: [],
 };
 
 const no = "Без фото";
@@ -155,6 +169,68 @@ function clientPageSizeControl(pageSize) {
     <label><span>Отображать клиентов</span><select data-client-page-size>
       ${CLIENTS_PAGE_SIZE_OPTIONS.map((size) => `<option value="${size}" ${pageSize === size ? "selected" : ""}>${size}</option>`).join("")}
     </select></label>
+  `;
+}
+
+function clientAuthLinkForm(items) {
+  const options = items.map((client) => `<option value="${escapeHtml(client.id)}">${escapeHtml(clientFullName(client))}</option>`).join("");
+  const authPath = state.authLink?.url || state.authLink?.path || "";
+  const link = authPath ? new URL(authPath, window.location.origin).toString() : "";
+  return `
+    <form class="inline-form compact" data-client-auth-link-create>
+      <label><span>Клиент</span><select name="client_id"><option value="">Без клиента</option>${options}</select></label>
+      <button class="primary">Сгенерировать ссылку</button>
+      ${link ? `
+        <label><span>Разовая ссылка</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
+        <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">Копировать</button>
+      ` : ""}
+      <p data-message></p>
+    </form>
+  `;
+}
+
+function enabledRegistrationFields(orgId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${REGISTRATION_FIELDS_STORAGE_PREFIX}${orgId || "default"}`) || "null");
+    if (Array.isArray(saved)) {
+      return REGISTRATION_FIELD_NAMES.filter((name) => saved.includes(name));
+    }
+  } catch {
+    // Use defaults if local settings are not readable.
+  }
+  return [...REGISTRATION_FIELD_NAMES];
+}
+
+
+function authLinkStatusLabel(link) {
+  if (link.completed_at) return "\u0417\u0430\u043f\u043e\u043b\u043d\u0435\u043d\u0430";
+  if (link.used_at) return "\u041e\u0442\u043a\u0440\u044b\u0442\u0430";
+  if (link.expires_at && new Date(link.expires_at).getTime() <= Date.now()) return "\u0418\u0441\u0442\u0435\u043a\u043b\u0430";
+  return "\u041d\u043e\u0432\u0430\u044f";
+}
+
+function authLinkClientLabel(item, clients) {
+  if (!item.client_id) return "\u0411\u0435\u0437 \u043a\u043b\u0438\u0435\u043d\u0442\u0430";
+  const client = clients.find((candidate) => String(candidate.id) === String(item.client_id));
+  if (!client) return "\u041a\u043b\u0438\u0435\u043d\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d";
+  return `<button type="button" class="ghost" data-open-client="${escapeHtml(client.id)}">${escapeHtml(clientFullName(client))}</button>`;
+}
+
+function clientAuthLinksList(items, clients) {
+  return `
+    <div class="subpanel">
+      <h3>\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 \u0441\u0441\u044b\u043b\u043a\u0438</h3>
+      ${rows(items, "\u0421\u0441\u044b\u043b\u043e\u043a \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.", (item) => `
+        <div class="readonly-field auth-link-row">
+          <div>${authLinkClientLabel(item, clients)}</div>
+          <b>${escapeHtml(authLinkStatusLabel(item))}</b>
+          <span>${escapeHtml(dateTime(item.created_at) || "")}</span>
+          <div class="auth-link-actions">
+            <button type="button" class="ghost" data-delete-auth-link="${escapeHtml(item.id)}">\u0423\u0434\u0430\u043b\u0438\u0442\u044c</button>
+          </div>
+        </div>
+      `)}
+    </div>
   `;
 }
 
@@ -825,7 +901,7 @@ export async function clients(ctx) {
   const pageSize = CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE;
   const requestedPage = Number(params.get("page") || 1);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
-  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems] = await Promise.all([
+  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, authLinks] = await Promise.all([
     api.clients(ctx.org.id, { query: search, offset: 0, limit: 1000 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
@@ -837,9 +913,20 @@ export async function clients(ctx) {
     api.clientSegments(ctx.org.id).catch(() => segmentExamples().map((name) => ({ name }))),
     (api.productCategories?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
     (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
+    api.clientAuthLinks(ctx.org.id).catch(() => []),
   ]);
 
   const sortedItems = sortClients(items, sort, direction);
+  const loadedClientIds = new Set(sortedItems.map((item) => String(item.id)));
+  const linkedClientIds = [...new Set(authLinks.map((item) => item.client_id).filter(Boolean).map(String))]
+    .filter((id) => !loadedClientIds.has(id));
+  const linkedClients = await Promise.all(
+    linkedClientIds.map((id) => api.client(id, ctx.org.id).catch(() => null)),
+  );
+  const knownClients = [
+    ...sortedItems,
+    ...linkedClients.filter(Boolean),
+  ];
   const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const offset = (currentPage - 1) * pageSize;
@@ -856,7 +943,7 @@ export async function clients(ctx) {
     return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
   };
 
-  state = { ...state, clients: pageItems, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems };
+  state = { ...state, clients: knownClients, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, authLinks };
 
   return `
     <section class="panel" data-clients>
@@ -886,6 +973,8 @@ export async function clients(ctx) {
           ${hasNextPage ? `<a class="ghost pagination-link" href="${pageUrl(currentPage + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
         </div>
       </div>
+      ${clientAuthLinkForm(knownClients)}
+      ${clientAuthLinksList(authLinks, knownClients)}
       <div class="subpanel">
         <h3>Сервис сегментации</h3>
         ${simpleList(segments, "Сегменты пока не настроены.", (item) => `${item.name}${item.is_dynamic ? " · динамический" : ""}`)}
@@ -1055,7 +1144,14 @@ export function bindClients(root, ctx) {
     const data = formData(form);
 
     try {
-      if (form.matches("[data-client-create]")) {
+      if (form.matches("[data-client-auth-link-create]")) {
+        const registrationSettings = await api.clientRegistrationFields(ctx.org.id).catch(() => null);
+        state.authLink = await api.createClientAuthLink(clean({
+          organization_id: ctx.org.id,
+          client_id: numberOrNull(data.client_id),
+          registration_fields: Array.isArray(registrationSettings?.fields) ? registrationSettings.fields : enabledRegistrationFields(ctx.org.id),
+        }));
+      } else if (form.matches("[data-client-create]")) {
         const created = await api.createClient(clean({
           organization_id: ctx.org.id,
           status: "active",
@@ -1160,10 +1256,28 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const copyAuthLinkButton = event.target.closest("[data-copy-auth-link]");
+    if (copyAuthLinkButton) {
+      const link = copyAuthLinkButton.dataset.copyAuthLink;
+      if (link) {
+        await navigator.clipboard.writeText(link);
+        copyAuthLinkButton.textContent = "Скопировано";
+      }
+      return;
+    }
+
     if (event.target.closest("[data-close-visit]")) {
       state.selectedVisit = null;
       state.selectedVisitDraft = {};
       event.target.closest("[data-visit-modal]")?.remove();
+      return;
+    }
+
+    const deleteAuthLinkButton = event.target.closest("[data-delete-auth-link]");
+    if (deleteAuthLinkButton) {
+      await api.deleteClientAuthLink(deleteAuthLinkButton.dataset.deleteAuthLink);
+      state.authLinks = state.authLinks.filter((item) => String(item.id) !== String(deleteAuthLinkButton.dataset.deleteAuthLink));
+      ctx.reload();
       return;
     }
 

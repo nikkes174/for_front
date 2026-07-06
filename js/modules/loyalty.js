@@ -2,6 +2,20 @@ import { api } from "../api.js";
 import { escapeHtml, formData, rows, setMessage } from "../dom.js";
 
 const CLIENTS_PAGE_SIZE = 10;
+const REGISTRATION_FIELDS_STORAGE_PREFIX = "loyalty.registrationFields.";
+const CLIENT_CARD_SECTIONS_STORAGE_PREFIX = "loyalty.clientCardSections.";
+const REGISTRATION_FIELD_NAMES = [
+  "last_name",
+  "first_name",
+  "middle_name",
+  "phone",
+  "gender",
+  "telegram_id",
+  "max_id",
+  "vk_id",
+  "email",
+];
+const DEFAULT_CLIENT_CARD_SECTIONS = ["client_name", "bonus_cashback", "client_level", "client_visits", "client_chat"];
 
 const loyaltyState = {
   selectedClientId: null,
@@ -39,6 +53,10 @@ const loyaltyState = {
     trigger_event: "first_visit",
   },
   actionResult: "",
+  cardMode: "client",
+  cardSelectedVisitId: null,
+  registrationFields: null,
+  clientCardSections: null,
 };
 
 let loyaltyModalCloseBound = false;
@@ -162,19 +180,20 @@ const L = {
 };
 
 const loyaltyTabs = [
-  ["rules", "Правила"],
-  ["levels", "Уровни"],
-  ["transactions", "Бонусы"],
-  ["subscriptions", "Абонементы", true],
-  ["certificates", "Сертификаты", true],
-  ["referrals", "Рефералы", true],
-  ["promotions", "Акции", true],
+  ["rules", "\u041f\u0440\u0430\u0432\u0438\u043b\u0430"],
+  ["levels", "\u0423\u0440\u043e\u0432\u043d\u0438"],
+  ["transactions", "\u0411\u043e\u043d\u0443\u0441\u044b"],
+  ["cards", "\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0438"],
+  ["subscriptions", "\u0410\u0431\u043e\u043d\u0435\u043c\u0435\u043d\u0442\u044b", true],
+  ["certificates", "\u0421\u0435\u0440\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u044b", true],
+  ["referrals", "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044b", true],
+  ["promotions", "\u0410\u043a\u0446\u0438\u0438", true],
 ];
-
 const permissions = {
   rules: "loyalty.rules.view",
   levels: "loyalty.levels.view",
   transactions: "loyalty.transactions.view",
+  cards: "loyalty.transactions.view",
   promotions: "loyalty.promotions.view",
   certificates: "loyalty.certificates.view",
   subscriptions: "loyalty.subscriptions.view",
@@ -337,6 +356,57 @@ function selectWithHint(label, hint, name, options, selected = "") {
 
 function checkbox(label, name, checked = false) {
   return `<label class="checkbox"><input name="${escapeHtml(name)}" type="checkbox" ${checked ? "checked" : ""}> ${escapeHtml(label)}</label>`;
+}
+
+function registrationFieldsStorageKey(orgId) {
+  return `${REGISTRATION_FIELDS_STORAGE_PREFIX}${orgId || "default"}`;
+}
+
+function enabledRegistrationFields(orgId) {
+  if (Array.isArray(loyaltyState.registrationFields)) {
+    return REGISTRATION_FIELD_NAMES.filter((name) => loyaltyState.registrationFields.includes(name));
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(registrationFieldsStorageKey(orgId)) || "null");
+    if (Array.isArray(saved)) {
+      return REGISTRATION_FIELD_NAMES.filter((name) => saved.includes(name));
+    }
+  } catch {
+    // Ignore broken local settings and fall back to defaults.
+  }
+  return [...REGISTRATION_FIELD_NAMES];
+}
+
+function saveEnabledRegistrationFields(orgId, fields) {
+  const normalized = REGISTRATION_FIELD_NAMES.filter((name) => fields.includes(name));
+  localStorage.setItem(registrationFieldsStorageKey(orgId), JSON.stringify(normalized));
+}
+
+function clientCardSectionsStorageKey(orgId) {
+  return `${CLIENT_CARD_SECTIONS_STORAGE_PREFIX}${orgId || "default"}`;
+}
+
+function normalizeClientCardSections(sections) {
+  if (!Array.isArray(sections)) return [...DEFAULT_CLIENT_CARD_SECTIONS];
+  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || String(name).startsWith("bonus_")))];
+}
+
+function enabledClientCardSections(orgId) {
+  if (Array.isArray(loyaltyState.clientCardSections)) {
+    return normalizeClientCardSections(loyaltyState.clientCardSections);
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(clientCardSectionsStorageKey(orgId)) || "null");
+    if (Array.isArray(saved)) return normalizeClientCardSections(saved);
+  } catch {
+    // Ignore broken local settings and fall back to defaults.
+  }
+  return [...DEFAULT_CLIENT_CARD_SECTIONS];
+}
+
+function saveEnabledClientCardSections(orgId, sections) {
+  const normalized = normalizeClientCardSections(sections);
+  localStorage.setItem(clientCardSectionsStorageKey(orgId), JSON.stringify(normalized));
 }
 
 function bonusTypeOptions(items, selected = "") {
@@ -647,10 +717,14 @@ async function loadClientContext(orgId) {
   if (!selectedClient && loyaltyState.selectedClientId) {
     selectedClient = await api.clientProfile(loyaltyState.selectedClientId, orgId).catch(() => null);
   }
-  const rules = await api.rules(orgId).catch(() => []);
-  const levels = await api.bonusLevels(orgId).catch(() => []);
-  const bonusTypes = await api.bonusTypes(orgId).catch(() => []);
-  const result = { clients, selectedClient, rules, levels, bonusTypes, filters, hasNextPage };
+  const [rules, levels, bonusTypes, registrationSettings, cardSettings] = await Promise.all([
+    api.rules(orgId).catch(() => []),
+    api.bonusLevels(orgId).catch(() => []),
+    api.bonusTypes(orgId).catch(() => []),
+    api.clientRegistrationFields(orgId).catch(() => null),
+    api.clientCardSections(orgId).catch(() => null),
+  ]);
+  const result = { clients, selectedClient, rules, levels, bonusTypes, registrationFields: registrationSettings?.fields || null, clientCardSections: cardSettings?.sections || null, filters, hasNextPage };
 
   if (!selectedClient) {
     const [history, subscriptions, certificates, referralSources, promotions] = await Promise.all([
@@ -669,10 +743,13 @@ async function loadClientContext(orgId) {
       referralStats: null,
       referrals: referralSources,
       promotions,
+      clientVisits: [],
+      bonusTypeBalances: [],
     };
   }
 
-  const [balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric] = await Promise.all([
+  const bonusBalanceTypes = ["cashback", ...(bonusTypes || []).map((item) => item.code).filter(Boolean)];
+  const [balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric, clientVisits, bonusTypeBalances] = await Promise.all([
     api.bonusBalance(selectedClient.id).catch(() => null),
     api.bonusHistory(selectedClient.id).catch(() => []),
     api.subscriptions(selectedClient.id).catch(() => []),
@@ -681,9 +758,11 @@ async function loadClientContext(orgId) {
     api.referralSources().catch(() => []),
     api.promotions(selectedClient.id).catch(() => []),
     api.clientProfileMetric(selectedClient.id).catch(() => selectedClient.metrics || null),
+    api.clientHistoryVisits(selectedClient.id).catch(() => []),
+    Promise.all(bonusBalanceTypes.map((type) => api.bonusBalance(selectedClient.id, type).catch(() => ({ bonus_type: type, balance: 0 })))),
   ]);
 
-  return { ...result, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric };
+  return { ...result, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric, clientVisits, bonusTypeBalances };
 }
 
 function clientSelector(orgId, tab, clients, selectedClient, filters, hasNextPage) {
@@ -730,12 +809,13 @@ function isTransitionRule(item) {
 
 function transitionRulesSection(ctx, rules, levels, selectedClient) {
   const transitionRules = (rules || []).filter(isTransitionRule);
+  const hasLevels = (levels || []).length > 0;
   return `
     <div class="subpanel">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-transition-rule-create>
         ${field("Сумма покупок клиента больше", "purchase_threshold", "0", 'type="number" step="0.01" min="0"')}
-        ${select("Перевести на уровень", "client_level", levelOptions(levels), "")}
-        <button class="primary" disabled>Создать правило</button>
+        ${hasLevels ? select("\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u043d\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c", "client_level", levelOptions(levels), "") : `<a class="primary inline-action-link" href="/organizations/${escapeHtml(ctx.org.id)}/loyalty/levels">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0443\u0440\u043e\u0432\u0435\u043d\u044c</a>`}
+        ${hasLevels ? `<button class="primary" disabled>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u0430\u0432\u0438\u043b\u043e</button>` : ""}
         <p data-message></p>
       </form>` : ""}
       <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
@@ -755,6 +835,172 @@ function levelsSection(ctx, levels) {
 
 function bonusTypesSection(ctx, bonusTypes) {
   return `<div class="subpanel">${titleWithHint(L.bonusTypesTitle, L.bonusTypesHint)}${canCreate(ctx, "transactions") ? `<form class="inline-form compact" data-loyalty-bonus-type-create>${field(L.name, "name")}<button class="primary" disabled>${L.createBonusType}</button><p data-message></p></form>` : ""}<table><tbody>${rows(bonusTypes || [], L.bonusTypesEmpty, (item) => `<tr><td>${escapeHtml(item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "bonus-type", item.id)}</td></tr>`)}</tbody></table></div>`;
+}
+
+function cardOrganizationAccess(ctx, key) {
+  const orgName = ctx.org?.name || ctx.org?.title || `#${ctx.org?.id || ""}`;
+  return `
+    <label class="card-access">
+      <span>\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c</span>
+      <details class="checkbox-select">
+        <summary>\u0412\u0441\u0435 \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438</summary>
+        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_all_orgs" checked> \u0412\u0441\u0435</label>
+        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_org_${escapeHtml(ctx.org?.id || "")}" checked> ${escapeHtml(orgName)}</label>
+      </details>
+    </label>
+  `;
+}
+
+function cardBlockSettings(ctx, key, order, enabled = true) {
+  const registrationField = key.startsWith("reg_") ? key.slice(4) : "";
+  const clientCardSection = registrationField ? "" : key;
+  return `
+    <div class="card-block-settings">
+      <label><span>\u041f\u043e\u0440\u044f\u0434\u043e\u043a</span><input type="number" min="1" value="${escapeHtml(order)}" name="${escapeHtml(key)}_order"></label>
+      <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}> \u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c</label>
+      ${cardOrganizationAccess(ctx, key)}
+    </div>
+  `;
+}
+
+function cardConfigBlock(ctx, key, title, order, preview, enabled = true) {
+  return `
+    <div class="card-config-block">
+      <div>
+        <h4>${escapeHtml(title)}</h4>
+        <div class="card-preview">${preview}</div>
+      </div>
+      ${cardBlockSettings(ctx, key, order, enabled)}
+    </div>
+  `;
+}
+
+function bonusBalanceBlocks(ctx, bonusTypes, bonusTypeBalances, enabledSections) {
+  const names = new Map([["cashback", "\u041a\u0435\u0448\u0431\u044d\u043a"]]);
+  (bonusTypes || []).forEach((item) => names.set(item.code, item.name || item.code));
+  const balances = (bonusTypeBalances || []).length ? bonusTypeBalances : [{ bonus_type: "cashback", balance: 0 }];
+  return balances.map((item, index) => {
+    const type = item.bonus_type || item.type || "cashback";
+    const key = `bonus_${type}`;
+    const title = `${names.get(type) || type}: ${money(item.balance)}`;
+    return cardConfigBlock(ctx, key, title, index + 2, `<b>${escapeHtml(money(item.balance))}</b><span>\u0431\u0430\u043b\u043b\u043e\u0432</span>`, enabledSections.includes(key));
+  }).join("");
+}
+
+function visitTitle(item) {
+  const visit = item.visit || item;
+  return dateTime(visit.visit_at || visit.created_at) || `#${visit.id || ""}`;
+}
+
+function visitItemsList(items, emptyText) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return `<p class="empty">${emptyText}</p>`;
+  return `<ul class="card-visit-items">${list.map((item) => `<li>${escapeHtml(item.title || item.name || item.service_name || item.product_name || item.good_title || item.id || "-")}</li>`).join("")}</ul>`;
+}
+
+function selectedVisitDetails(visits) {
+  const selected = (visits || []).find((item) => String((item.visit || item).id) === String(loyaltyState.cardSelectedVisitId));
+  if (!selected) return "";
+  const visit = selected.visit || selected;
+  const services = selected.services || visit.yclients_services || [];
+  const products = selected.products || visit.yclients_goods_transactions || [];
+  return `
+    <div class="card-visit-details">
+      <h4>\u0414\u0435\u0442\u0430\u043b\u0438 \u0432\u0438\u0437\u0438\u0442\u0430</h4>
+      <div class="modal-grid">
+        <div class="readonly-field"><span>\u0414\u0430\u0442\u0430</span><b>${escapeHtml(visitTitle(selected))}</b></div>
+        <div class="readonly-field"><span>\u0421\u0442\u0430\u0442\u0443\u0441</span><b>${escapeHtml(visit.visit_status || visit.attendance_title || L.notSet)}</b></div>
+        <div class="readonly-field"><span>\u0423\u0441\u043b\u0443\u0433\u0438</span>${visitItemsList(services, "\u0423\u0441\u043b\u0443\u0433 \u043d\u0435\u0442")}</div>
+        <div class="readonly-field"><span>\u0422\u043e\u0432\u0430\u0440\u044b</span>${visitItemsList(products, "\u0422\u043e\u0432\u0430\u0440\u043e\u0432 \u043d\u0435\u0442")}</div>
+      </div>
+    </div>
+  `;
+}
+
+function visitsPreview(visits) {
+  const items = (visits || []).slice(0, 8);
+  if (!items.length) return `<p class="empty">\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</p>`;
+  return `
+    <div class="entity-list compact-list">
+      ${items.map((item) => {
+        const visit = item.visit || item;
+        return `<button type="button" class="entity-card" data-card-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(visitTitle(item))}</b><span>${escapeHtml(visit.visit_status || visit.source || L.notSet)}</span></button>`;
+      }).join("")}
+    </div>
+    ${selectedVisitDetails(visits)}
+  `;
+}
+
+function registrationBlocks(ctx) {
+  const fields = [
+    ["last_name", "\u0424\u0430\u043c\u0438\u043b\u0438\u044f"],
+    ["first_name", "\u0418\u043c\u044f"],
+    ["middle_name", "\u041e\u0442\u0447\u0435\u0441\u0442\u0432\u043e"],
+    ["phone", "\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430"],
+    ["gender", "\u041f\u043e\u043b"],
+    ["telegram_id", "Telegram ID"],
+    ["max_id", "Max ID"],
+    ["vk_id", "VK ID"],
+    ["email", "Email"],
+  ];
+  const enabledFields = enabledRegistrationFields(ctx.org?.id);
+  return fields.map(([key, title], index) => cardConfigBlock(
+    ctx,
+    `reg_${key}`,
+    title,
+    index + 1,
+    `<span>${escapeHtml(title)}</span><input disabled placeholder="${escapeHtml(title)}">`,
+    enabledFields.includes(key),
+  )).join("");
+}
+
+function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
+  const level = selectedClient?.client_level || metric?.client_level || metric?.loyalty_level || levels?.[0]?.name || L.notSet;
+  const enabledSections = enabledClientCardSections(ctx.org?.id);
+  return `
+    ${cardConfigBlock(ctx, "client_name", "\u0424\u0418\u041e", 1, `<b>${escapeHtml(selectedClient ? clientName(selectedClient) : L.notSelected)}</b>`, enabledSections.includes("client_name"))}
+    ${bonusBalanceBlocks(ctx, bonusTypes, bonusTypeBalances, enabledSections)}
+    ${cardConfigBlock(ctx, "client_level", "\u0423\u0440\u043e\u0432\u0435\u043d\u044c", (bonusTypeBalances || []).length + 2, `<b>${escapeHtml(level)}</b>`, enabledSections.includes("client_level"))}
+    ${cardConfigBlock(ctx, "client_visits", "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0438\u0437\u0438\u0442\u043e\u0432", (bonusTypeBalances || []).length + 3, visitsPreview(visits), enabledSections.includes("client_visits"))}
+    ${cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", (bonusTypeBalances || []).length + 4, `<p class="empty">\u0427\u0430\u0442 \u0431\u0443\u0434\u0435\u0442 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d \u043f\u043e\u0441\u043b\u0435 backend-\u043b\u043e\u0433\u0438\u043a\u0438.</p>`, enabledSections.includes("client_chat"))}
+  `;
+}
+
+function cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalances, levels, metric, visits) {
+  const mode = ["registration", "chat"].includes(loyaltyState.cardMode) ? loyaltyState.cardMode : "client";
+  const configBody = mode === "registration"
+    ? registrationBlocks(ctx)
+    : mode === "client"
+      ? clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances || (balance ? [balance] : []), levels, metric, visits)
+      : "";
+  return `
+    <div class="subpanel">
+      ${titleWithHint("\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0438", "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430 \u0431\u043b\u043e\u043a\u043e\u0432 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438 \u0438 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u0430.")}
+      <div class="tabs compact-tabs">
+        <button type="button" class="${mode === "registration" ? "active" : ""}" data-card-mode="registration">\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f</button>
+        <button type="button" class="${mode === "client" ? "active" : ""}" data-card-mode="client">\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430</button>
+      </div>
+      <div class="card-config-grid">
+        ${configBody}
+      </div>
+      ${mode === "registration" ? `
+        <div class="form-actions">
+          <button type="button" class="primary" data-save-registration-fields>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>
+        </div>
+      ` : ""}
+      ${mode === "client" ? `
+        <div class="form-actions">
+          <button type="button" class="primary" data-save-client-card-sections>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>
+        </div>
+      ` : ""}
+      ${loyaltyState.actionResult ? `<p class="empty">${escapeHtml(loyaltyState.actionResult)}</p>` : ""}
+      <div class="card-bottom-switch">
+        <button type="button" class="${mode === "client" ? "active" : ""}" data-card-mode="client">\u041a\u0430\u0440\u0442\u0430</button>
+        <button type="button" class="${mode === "chat" ? "active" : ""}" data-card-mode="chat">\u0427\u0430\u0442</button>
+      </div>
+      ${mode === "chat" ? `<div class="readonly-field"><span>\u0427\u0430\u0442</span><b>\u0418\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441 \u0447\u0430\u0442\u0430 \u043f\u043e\u043a\u0430 \u0431\u0435\u0437 backend-\u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f.</b></div>` : ""}
+    </div>
+  `;
 }
 
 function transactionsSection(ctx, clients, selectedClient, balance, history, bonusTypes) {
@@ -833,17 +1079,20 @@ export async function loyalty(ctx, tab = "rules") {
   const visibleTabs = loyaltyTabs.filter(([key]) => !ctx.can || ctx.can(permissions[key]));
   const activeTab = visibleTabs.some(([key]) => key === tab) ? tab : (visibleTabs[0]?.[0] || "rules");
   const data = await loadClientContext(ctx.org.id);
-  const { clients, selectedClient, rules, levels, bonusTypes, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric, filters, hasNextPage } = data;
+  const { clients, selectedClient, rules, levels, bonusTypes, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric, clientVisits, bonusTypeBalances, registrationFields, clientCardSections, filters, hasNextPage } = data;
   loyaltyState.clients = clients;
   loyaltyState.bonusTypes = bonusTypes;
   loyaltyState.levels = levels;
   loyaltyState.referrals = referrals;
   loyaltyState.selectedClientMetric = metric;
+  loyaltyState.registrationFields = registrationFields;
+  loyaltyState.clientCardSections = clientCardSections;
 
   let body = "";
   if (activeTab === "rules") body = rulesSection(ctx, rules, selectedClient, bonusTypes, levels);
   if (activeTab === "levels") body = levelsSection(ctx, levels);
   if (activeTab === "transactions") body = transactionsSection(ctx, clients, selectedClient, balance, history, bonusTypes);
+  if (activeTab === "cards") body = cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalances, levels, metric, clientVisits);
   if (activeTab === "subscriptions") body = subscriptionsSection(clients, selectedClient, subscriptions);
   if (activeTab === "certificates") body = certificatesSection(clients, selectedClient, certificates);
   if (activeTab === "referrals") body = referralsSection(clients, selectedClient, referralStats, referrals, bonusTypes);
@@ -857,8 +1106,6 @@ export async function loyalty(ctx, tab = "rules") {
           ? `<span class="tab-disabled">${escapeHtml(title)}</span>`
           : `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
       </nav>
-      ${clientSelector(ctx.org.id, activeTab, clients, selectedClient, filters, hasNextPage)}
-      ${selectedClientBanner(selectedClient)}
       ${body}
     </section>
   `;
@@ -1128,7 +1375,48 @@ export function bindLoyalty(root, ctx) {
     const clientButton = event.target.closest("[data-loyalty-client]");
     if (clientButton) {
       loyaltyState.selectedClientId = Number(clientButton.dataset.loyaltyClient);
+      loyaltyState.cardSelectedVisitId = null;
       loyaltyState.actionResult = "";
+      ctx.reload();
+      return;
+    }
+
+    const cardModeButton = event.target.closest("[data-card-mode]");
+    if (cardModeButton) {
+      loyaltyState.cardMode = cardModeButton.dataset.cardMode;
+      ctx.reload();
+      return;
+    }
+
+    const cardVisitButton = event.target.closest("[data-card-visit]");
+    if (cardVisitButton) {
+      loyaltyState.cardSelectedVisitId = cardVisitButton.dataset.cardVisit;
+      ctx.reload();
+      return;
+    }
+
+    const saveRegistrationFieldsButton = event.target.closest("[data-save-registration-fields]");
+    if (saveRegistrationFieldsButton) {
+      const fields = [...root.querySelectorAll("[data-registration-field]")]
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.registrationField);
+      await api.updateClientRegistrationFields(ctx.org.id, fields);
+      saveEnabledRegistrationFields(ctx.org.id, fields);
+      loyaltyState.registrationFields = fields;
+      loyaltyState.actionResult = "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.";
+      ctx.reload();
+      return;
+    }
+
+    const saveClientCardSectionsButton = event.target.closest("[data-save-client-card-sections]");
+    if (saveClientCardSectionsButton) {
+      const sections = [...root.querySelectorAll("[data-client-card-section]")]
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.clientCardSection);
+      await api.updateClientCardSections(ctx.org.id, sections);
+      saveEnabledClientCardSections(ctx.org.id, sections);
+      loyaltyState.clientCardSections = sections;
+      loyaltyState.actionResult = "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.";
       ctx.reload();
       return;
     }
