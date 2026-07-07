@@ -102,6 +102,13 @@
   grid-column: 1 / -1;
 }
 
+.cabinet-subtitle {
+  margin: 8px 0 0;
+  color: #172033;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
 .cabinet-message {
   min-height: 20px;
   margin: 0;

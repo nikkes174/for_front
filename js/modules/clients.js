@@ -37,11 +37,12 @@ let state = {
   photoPreviewUrl: "",
   photoFile: null,
   authLink: null,
+  registrationLink: null,
   clientAuthLink: null,
   authLinks: [],
 };
 
-const no = "Без фото";
+const no = "Не указано";
 const notSpecified = "Не указано";
 const bonusTransactionTypes = {
   accrual: "Начисление",
@@ -192,6 +193,22 @@ function clientAuthLinkForm(items) {
       ` : ""}
       <p data-message></p>
     </form>
+  `;
+}
+
+function clientRegistrationLinkBlock() {
+  const authPath = state.registrationLink?.url || state.registrationLink?.path || "";
+  const link = authPath ? new URL(authPath, window.location.origin).toString() : "";
+  return `
+    <div class="subpanel">
+      <h3>\u0421\u0441\u044b\u043b\u043a\u0430 \u0434\u043b\u044f \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</h3>
+      ${link ? `
+        <div class="inline-form compact">
+          <label><span>\u041e\u0431\u0449\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
+          <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button>
+        </div>
+      ` : `<p class="empty">\u0421\u0441\u044b\u043b\u043a\u0430 \u0435\u0449\u0451 \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d\u0430.</p>`}
+    </div>
   `;
 }
 
@@ -927,7 +944,7 @@ export async function clients(ctx) {
   const pageSize = CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE;
   const requestedPage = Number(params.get("page") || 1);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
-  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, authLinks] = await Promise.all([
+  const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink] = await Promise.all([
     api.clients(ctx.org.id, { query: search, offset: 0, limit: 1000 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
@@ -939,20 +956,11 @@ export async function clients(ctx) {
     api.clientSegments(ctx.org.id).catch(() => segmentExamples().map((name) => ({ name }))),
     (api.productCategories?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
     (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
-    api.clientAuthLinks(ctx.org.id).catch(() => []),
+    api.clientRegistrationLink(ctx.org.id).catch(() => null),
   ]);
 
   const sortedItems = sortClients(items, sort, direction);
-  const loadedClientIds = new Set(sortedItems.map((item) => String(item.id)));
-  const linkedClientIds = [...new Set(authLinks.map((item) => item.client_id).filter(Boolean).map(String))]
-    .filter((id) => !loadedClientIds.has(id));
-  const linkedClients = await Promise.all(
-    linkedClientIds.map((id) => api.client(id, ctx.org.id).catch(() => null)),
-  );
-  const knownClients = [
-    ...sortedItems,
-    ...linkedClients.filter(Boolean),
-  ];
+  const knownClients = sortedItems;
   const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const offset = (currentPage - 1) * pageSize;
@@ -969,7 +977,7 @@ export async function clients(ctx) {
     return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
   };
 
-  state = { ...state, clients: knownClients, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, authLinks };
+  state = { ...state, clients: knownClients, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink };
   if (selectedClientId && String(state.selectedClient?.id || "") !== String(selectedClientId)) {
     const selectedClient = knownClients.find((item) => String(item.id) === String(selectedClientId))
       || await api.client(selectedClientId, ctx.org.id).catch(() => null);
@@ -1012,8 +1020,7 @@ export async function clients(ctx) {
           ${hasNextPage ? `<a class="ghost pagination-link" href="${pageUrl(currentPage + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
         </div>
       </div>
-      ${clientAuthLinkForm(knownClients)}
-      ${clientAuthLinksList(authLinks, knownClients)}
+      ${clientRegistrationLinkBlock()}
       <div class="subpanel">
         <h3>Сервис сегментации</h3>
         ${simpleList(segments, "Сегменты пока не настроены.", (item) => `${item.name}${item.is_dynamic ? " · динамический" : ""}`)}
@@ -1189,13 +1196,6 @@ export function bindClients(root, ctx) {
           organization_id: ctx.org.id,
           client_id: state.selectedClient.id,
           one_time: true,
-          registration_fields: Array.isArray(registrationSettings?.fields) ? registrationSettings.fields : enabledRegistrationFields(ctx.org.id),
-        }));
-      } else if (form.matches("[data-client-auth-link-create]")) {
-        const registrationSettings = await api.clientRegistrationFields(ctx.org.id).catch(() => null);
-        state.authLink = await api.createClientAuthLink(clean({
-          organization_id: ctx.org.id,
-          client_id: numberOrNull(data.client_id),
           registration_fields: Array.isArray(registrationSettings?.fields) ? registrationSettings.fields : enabledRegistrationFields(ctx.org.id),
         }));
       } else if (form.matches("[data-client-create]")) {

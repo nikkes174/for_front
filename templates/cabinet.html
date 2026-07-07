@@ -11,7 +11,6 @@
     <main class="cabinet-shell">
       <aside class="cabinet-sidebar" aria-label="&#1056;&#1072;&#1079;&#1076;&#1077;&#1083;&#1099; &#1083;&#1080;&#1095;&#1085;&#1086;&#1075;&#1086; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;&#1072;">
         <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</a>
-        <a class="cabinet-nav-link" href="#history" data-cabinet-tab="history">&#1048;&#1089;&#1090;&#1086;&#1088;&#1080;&#1103;</a>
         <button type="button" class="cabinet-logout" data-cabinet-logout>&#1042;&#1099;&#1093;&#1086;&#1076;</button>
       </aside>
 
@@ -19,7 +18,7 @@
         <div class="cabinet-panel" data-cabinet-view="profile">
           <div class="cabinet-heading">
             <p>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</p>
-            <h1>&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</h1>
+            <h1 data-cabinet-title>&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</h1>
           </div>
 
           <form class="profile-form" data-cabinet-form>
@@ -33,16 +32,12 @@
             <label class="field" data-cabinet-field="vk_id"><span>VK ID</span><input name="vk_id" type="text" inputmode="numeric" /></label>
             <label class="field wide" data-cabinet-field="email"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
             <p class="cabinet-message" data-cabinet-message></p>
-            <div class="form-actions"><button type="submit">&#1057;&#1086;&#1093;&#1088;&#1072;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</button></div>
+            <div class="form-actions"><button type="submit" data-cabinet-submit>&#1057;&#1086;&#1093;&#1088;&#1072;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</button></div>
           </form>
-        </div>
-
-        <div class="cabinet-panel" data-cabinet-view="history" hidden>
-          <div class="cabinet-heading">
-            <p>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</p>
-            <h1>&#1048;&#1089;&#1090;&#1086;&#1088;&#1080;&#1103;</h1>
-          </div>
-          <div class="cabinet-history-list" data-cabinet-history></div>
+          <section data-cabinet-history-section>
+            <h2 class="cabinet-subtitle">&#1048;&#1089;&#1090;&#1086;&#1088;&#1080;&#1103;</h2>
+            <div class="cabinet-history-list" data-cabinet-history></div>
+          </section>
         </div>
       </section>
     </main>
@@ -51,6 +46,8 @@
       const form = document.querySelector("[data-cabinet-form]");
       const message = document.querySelector("[data-cabinet-message]");
       const historyList = document.querySelector("[data-cabinet-history]");
+      const historySection = document.querySelector("[data-cabinet-history-section]");
+      const cabinetTitle = document.querySelector("[data-cabinet-title]");
       const token = new URLSearchParams(window.location.search).get("token");
       const submitButton = form.querySelector("button");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
@@ -217,6 +214,12 @@
         });
       }
 
+      function setRegistrationMode(enabled) {
+        if (cabinetTitle) cabinetTitle.textContent = enabled ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u0430" : "\u041c\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435";
+        if (historySection) historySection.hidden = enabled;
+        submitButton.textContent = enabled ? "\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u0441\u044f" : "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435";
+      }
+
       function applyRegistrationFields(fields) {
         const enabled = Array.isArray(fields) ? fields : defaultRegistrationFields;
         const fieldsByName = new Map([...form.querySelectorAll("[data-cabinet-field]")].map((field) => [field.dataset.cabinetField, field]));
@@ -270,6 +273,7 @@
       async function consumeLink() {
         applyRegistrationFields([]);
         renderHistorySections([]);
+        setRegistrationMode(false);
         if (!token) {
           try {
             const response = await fetch("/auth/me");
@@ -295,6 +299,7 @@
           const link = await response.json();
           cabinetData = link;
           currentClient = link.client || link.profile || null;
+          setRegistrationMode(!link.client_id);
           applyRegistrationFields(link.registration_fields);
           fillCurrentUserCabinet(currentClient || {});
           renderHistorySections(link.card_sections);
@@ -335,7 +340,7 @@
         }
       });
 
-      setCabinetTab(location.hash === "#history" ? "history" : "profile");
+      setCabinetTab("profile");
       consumeLink();
 
       form.addEventListener("submit", async (event) => {
@@ -369,6 +374,10 @@
             throw new Error(error.detail || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435");
           }
           const result = await response.json();
+          if (result.redirect_url) {
+            location.href = result.redirect_url;
+            return;
+          }
           currentClient = result.client || null;
           renderHistorySections(currentCardSections);
           setMessage("\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.", "success");

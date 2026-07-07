@@ -168,6 +168,7 @@ export const api = {
   },
   deleteClient: (id) => request(`/crm-api/clients-core/clients/${id}`, { method: "DELETE" }),
   createClientAuthLink: (body) => request("/auth/client-auth-links", { method: "POST", body: JSON.stringify(body) }),
+  clientRegistrationLink: (organizationId) => request(`/auth/client-registration-link?organization_id=${organizationId}`),
   clientAuthLinks: (organizationId) => request(`/auth/client-auth-links?organization_id=${organizationId}`),
   deleteClientAuthLink: (id) => request(`/auth/client-auth-links/${id}`, { method: "DELETE" }),
   clientRegistrationFields: (organizationId) => request(`/auth/client-registration-fields?organization_id=${organizationId}`),
