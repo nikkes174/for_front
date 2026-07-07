@@ -15,7 +15,12 @@ let userFilterRoleId = "";
 let userFilterDepartmentId = "";
 let userFilterWorkplaceId = "";
 let userPage = 1;
+let auditPage = 1;
+let eventsPage = 1;
+let auditPageSize = 10;
+let eventsPageSize = 10;
 const USER_PAGE_SIZE = 20;
+const LOG_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
   { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
@@ -698,6 +703,8 @@ function humanizeCode(value) {
     edit: "Редактирование",
     delete: "Удаление",
     deleted: "Удаление",
+    complete: "Завершение",
+    completed: "Завершение",
     login: "Вход",
     logout: "Выход",
     renew: "Продление",
@@ -711,6 +718,10 @@ function humanizeCode(value) {
     promotion: "Акция",
     client_created: "Создание клиента",
     visit_created: "Создание визита",
+    "visit.completed": "Завершение визита",
+    "visit.complete": "Завершение визита",
+    visit_completed: "Завершение визита",
+    visit_complete: "Завершение визита",
     subscription_create: "Создание абонемента",
     subscription_renew: "Продление абонемента",
     subscription_transfer: "Перенос абонемента",
@@ -797,6 +808,33 @@ function yclientsTerminalLabel(id) {
   return name || "";
 }
 
+function branchLabel(id) {
+  if (!id) return no;
+  return yclientsTerminalLabel(id) || nameById(cache.branches || [], id) || `#${id}`;
+}
+
+function eventBranchId(item, payload = {}) {
+  return item.branch_id
+    || payload.branch_id
+    || payload.company_id
+    || payload.yclients_company_id
+    || payload.yclients_terminal_id
+    || payload.terminal_id;
+}
+
+function clientEventButton(clientId, label) {
+  const text = String(label || (clientId ? `#${clientId}` : no)).trim() || no;
+  if (!clientId) return escapeHtml(text);
+  return `<button type="button" class="ghost" data-open-settings-client="${escapeHtml(clientId)}">${escapeHtml(text)}</button>`;
+}
+
+function openClientUrl(ctx, clientId) {
+  const params = new URLSearchParams();
+  params.set("client_id", clientId);
+  params.set("return_to", `${location.pathname}${location.hash || ""}`);
+  return `/organizations/${ctx.org.id}/clients?${params.toString()}`;
+}
+
 function compactDetails(value) {
   if (!value || typeof value !== "object") return "";
   if (value.summary) return String(value.summary);
@@ -813,10 +851,10 @@ function compactDetails(value) {
   if (value.invited_client_id) fields.push(`Приглашенный клиент: #${value.invited_client_id}`);
   if (value.visit_status) fields.push(`Статус визита: ${value.visit_status}`);
   if (value.primary_phone) fields.push(`Телефон: ${value.primary_phone}`);
-  if (value.branch_id) fields.push(`Филиал: #${value.branch_id}`);
+  if (value.branch_id) fields.push(`Филиал: ${branchLabel(value.branch_id)}`);
   if (value.terminal_id) fields.push(`Терминал: ${yclientsTerminalLabel(value.terminal_id) || `#${value.terminal_id}`}`);
-  if (value.yclients_terminal_id) fields.push(`Терминал: ${yclientsTerminalLabel(value.yclients_terminal_id) || `#${value.yclients_terminal_id}`}`);
-  if (value.company_id) fields.push(`Терминал: ${yclientsTerminalLabel(value.company_id) || `#${value.company_id}`}`);
+  if (value.yclients_terminal_id) fields.push(`Филиал: ${branchLabel(value.yclients_terminal_id)}`);
+  if (value.company_id) fields.push(`Филиал: ${branchLabel(value.company_id)}`);
   if (value.employee_id) fields.push(`Сотрудник: #${value.employee_id}`);
   if (value.actor_id) fields.push(`Инициатор: ${userShortNameById(value.actor_id)}`);
   if (value.bonus_type) fields.push(`Тип бонусов: ${value.bonus_type}`);
@@ -843,12 +881,13 @@ function addDetail(fields, value) {
 
 function eventVisitDetails(item) {
   const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+  const branchId = eventBranchId(item, payload);
   const fields = [];
   addDetail(fields, `Клиент: ${payload.full_name || (item.client_id ? `#${item.client_id}` : no)}`);
   addDetail(fields, `Статус: ${visitStatusLabel(payload.visit_status)}`);
   addDetail(fields, `Дата визита: ${formatVisitDateTime(payload.visit_at)}`);
-  if (payload.branch_id || item.branch_id) {
-    addDetail(fields, `Филиал: ${nameById(cache.branches || [], payload.branch_id || item.branch_id)}`);
+  if (branchId) {
+    addDetail(fields, `Филиал: ${branchLabel(branchId)}`);
   }
   if (payload.employee_id) {
     addDetail(fields, `Сотрудник: ${userLabelById(payload.employee_id)}`);
@@ -863,6 +902,52 @@ function eventVisitDetails(item) {
     addDetail(fields, `Оплачено: ${payload.paid_amount}`);
   }
   return fields.join(" · ") || no;
+}
+
+function eventVisitDetailsHtml(item) {
+  const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+  const clientId = item.client_id || payload.client_id;
+  const branchId = eventBranchId(item, payload);
+  const fields = [
+    `Клиент: ${clientEventButton(clientId, payload.full_name || (clientId ? `#${clientId}` : no))}`,
+    `Статус: ${escapeHtml(visitStatusLabel(payload.visit_status))}`,
+    `Дата визита: ${escapeHtml(formatVisitDateTime(payload.visit_at))}`,
+  ];
+  if (branchId) {
+    fields.push(`Филиал: ${escapeHtml(branchLabel(branchId))}`);
+  }
+  if (payload.employee_name) {
+    fields.push(`Мастер: ${escapeHtml(payload.employee_name)}`);
+  } else if (payload.employee_id) {
+    fields.push(`Мастер: #${escapeHtml(payload.employee_id)}`);
+  }
+  if (Array.isArray(payload.service_titles) && payload.service_titles.length) {
+    fields.push(`Услуги: ${escapeHtml(payload.service_titles.join(", "))}`);
+  }
+  if (payload.total_cost !== undefined && payload.total_cost !== null) {
+    fields.push(`Стоимость: ${escapeHtml(payload.total_cost)}`);
+  }
+  if (payload.paid_amount !== undefined && payload.paid_amount !== null) {
+    fields.push(`Оплачено: ${escapeHtml(payload.paid_amount)}`);
+  }
+  return fields.filter(Boolean).join(" · ") || no;
+}
+
+function clientEventDetailsHtml(item) {
+  const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+  const clientId = item.client_id || payload.client_id || payload.id || item.entity_id;
+  const branchId = eventBranchId(item, payload);
+  const fields = [];
+  fields.push(`Клиент: ${clientEventButton(clientId, payload.full_name || (clientId ? `#${clientId}` : no))}`);
+  if (payload.primary_phone) fields.push(`Телефон: ${escapeHtml(payload.primary_phone)}`);
+  if (branchId) fields.push(`Филиал: ${escapeHtml(branchLabel(branchId))}`);
+  return fields.join(" · ") || no;
+}
+
+function eventDetailsHtml(item) {
+  if (item.entity_type === "client_visit") return eventVisitDetailsHtml(item);
+  if (item.entity_type === "client" || item.client_id || item.payload?.client_id) return clientEventDetailsHtml(item);
+  return escapeHtml(eventDetails(item));
 }
 
 function eventDetails(item) {
@@ -882,7 +967,8 @@ function eventDetails(item) {
   if (terminalLabel) addDetail(fields, `Терминал: ${terminalLabel}`);
   else if (item.entity_type && entityId) addDetail(fields, `${humanizeCode(item.entity_type)}: #${entityId}`);
   if (item.client_id || payload.client_id) addDetail(fields, `Клиент: #${item.client_id || payload.client_id}`);
-  if (item.branch_id || payload.branch_id) addDetail(fields, `Филиал: #${item.branch_id || payload.branch_id}`);
+  const branchId = eventBranchId(item, payload);
+  if (branchId) addDetail(fields, `Филиал: ${branchLabel(branchId)}`);
   if (payload.employee_id) addDetail(fields, `Сотрудник: #${payload.employee_id}`);
   if (item.actor_id || payload.actor_id) addDetail(fields, `Инициатор: ${userShortNameById(item.actor_id || payload.actor_id)}`);
   return fields.join(" · ") || no;
@@ -1383,13 +1469,25 @@ function paginate(items, page, pageSize) {
   };
 }
 
-function paginationControls(currentPage, totalPages, totalItems) {
-  if (totalPages <= 1) return "";
+function pageSizeControl(pageSize, attr, label) {
   return `
-    <div class="inline-form compact" style="align-items:center;">
-      <button type="button" class="ghost" data-user-page="${escapeHtml(currentPage - 1)}" ${currentPage <= 1 ? "disabled" : ""}>Назад</button>
+    <label><span>${escapeHtml(label)}</span><select ${attr}>
+      ${LOG_PAGE_SIZE_OPTIONS.map((size) => `<option value="${size}" ${pageSize === size ? "selected" : ""}>${size}</option>`).join("")}
+    </select></label>
+  `;
+}
+
+function paginationControls(currentPage, totalPages, totalItems, options = {}) {
+  const pageAttr = options.pageAttr || "data-user-page";
+  if (totalPages <= 1 && !options.pageSizeAttr) return "";
+  return `
+    <div class="pagination">
       <span>${escapeHtml(`Страница ${currentPage} из ${totalPages} · ${totalItems}`)}</span>
-      <button type="button" class="ghost" data-user-page="${escapeHtml(currentPage + 1)}" ${currentPage >= totalPages ? "disabled" : ""}>Вперёд</button>
+      <div>
+        ${options.pageSizeAttr ? pageSizeControl(options.pageSize, options.pageSizeAttr, options.pageSizeLabel || "Отображать") : ""}
+        <button type="button" class="ghost" ${pageAttr}="${escapeHtml(currentPage - 1)}" ${currentPage <= 1 ? "disabled" : ""}>Назад</button>
+        <button type="button" class="ghost" ${pageAttr}="${escapeHtml(currentPage + 1)}" ${currentPage >= totalPages ? "disabled" : ""}>Вперёд</button>
+      </div>
     </div>
   `;
 }
@@ -1876,7 +1974,11 @@ export async function settings(ctx) {
     .filter((item) => !serviceFilterCategoryId || String(item.category_id) === String(serviceFilterCategoryId));
   const filteredUsers = users.filter((user) => userMatchesFilters(user, memberships, branchMemberships));
   const pagedUsersData = paginate(filteredUsers, userPage, USER_PAGE_SIZE);
+  const pagedAuditData = paginate(auditLogs, auditPage, auditPageSize);
+  const pagedEventsData = paginate(events, eventsPage, eventsPageSize);
   userPage = pagedUsersData.currentPage;
+  auditPage = pagedAuditData.currentPage;
+  eventsPage = pagedEventsData.currentPage;
 
   return `
     <section class="panel" data-settings>
@@ -2087,7 +2189,7 @@ export async function settings(ctx) {
       <div id="audit" data-permission="settings.audit.view">
         ${section("Аудит и события", `
           <table><thead><tr><th>Действие</th><th>Сущность</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
-            ${rows(auditLogs, "Записей аудита пока нет", (item) => `
+            ${rows(pagedAuditData.pageItems, "Записей аудита пока нет", (item) => `
               <tr>
                 <td>${escapeHtml(humanizeCode(item.action))}</td>
                 <td>${auditEntityCell(item)}</td>
@@ -2096,20 +2198,32 @@ export async function settings(ctx) {
               </tr>
             `)}
           </tbody></table>
+          ${paginationControls(pagedAuditData.currentPage, pagedAuditData.totalPages, auditLogs.length, {
+            pageAttr: "data-audit-page",
+            pageSizeAttr: "data-audit-page-size",
+            pageSize: auditPageSize,
+            pageSizeLabel: "Отображать записей",
+          })}
         `, "Аудит и события показывает важные действия и изменения в системе.")}
       </div>
 
       <div id="events" data-permission="settings.events.view">
         ${section("События", `
           <table><thead><tr><th>Событие</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
-            ${rows(events, "Событий пока нет", (item) => `
+            ${rows(pagedEventsData.pageItems, "Событий пока нет", (item) => `
               <tr>
                 <td>${eventNameCell(item)}</td>
-                <td>${escapeHtml(eventDetails(item))}</td>
+                <td>${eventDetailsHtml(item)}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
             `)}
           </tbody></table>
+          ${paginationControls(pagedEventsData.currentPage, pagedEventsData.totalPages, events.length, {
+            pageAttr: "data-events-page",
+            pageSizeAttr: "data-events-page-size",
+            pageSize: eventsPageSize,
+            pageSizeLabel: "Отображать событий",
+          })}
         `, "События — это системные записи о произошедших действиях.")}
       </div>
       ${eventVisitModal()}
@@ -2171,6 +2285,20 @@ export function bindSettings(root, ctx) {
     if (event.target.matches("[data-user-filter-workplace]")) {
       userFilterWorkplaceId = event.target.value || "";
       userPage = 1;
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-audit-page-size]")) {
+      const value = Number(event.target.value);
+      auditPageSize = LOG_PAGE_SIZE_OPTIONS.includes(value) ? value : LOG_PAGE_SIZE_OPTIONS[0];
+      auditPage = 1;
+      ctx.reload();
+      return;
+    }
+    if (event.target.matches("[data-events-page-size]")) {
+      const value = Number(event.target.value);
+      eventsPageSize = LOG_PAGE_SIZE_OPTIONS.includes(value) ? value : LOG_PAGE_SIZE_OPTIONS[0];
+      eventsPage = 1;
       ctx.reload();
       return;
     }
@@ -2353,6 +2481,12 @@ export function bindSettings(root, ctx) {
     if (handleAchievementConditionClick(event, root)) return;
     if (handleProductAmountClick(event, root)) return;
 
+    const openClientButton = event.target.closest("[data-open-settings-client]");
+    if (openClientButton) {
+      ctx.navigate(openClientUrl(ctx, openClientButton.dataset.openSettingsClient));
+      return;
+    }
+
     const openVisitButton = event.target.closest("[data-open-event-visit]");
     if (openVisitButton) {
       const visitRef = String(openVisitButton.dataset.openEventVisit || "");
@@ -2373,6 +2507,20 @@ export function bindSettings(root, ctx) {
     const userPageButton = event.target.closest("[data-user-page]");
     if (userPageButton && !userPageButton.disabled) {
       userPage = Number(userPageButton.dataset.userPage) || 1;
+      ctx.reload();
+      return;
+    }
+
+    const auditPageButton = event.target.closest("[data-audit-page]");
+    if (auditPageButton && !auditPageButton.disabled) {
+      auditPage = Number(auditPageButton.getAttribute("data-audit-page")) || 1;
+      ctx.reload();
+      return;
+    }
+
+    const eventsPageButton = event.target.closest("[data-events-page]");
+    if (eventsPageButton && !eventsPageButton.disabled) {
+      eventsPage = Number(eventsPageButton.getAttribute("data-events-page")) || 1;
       ctx.reload();
       return;
     }

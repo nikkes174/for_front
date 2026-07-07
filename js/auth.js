@@ -7,6 +7,7 @@ let twoFactor = null;
 let loginDraft = "";
 let twoFactorTarget = "/";
 let resetPasswordOpen = false;
+let loginContext = { is_client_domain: false };
 
 ensureCss();
 
@@ -80,7 +81,7 @@ function authHtml() {
         ${isRegister ? '<label><span>\u041f\u043e\u0432\u0442\u043e\u0440 \u043f\u0430\u0440\u043e\u043b\u044f</span><input name="confirm" type="password" required></label>' : ""}
         <p data-message></p>
         <button class="primary">${isRegister ? "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442" : "\u0412\u043e\u0439\u0442\u0438"}</button>
-        ${!isRegister ? '<button type="button" class="ghost" data-client-max-login>\u0412\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 MAX</button>' : ""}
+        ${!isRegister && loginContext.is_client_domain ? '<button type="button" class="ghost" data-client-max-login>\u0412\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 MAX</button>' : ""}
         ${!isRegister ? '<button type="button" class="ghost" data-reset-password-open>\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c</button>' : ""}
       </form>
       ${twoFactorHtml()}
@@ -93,11 +94,19 @@ function draw() {
   render(root, authHtml());
 }
 
+function sameHostUrl(url) {
+  if (!url) return "";
+  try {
+    const target = new URL(url, window.location.origin);
+    return target.host === window.location.host ? target.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 root.addEventListener("input", (event) => {
   if (!event.target.matches('[name="login"]')) return;
   loginDraft = event.target.value;
-  twoFactor = null;
-  root.querySelector("[data-2fa-modal]")?.remove();
 });
 
 root.addEventListener("click", async (event) => {
@@ -121,6 +130,7 @@ root.addEventListener("click", async (event) => {
 
   const maxLogin = event.target.closest("[data-client-max-login]");
   if (maxLogin) {
+    if (!loginContext.is_client_domain) return;
     const form = maxLogin.closest("[data-auth-form]");
     const data = formData(form);
     const phone = data.login || loginDraft;
@@ -128,7 +138,7 @@ root.addEventListener("click", async (event) => {
     try {
       if (!phone) throw new Error("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
       twoFactor = await api.startClientMaxAuth({ phone });
-      twoFactorTarget = "/cabinet.html";
+      twoFactorTarget = sameHostUrl(twoFactor.redirect_url) || "/";
       draw();
     } catch (error) {
       setMessage(form, error.message);
@@ -201,7 +211,12 @@ root.addEventListener("submit", async (event) => {
   }
 });
 
-draw();
+api.loginContext()
+  .then((context) => {
+    loginContext = context || loginContext;
+  })
+  .catch(() => null)
+  .finally(draw);
 
 
 

@@ -364,21 +364,24 @@ function registrationFieldsStorageKey(orgId) {
 
 function enabledRegistrationFields(orgId) {
   if (Array.isArray(loyaltyState.registrationFields)) {
-    return REGISTRATION_FIELD_NAMES.filter((name) => loyaltyState.registrationFields.includes(name));
+    return normalizeRegistrationFields(loyaltyState.registrationFields);
   }
   try {
     const saved = JSON.parse(localStorage.getItem(registrationFieldsStorageKey(orgId)) || "null");
-    if (Array.isArray(saved)) {
-      return REGISTRATION_FIELD_NAMES.filter((name) => saved.includes(name));
-    }
+    if (Array.isArray(saved)) return normalizeRegistrationFields(saved);
   } catch {
     // Ignore broken local settings and fall back to defaults.
   }
   return [...REGISTRATION_FIELD_NAMES];
 }
 
+function normalizeRegistrationFields(fields) {
+  if (!Array.isArray(fields)) return [...REGISTRATION_FIELD_NAMES];
+  return [...new Set(fields.filter((name) => REGISTRATION_FIELD_NAMES.includes(name)))];
+}
+
 function saveEnabledRegistrationFields(orgId, fields) {
-  const normalized = REGISTRATION_FIELD_NAMES.filter((name) => fields.includes(name));
+  const normalized = normalizeRegistrationFields(fields);
   localStorage.setItem(registrationFieldsStorageKey(orgId), JSON.stringify(normalized));
 }
 
@@ -537,7 +540,7 @@ function loyaltyModal(kind, item) {
   const bonusTypes = currentBonusTypeOptions(loyaltyState.bonusTypes || [], item.bonus_type || item.reward_bonus_type || "");
   const levels = levelOptions(loyaltyState.levels || [], item.client_level || "");
   let fields = "";
-  if (kind === "rule") fields = `${field(L.name, "name", item.name)}${select(L.type, "rule_type", typeOptions, item.rule_type)}${select(L.bonusType, "bonus_type", bonusTypes, item.bonus_type || "")}${field(L.ruleAmount, "amount", item.amount, 'type="number"')}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${field(L.targetType, "target_type", item.target_type || "")}${select(L.clientLevel, "client_level", levelOptions(loyaltyState.levels || [], item.client_level || ""), item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}${field(L.restrictions, "usage_restrictions", item.usage_restrictions?.allowed_target_types?.join(",") || "", 'placeholder="service,product"')}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`;
+  if (kind === "rule") fields = `${field(L.name, "name", item.name)}${select(L.type, "rule_type", typeOptions, item.rule_type)}${select(L.bonusType, "bonus_type", bonusTypes, item.bonus_type || "")}${field(L.ruleAmount, "amount", item.amount, 'type="number"')}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(loyaltyState.levels || [], item.client_level || ""), item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`;
   if (kind === "level") fields = `${field(L.name, "name", item.name)}${field(L.cashback, "params", item.params?.cashback || "", 'type="number" step="0.01"')}`;
   if (kind === "bonus") fields = `<div class="readonly-field"><span>ID</span><b>${escapeHtml(item.id)}</b></div><div class="readonly-field"><span>${L.type}</span><b>${escapeHtml(item.bonus_type || "-")}</b></div>${field(L.reason, "reason", item.reason || "")}${field(L.clientLevel, "client_level", item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}${field(L.restrictions, "usage_restrictions", item.usage_restrictions?.allowed_target_types?.join(",") || "", 'placeholder="service,product"')}${field(L.expiresAt, "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
   if (kind === "subscription") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${field("\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "subscription_name", item.subscription_name || "")}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u0432\u0441\u0435\u0433\u043e", "visits_total", item.visits_total ?? 0, 'type="number"')}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043e\u0441\u0442\u0430\u043b\u043e\u0441\u044c", "visits_left", item.visits_left ?? 0, 'type="number"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u0432\u0441\u0435\u0433\u043e", "deposit_amount", item.deposit_amount ?? 0, 'type="number" step="0.01"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u043e\u0441\u0442\u0430\u0442\u043e\u043a", "deposit_left", item.deposit_left ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}<label class="checkbox modal-full"><input name="auto_renewal_enabled" type="checkbox" ${item.auto_renewal_enabled ? "checked" : ""}> \u0410\u0432\u0442\u043e\u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435</label><label class="checkbox modal-full"><input name="is_frozen" type="checkbox" ${item.is_frozen ? "checked" : ""}> \u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d</label>`;
@@ -615,10 +618,8 @@ function editPayload(kind, data) {
     bonus_type: data.bonus_type,
     amount: Number(data.amount || 0),
     expires_in_days: data.expires_in_days ? Number(data.expires_in_days) : null,
-    target_type: optional(data.target_type),
     client_level: optional(data.client_level),
     level_params: optional(data.level_params) ? { cashback: Number(data.level_params) } : null,
-    usage_restrictions: optional(data.usage_restrictions) ? { allowed_target_types: data.usage_restrictions.split(",").map((item) => item.trim()).filter(Boolean) } : null,
     is_active: data.is_active === "on",
   };
   if (kind === "level") return { name: data.name, params: optional(data.params) ? { cashback: Number(data.params) } : null };
@@ -851,26 +852,25 @@ function cardOrganizationAccess(ctx, key) {
   `;
 }
 
-function cardBlockSettings(ctx, key, order, enabled = true) {
+function cardBlockSettings(ctx, key, enabled = true) {
   const registrationField = key.startsWith("reg_") ? key.slice(4) : "";
   const clientCardSection = registrationField ? "" : key;
   return `
     <div class="card-block-settings">
-      <label><span>\u041f\u043e\u0440\u044f\u0434\u043e\u043a</span><input type="number" min="1" value="${escapeHtml(order)}" name="${escapeHtml(key)}_order"></label>
       <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}> \u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c</label>
       ${cardOrganizationAccess(ctx, key)}
     </div>
   `;
 }
 
-function cardConfigBlock(ctx, key, title, order, preview, enabled = true) {
+function cardConfigBlock(ctx, key, title, preview, enabled = true) {
   return `
-    <div class="card-config-block">
+    <div class="card-config-block" draggable="true" data-card-config-block="${escapeHtml(key)}">
       <div>
         <h4>${escapeHtml(title)}</h4>
         <div class="card-preview">${preview}</div>
       </div>
-      ${cardBlockSettings(ctx, key, order, enabled)}
+      ${cardBlockSettings(ctx, key, enabled)}
     </div>
   `;
 }
@@ -879,12 +879,15 @@ function bonusBalanceBlocks(ctx, bonusTypes, bonusTypeBalances, enabledSections)
   const names = new Map([["cashback", "\u041a\u0435\u0448\u0431\u044d\u043a"]]);
   (bonusTypes || []).forEach((item) => names.set(item.code, item.name || item.code));
   const balances = (bonusTypeBalances || []).length ? bonusTypeBalances : [{ bonus_type: "cashback", balance: 0 }];
-  return balances.map((item, index) => {
+  return balances.map((item) => {
     const type = item.bonus_type || item.type || "cashback";
     const key = `bonus_${type}`;
     const title = `${names.get(type) || type}: ${money(item.balance)}`;
-    return cardConfigBlock(ctx, key, title, index + 2, `<b>${escapeHtml(money(item.balance))}</b><span>\u0431\u0430\u043b\u043b\u043e\u0432</span>`, enabledSections.includes(key));
-  }).join("");
+    return {
+      key,
+      html: cardConfigBlock(ctx, key, title, `<b>${escapeHtml(money(item.balance))}</b><span>\u0431\u0430\u043b\u043b\u043e\u0432</span>`, enabledSections.includes(key)),
+    };
+  });
 }
 
 function visitTitle(item) {
@@ -932,7 +935,7 @@ function visitsPreview(visits) {
 }
 
 function registrationBlocks(ctx) {
-  const fields = [
+  const fieldMap = new Map([
     ["last_name", "\u0424\u0430\u043c\u0438\u043b\u0438\u044f"],
     ["first_name", "\u0418\u043c\u044f"],
     ["middle_name", "\u041e\u0442\u0447\u0435\u0441\u0442\u0432\u043e"],
@@ -942,28 +945,48 @@ function registrationBlocks(ctx) {
     ["max_id", "Max ID"],
     ["vk_id", "VK ID"],
     ["email", "Email"],
-  ];
+  ]);
   const enabledFields = enabledRegistrationFields(ctx.org?.id);
-  return fields.map(([key, title], index) => cardConfigBlock(
+  const fieldOrder = [...enabledFields, ...REGISTRATION_FIELD_NAMES.filter((name) => !enabledFields.includes(name))];
+  return fieldOrder.map((key) => {
+    const title = fieldMap.get(key) || key;
+    return cardConfigBlock(
     ctx,
     `reg_${key}`,
     title,
-    index + 1,
     `<span>${escapeHtml(title)}</span><input disabled placeholder="${escapeHtml(title)}">`,
     enabledFields.includes(key),
-  )).join("");
+    );
+  }).join("");
 }
 
 function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
   const level = selectedClient?.client_level || metric?.client_level || metric?.loyalty_level || levels?.[0]?.name || L.notSet;
   const enabledSections = enabledClientCardSections(ctx.org?.id);
-  return `
-    ${cardConfigBlock(ctx, "client_name", "\u0424\u0418\u041e", 1, `<b>${escapeHtml(selectedClient ? clientName(selectedClient) : L.notSelected)}</b>`, enabledSections.includes("client_name"))}
-    ${bonusBalanceBlocks(ctx, bonusTypes, bonusTypeBalances, enabledSections)}
-    ${cardConfigBlock(ctx, "client_level", "\u0423\u0440\u043e\u0432\u0435\u043d\u044c", (bonusTypeBalances || []).length + 2, `<b>${escapeHtml(level)}</b>`, enabledSections.includes("client_level"))}
-    ${cardConfigBlock(ctx, "client_visits", "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0438\u0437\u0438\u0442\u043e\u0432", (bonusTypeBalances || []).length + 3, visitsPreview(visits), enabledSections.includes("client_visits"))}
-    ${cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", (bonusTypeBalances || []).length + 4, `<p class="empty">\u0427\u0430\u0442 \u0431\u0443\u0434\u0435\u0442 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d \u043f\u043e\u0441\u043b\u0435 backend-\u043b\u043e\u0433\u0438\u043a\u0438.</p>`, enabledSections.includes("client_chat"))}
-  `;
+  const blocks = [
+    {
+      key: "client_name",
+      html: cardConfigBlock(ctx, "client_name", "\u0424\u0418\u041e", `<b>${escapeHtml(selectedClient ? clientName(selectedClient) : L.notSelected)}</b>`, enabledSections.includes("client_name")),
+    },
+    ...bonusBalanceBlocks(ctx, bonusTypes, bonusTypeBalances, enabledSections),
+    {
+      key: "client_level",
+      html: cardConfigBlock(ctx, "client_level", "\u0423\u0440\u043e\u0432\u0435\u043d\u044c", `<b>${escapeHtml(level)}</b>`, enabledSections.includes("client_level")),
+    },
+    {
+      key: "client_visits",
+      html: cardConfigBlock(ctx, "client_visits", "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0438\u0437\u0438\u0442\u043e\u0432", visitsPreview(visits), enabledSections.includes("client_visits")),
+    },
+    {
+      key: "client_chat",
+      html: cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", `<p class="empty">\u0427\u0430\u0442 \u0431\u0443\u0434\u0435\u0442 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d \u043f\u043e\u0441\u043b\u0435 backend-\u043b\u043e\u0433\u0438\u043a\u0438.</p>`, enabledSections.includes("client_chat")),
+    },
+  ];
+  const order = new Map(enabledSections.map((key, index) => [key, index]));
+  return blocks
+    .sort((a, b) => (order.get(a.key) ?? blocks.length) - (order.get(b.key) ?? blocks.length))
+    .map((item) => item.html)
+    .join("");
 }
 
 function cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalances, levels, metric, visits) {
@@ -1364,6 +1387,27 @@ export function bindLoyalty(root, ctx) {
     }
   });
 
+  root.addEventListener("dragstart", (event) => {
+    const block = event.target.closest("[data-card-config-block]");
+    if (!block) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", block.dataset.cardConfigBlock || "");
+    block.classList.add("dragging");
+  });
+
+  root.addEventListener("dragend", (event) => {
+    event.target.closest("[data-card-config-block]")?.classList.remove("dragging");
+  });
+
+  root.addEventListener("dragover", (event) => {
+    const block = event.target.closest("[data-card-config-block]");
+    const dragging = root.querySelector("[data-card-config-block].dragging");
+    if (!block || !dragging || block === dragging) return;
+    event.preventDefault();
+    const after = event.clientY > block.getBoundingClientRect().top + block.offsetHeight / 2;
+    block.parentNode.insertBefore(dragging, after ? block.nextSibling : block);
+  });
+
   root.addEventListener("click", async (event) => {
     const tasksButton = event.target.closest("[data-go-tasks]");
     if (tasksButton) {
@@ -1397,7 +1441,7 @@ export function bindLoyalty(root, ctx) {
 
     const saveRegistrationFieldsButton = event.target.closest("[data-save-registration-fields]");
     if (saveRegistrationFieldsButton) {
-      const fields = [...root.querySelectorAll("[data-registration-field]")]
+      const fields = [...root.querySelectorAll("[data-card-config-block] [data-registration-field]")]
         .filter((input) => input.checked)
         .map((input) => input.dataset.registrationField);
       await api.updateClientRegistrationFields(ctx.org.id, fields);
@@ -1410,7 +1454,7 @@ export function bindLoyalty(root, ctx) {
 
     const saveClientCardSectionsButton = event.target.closest("[data-save-client-card-sections]");
     if (saveClientCardSectionsButton) {
-      const sections = [...root.querySelectorAll("[data-client-card-section]")]
+      const sections = [...root.querySelectorAll("[data-card-config-block] [data-client-card-section]")]
         .filter((input) => input.checked)
         .map((input) => input.dataset.clientCardSection);
       await api.updateClientCardSections(ctx.org.id, sections);

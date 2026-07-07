@@ -263,7 +263,13 @@ function setCabinetTab(tab) {
 
 function applyCabinetRegistrationFields(form, fields) {
   const enabled = Array.isArray(fields) ? fields : DEFAULT_CABINET_FIELDS;
-  form.querySelectorAll("[data-cabinet-field]").forEach((field) => {
+  const fieldsByName = new Map([...form.querySelectorAll("[data-cabinet-field]")].map((field) => [field.dataset.cabinetField, field]));
+  const order = [...enabled, ...DEFAULT_CABINET_FIELDS.filter((name) => !enabled.includes(name))];
+  order.forEach((name) => {
+    const field = fieldsByName.get(name);
+    if (field) form.insertBefore(field, form.querySelector("[data-cabinet-message]"));
+  });
+  fieldsByName.forEach((field) => {
     const isVisible = enabled.includes(field.dataset.cabinetField);
     field.hidden = !isVisible;
     field.style.display = isVisible ? "" : "none";
@@ -308,9 +314,9 @@ async function initCabinetForm() {
       const user = state.me || await api.me();
       cabinetData = await api.cabinet().catch(() => null);
       cabinetClient = cabinetData?.client || null;
-      applyCabinetRegistrationFields(form, DEFAULT_CABINET_FIELDS);
+      applyCabinetRegistrationFields(form, cabinetData?.registration_fields);
       fillCabinetUser(form, cabinetClient || user);
-      renderCabinetHistory(cabinetData?.card_sections || DEFAULT_CABINET_CARD_SECTIONS);
+      renderCabinetHistory(cabinetData?.card_sections ?? DEFAULT_CABINET_CARD_SECTIONS);
       setMessage("", "");
     } catch {
       setMessage("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430. \u0412\u043e\u0439\u0434\u0438\u0442\u0435 \u0441\u043d\u043e\u0432\u0430.", "error");
@@ -325,11 +331,18 @@ async function initCabinetForm() {
     const response = await fetch(`/auth/client-auth-links/${encodeURIComponent(token)}/consume`, { method: "POST" });
     if (!response.ok) throw new Error();
     const link = await response.json();
+    cabinetData = link;
+    cabinetClient = link.client || link.profile || null;
     applyCabinetRegistrationFields(form, link.registration_fields);
+    fillCabinetUser(form, cabinetClient || {});
     renderCabinetHistory(link.card_sections);
     button.disabled = false;
   } catch {
-    setMessage("\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0430.", "error");
+    const text = "\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0430.";
+    alert(text);
+    setMessage(text, "error");
+    root.querySelector(".cabinet-shell")?.setAttribute("hidden", "");
+    location.replace("/auth.html");
   }
 }
 
@@ -415,10 +428,6 @@ async function userHasOrganizationRole() {
   );
 }
 
-function isClientSession() {
-  return !!(state.me?.max_id || state.me?.telegram_id || state.me?.phone);
-}
-
 function chooseOrg(routeInfo) {
   if (!state.orgs.length) return null;
   const saved = Number(localStorage.getItem(LAST_ORG_KEY));
@@ -488,13 +497,6 @@ async function draw(options = {}) {
       return;
     }
     render(root, onboarding());
-    return;
-  }
-
-  if (!state.orgs.length && isClientSession()) {
-    history.replaceState(null, "", "/cabinet.html");
-    render(root, cabinetPage());
-    initCabinetForm();
     return;
   }
 
@@ -579,7 +581,6 @@ root.addEventListener("submit", async (event) => {
     cabinetClient = result.client || null;
     renderCabinetHistory(cabinetCardSections);
     setMessage("\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.", "success");
-    form.reset();
   } catch (error) {
     setMessage(error.message, "error");
     button.disabled = false;
@@ -652,7 +653,7 @@ window.addEventListener("ajax:end", () => {
 bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
-bindSettings(root, { get org() { return state.org; }, reload });
+bindSettings(root, { get org() { return state.org; }, navigate, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
 
 draw();

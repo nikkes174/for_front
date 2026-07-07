@@ -623,6 +623,12 @@ button:active { transform: translateY(1px); }
   border: 1px solid #dce3ee;
   border-radius: 8px;
   background: #f8fbff;
+  cursor: grab;
+}
+
+.card-config-block.dragging {
+  opacity: 0.55;
+  cursor: grabbing;
 }
 
 .card-config-block h4 {

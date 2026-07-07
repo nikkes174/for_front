@@ -37,6 +37,7 @@ let state = {
   photoPreviewUrl: "",
   photoFile: null,
   authLink: null,
+  clientAuthLink: null,
   authLinks: [],
 };
 
@@ -172,6 +173,11 @@ function clientPageSizeControl(pageSize) {
   `;
 }
 
+function returnToSettingsUrl(ctx) {
+  const returnTo = new URLSearchParams(location.search).get("return_to") || "";
+  return returnTo.startsWith(`/organizations/${ctx.org.id}/settings`) ? returnTo : "";
+}
+
 function clientAuthLinkForm(items) {
   const options = items.map((client) => `<option value="${escapeHtml(client.id)}">${escapeHtml(clientFullName(client))}</option>`).join("");
   const authPath = state.authLink?.url || state.authLink?.path || "";
@@ -181,8 +187,23 @@ function clientAuthLinkForm(items) {
       <label><span>Клиент</span><select name="client_id"><option value="">Без клиента</option>${options}</select></label>
       <button class="primary">Сгенерировать ссылку</button>
       ${link ? `
-        <label><span>Разовая ссылка</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
+        <label><span>Ссылка в личный кабинет</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
         <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">Копировать</button>
+      ` : ""}
+      <p data-message></p>
+    </form>
+  `;
+}
+
+function selectedClientAuthLinkForm() {
+  const authPath = state.clientAuthLink?.url || state.clientAuthLink?.path || "";
+  const link = authPath ? new URL(authPath, window.location.origin).toString() : "";
+  return `
+    <form class="inline-form compact" data-client-one-time-auth-link-create>
+      <button class="primary">\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443</button>
+      ${link ? `
+        <label><span>\u041e\u0434\u043d\u043e\u0440\u0430\u0437\u043e\u0432\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430 \u0432 \u043b\u0438\u0447\u043d\u044b\u0439 \u043a\u0430\u0431\u0438\u043d\u0435\u0442</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
+        <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button>
       ` : ""}
       <p data-message></p>
     </form>
@@ -761,6 +782,10 @@ function modal(client) {
           <button class="primary">Сохранить</button>
         </form>
         <div class="subpanel">
+          <h3>\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u0441\u0441\u044b\u043b\u043a\u0438</h3>
+          ${selectedClientAuthLinkForm()}
+        </div>
+        <div class="subpanel">
           <h3>Сервис истории</h3>
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
             ${visitCreateFormMarkup()}
@@ -895,6 +920,7 @@ function editableVisitModal(client) {
 export async function clients(ctx) {
   const params = new URLSearchParams(location.search);
   const search = params.get("q") || "";
+  const selectedClientId = params.get("client_id") || "";
   const sort = params.get("sort") || "name";
   const direction = params.get("dir") === "desc" ? "desc" : "asc";
   const requestedPageSize = Number(params.get("page_size") || DEFAULT_CLIENTS_PAGE_SIZE);
@@ -944,6 +970,19 @@ export async function clients(ctx) {
   };
 
   state = { ...state, clients: knownClients, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, authLinks };
+  if (selectedClientId && String(state.selectedClient?.id || "") !== String(selectedClientId)) {
+    const selectedClient = knownClients.find((item) => String(item.id) === String(selectedClientId))
+      || await api.client(selectedClientId, ctx.org.id).catch(() => null);
+    if (selectedClient) {
+      clearPhotoPreview();
+      state.selectedVisit = null;
+      state.selectedVisitDraft = {};
+      state.visitDraft = {};
+      state.visitErrors = {};
+      state.clientAuthLink = null;
+      state.selectedClient = await loadClientDetails(selectedClient, ctx.org.id);
+    }
+  }
 
   return `
     <section class="panel" data-clients>
@@ -1144,7 +1183,15 @@ export function bindClients(root, ctx) {
     const data = formData(form);
 
     try {
-      if (form.matches("[data-client-auth-link-create]")) {
+      if (form.matches("[data-client-one-time-auth-link-create]") && state.selectedClient) {
+        const registrationSettings = await api.clientRegistrationFields(ctx.org.id).catch(() => null);
+        state.clientAuthLink = await api.createClientAuthLink(clean({
+          organization_id: ctx.org.id,
+          client_id: state.selectedClient.id,
+          one_time: true,
+          registration_fields: Array.isArray(registrationSettings?.fields) ? registrationSettings.fields : enabledRegistrationFields(ctx.org.id),
+        }));
+      } else if (form.matches("[data-client-auth-link-create]")) {
         const registrationSettings = await api.clientRegistrationFields(ctx.org.id).catch(() => null);
         state.authLink = await api.createClientAuthLink(clean({
           organization_id: ctx.org.id,
@@ -1293,6 +1340,7 @@ export function bindClients(root, ctx) {
         state.visitDraft = {};
         state.visitErrors = {};
         state.selectedVisitDraft = {};
+        state.clientAuthLink = null;
       }
       ctx.reload();
       return;
@@ -1307,6 +1355,7 @@ export function bindClients(root, ctx) {
         state.selectedVisitDraft = {};
         state.visitDraft = {};
         state.visitErrors = {};
+        state.clientAuthLink = null;
         state.selectedClient = await loadClientDetails(client, ctx.org.id);
         ctx.reload();
       }
@@ -1335,12 +1384,18 @@ export function bindClients(root, ctx) {
     }
 
     if (event.target.closest("[data-close-client]")) {
+      const returnUrl = returnToSettingsUrl(ctx);
       clearPhotoPreview();
       state.selectedClient = null;
       state.selectedVisit = null;
       state.visitDraft = {};
       state.visitErrors = {};
       state.selectedVisitDraft = {};
+      state.clientAuthLink = null;
+      if (returnUrl) {
+        ctx.navigate(returnUrl);
+        return;
+      }
       event.target.closest("[data-client-modal]")?.remove();
       return;
     }
@@ -1358,12 +1413,18 @@ export function bindClients(root, ctx) {
     }
 
     if (event.target.matches("[data-client-modal]")) {
+      const returnUrl = returnToSettingsUrl(ctx);
       clearPhotoPreview();
       state.selectedClient = null;
       state.selectedVisit = null;
       state.visitDraft = {};
       state.visitErrors = {};
       state.selectedVisitDraft = {};
+      state.clientAuthLink = null;
+      if (returnUrl) {
+        ctx.navigate(returnUrl);
+        return;
+      }
       event.target.remove();
     }
   });

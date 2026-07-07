@@ -61,6 +61,7 @@ export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   testResetPassword: (body) => request("/auth/test-reset-password", { method: "POST", body: JSON.stringify(body) }),
+  loginContext: () => request("/auth/login-context"),
   startClientMaxAuth: (body) => request("/auth/client-max/start", { method: "POST", body: JSON.stringify(body) }),
   start2fa: (body) => request("/auth/2fa/start", { method: "POST", body: JSON.stringify(body) }),
   verify2fa: (body) => request("/auth/2fa/verify", { method: "POST", body: JSON.stringify(body) }),
