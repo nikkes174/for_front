@@ -11,14 +11,21 @@
   padding: 18px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 6px;
 }
 
 .cabinet-nav-link {
+  display: flex;
   padding: 10px 12px;
   border-radius: 7px;
   color: #dbe4f0;
   text-decoration: none;
+}
+
+.cabinet-logout {
+  display: flex;
+  width: 100%;
 }
 
 .cabinet-nav-link:hover,

@@ -60,6 +60,7 @@ export async function upload(path, formData) {
 export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  restoreSession: (body) => request("/auth/session/restore", { method: "POST", body: JSON.stringify(body) }),
   testResetPassword: (body) => request("/auth/test-reset-password", { method: "POST", body: JSON.stringify(body) }),
   loginContext: () => request("/auth/login-context"),
   startClientMaxAuth: (body) => request("/auth/client-max/start", { method: "POST", body: JSON.stringify(body) }),
@@ -186,6 +187,12 @@ export const api = {
   clientCategories: (id) => request(`/crm-api/clients-core/category-links?client_id=${id}`),
   clientAdditionalFieldValues: (id) => request(`/crm-api/clients-core/additional-field-values?client_id=${id}`),
   clientBranches: (id) => request(`/crm-api/clients-core/branches?client_id=${id}`),
+  pushStatus: (organizationId, clientId = "", endpoint = "") => request(`/crm-api/client-communications/push/status?organization_id=${organizationId}${clientId ? `&client_id=${clientId}` : ""}${endpoint ? `&endpoint=${encodeURIComponent(endpoint)}` : ""}`, { cache: "no-store" }),
+  pushPreference: (body) => request("/crm-api/client-communications/push/preference", { method: "POST", body: JSON.stringify(body) }),
+  pushSubscribe: (body) => request("/crm-api/client-communications/push/subscribe", { method: "POST", body: JSON.stringify(body) }),
+  pushUnsubscribe: (endpoint) => request("/crm-api/client-communications/push/subscribe", { method: "DELETE", body: JSON.stringify({ endpoint }) }),
+  clientPushMessages: (clientId) => request(`/crm-api/client-communications/clients/${clientId}/messages?channel=push&message_type=notification&limit=20`, { cache: "no-store" }),
+  sendPushNotification: (body) => request("/crm-api/client-communications/push/send", { method: "POST", body: JSON.stringify(body) }),
 
   rules: (orgId) => request(`/loyalty-api/organizations/${orgId}/rules`),
   createRule: (body) => request("/loyalty-api/client-bonuses/rules", { method: "POST", body: JSON.stringify(body) }),

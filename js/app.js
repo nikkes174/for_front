@@ -4,10 +4,12 @@ import { dashboard } from "./modules/dashboard.js";
 import { onboarding, bindOnboarding } from "./modules/onboarding.js";
 import { clients, bindClients } from "./modules/clients.js";
 import { loyalty, bindLoyalty } from "./modules/loyalty.js";
+import { notifications, bindNotifications } from "./modules/notifications.js";
 import { settings, bindSettings } from "./modules/settings.js";
 import { tasks, bindTasks } from "./modules/tasks.js";
 
 const LAST_ORG_KEY = "loyalty.lastOrganizationId";
+const SESSION_TOKEN_KEY = "loyalty.sessionToken";
 
 ensureCss();
 
@@ -42,6 +44,14 @@ function authRedirect() {
   location.href = `/auth.html?mode=${mode}`;
 }
 
+async function redirectClientDomainFromAdminPath() {
+  if (!location.pathname.startsWith("/organizations/")) return false;
+  const context = await api.loginContext().catch(() => null);
+  if (!context?.is_client_domain) return false;
+  location.replace("/auth.html?mode=login");
+  return true;
+}
+
 function route() {
   const parts = location.pathname.split("/").filter(Boolean);
   if (parts[0] === "cabinet.html") return { page: "cabinet" };
@@ -53,6 +63,37 @@ function route() {
 
 
 function cabinetPage() {
+  document.querySelector('meta[name="viewport"]')?.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no");
+  if (!document.querySelector('meta[name="theme-color"]')) {
+    const theme = document.createElement("meta");
+    theme.name = "theme-color";
+    theme.content = "#111827";
+    document.head.appendChild(theme);
+  }
+  [
+    ["mobile-web-app-capable", "yes"],
+    ["apple-mobile-web-app-capable", "yes"],
+    ["apple-mobile-web-app-status-bar-style", "black-translucent"],
+    ["apple-mobile-web-app-title", "Личный кабинет"],
+  ].forEach(([name, content]) => {
+    if (document.querySelector(`meta[name="${name}"]`)) return;
+    const meta = document.createElement("meta");
+    meta.name = name;
+    meta.content = content;
+    document.head.appendChild(meta);
+  });
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const manifest = document.createElement("link");
+    manifest.rel = "manifest";
+    manifest.href = "/manifest.webmanifest";
+    document.head.appendChild(manifest);
+  }
+  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+    const icon = document.createElement("link");
+    icon.rel = "apple-touch-icon";
+    icon.href = "/apple-touch-icon.png";
+    document.head.appendChild(icon);
+  }
   if (!document.querySelector('link[href="/css/cabinet.css"]')) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -62,11 +103,15 @@ function cabinetPage() {
 
   return `
     <main class="cabinet-shell">
-      <aside class="cabinet-sidebar" aria-label="\u041b\u0438\u0447\u043d\u044b\u0439 \u043a\u0430\u0431\u0438\u043d\u0435\u0442">
-        <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">\u041c\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435</a>
-        <button type="button" class="cabinet-logout" data-cabinet-logout>\u0412\u044b\u0445\u043e\u0434</button>
-      </aside>
       <section class="cabinet-content">
+        <div class="cabinet-topbar">
+          <button type="button" class="cabinet-menu-button" data-cabinet-menu-open aria-label="\u041c\u0435\u043d\u044e">
+            <span></span><span></span><span></span>
+          </button>
+          <button type="button" class="cabinet-notifications-button" data-cabinet-notifications-open aria-label="\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </button>
+        </div>
         <div class="cabinet-panel" data-cabinet-view="profile">
           <div class="cabinet-heading">
             <p>\u041b\u0438\u0447\u043d\u044b\u0439 \u043a\u0430\u0431\u0438\u043d\u0435\u0442</p>
@@ -78,9 +123,9 @@ function cabinetPage() {
             <label class="field" data-cabinet-field="middle_name"><span>\u041e\u0442\u0447\u0435\u0441\u0442\u0432\u043e</span><input name="middle_name" type="text" autocomplete="additional-name" /></label>
             <label class="field" data-cabinet-field="phone"><span>\u041d\u043e\u043c\u0435\u0440 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 *</span><input name="phone" type="tel" required autocomplete="tel" /></label>
             <label class="field" data-cabinet-field="gender"><span>\u041f\u043e\u043b *</span><select name="gender" required><option value="">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u043e\u043b</option><option value="male">\u041c\u0443\u0436\u0441\u043a\u043e\u0439</option><option value="female">\u0416\u0435\u043d\u0441\u043a\u0438\u0439</option></select></label>
-            <label class="field" data-cabinet-field="telegram_id"><span>Telegram ID</span><input name="telegram_id" type="text" inputmode="numeric" /></label>
-            <label class="field" data-cabinet-field="max_id"><span>Max ID</span><input name="max_id" type="text" inputmode="numeric" /></label>
-            <label class="field" data-cabinet-field="vk_id"><span>VK ID</span><input name="vk_id" type="text" inputmode="numeric" /></label>
+            <label class="field" data-cabinet-field="telegram_id" hidden><span>Telegram ID</span><input name="telegram_id" type="text" inputmode="numeric" disabled /></label>
+            <label class="field" data-cabinet-field="max_id" hidden><span>Max ID</span><input name="max_id" type="text" inputmode="numeric" disabled /></label>
+            <label class="field" data-cabinet-field="vk_id" hidden><span>VK ID</span><input name="vk_id" type="text" inputmode="numeric" disabled /></label>
             <label class="field wide" data-cabinet-field="email"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
             <p class="cabinet-message" data-cabinet-message></p>
             <div class="form-actions"><button type="submit" data-cabinet-submit>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435</button></div>
@@ -91,16 +136,52 @@ function cabinetPage() {
           </section>
         </div>
       </section>
+      <div class="modal-backdrop cabinet-menu-backdrop" data-cabinet-menu hidden>
+        <aside class="cabinet-drawer" aria-label="\u041c\u0435\u043d\u044e \u043b\u0438\u0447\u043d\u043e\u0433\u043e \u043a\u0430\u0431\u0438\u043d\u0435\u0442\u0430">
+          <div class="cabinet-drawer-head">
+            <strong>\u041a\u0430\u0431\u0438\u043d\u0435\u0442</strong>
+            <button type="button" class="cabinet-drawer-close" data-cabinet-menu-close aria-label="\u0417\u0430\u043a\u0440\u044b\u0442\u044c">\u00d7</button>
+          </div>
+          <nav class="cabinet-drawer-nav">
+            <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">\u041c\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435</a>
+            <button type="button" class="cabinet-logout" data-cabinet-logout>\u0412\u044b\u0445\u043e\u0434</button>
+          </nav>
+        </aside>
+      </div>
+      <div class="modal-backdrop" data-cabinet-notifications-modal hidden>
+        <div class="modal-card cabinet-notifications-modal">
+          <div class="modal-head">
+            <h3>\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f</h3>
+            <button type="button" class="ghost" data-cabinet-notifications-close>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
+          </div>
+          <label class="cabinet-notifications-toggle">
+            <span class="cabinet-notifications-toggle-text">\u041f\u043e\u043b\u0443\u0447\u0430\u0442\u044c \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f</span>
+            <span class="cabinet-switch">
+              <input type="checkbox" data-cabinet-push-toggle />
+              <span class="cabinet-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="cabinet-message" data-cabinet-push-status></p>
+          <div class="cabinet-notifications-empty" data-cabinet-notifications-list>\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</div>
+        </div>
+      </div>
     </main>
   `;
 }
 
-const DEFAULT_CABINET_FIELDS = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
+const DEFAULT_CABINET_FIELDS = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
 const DEFAULT_CABINET_CARD_SECTIONS = ["client_name", "bonus_cashback", "client_level", "client_visits", "client_chat"];
 let cabinetCardSections = DEFAULT_CABINET_CARD_SECTIONS;
 let cabinetClient = null;
 let cabinetData = null;
 let cabinetSelectedVisit = null;
+const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
+
+if ("serviceWorker" in navigator && location.pathname.endsWith("/cabinet.html")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => null);
+  });
+}
 
 function cabinetSectionTitle(section) {
   if (section === "client_name") return "\u0424\u0418\u041e";
@@ -257,6 +338,20 @@ function setCabinetTab(tab) {
   });
 }
 
+function openCabinetMenu() {
+  const menu = root.querySelector("[data-cabinet-menu]");
+  if (!menu) return;
+  menu.removeAttribute("hidden");
+  requestAnimationFrame(() => menu.classList.add("is-open"));
+}
+
+function closeCabinetMenu() {
+  const menu = root.querySelector("[data-cabinet-menu]");
+  if (!menu || menu.hasAttribute("hidden")) return;
+  menu.classList.remove("is-open");
+  window.setTimeout(() => menu.setAttribute("hidden", ""), 230);
+}
+
 function setCabinetRegistrationMode(enabled) {
   const title = root.querySelector("[data-cabinet-title]");
   const historySection = root.querySelector("[data-cabinet-history-section]");
@@ -303,6 +398,135 @@ function fillCabinetUser(form, user) {
   });
 }
 
+function cabinetPushContext() {
+  const client = cabinetData?.client || cabinetClient || {};
+  return { organizationId: cabinetData?.organization_id || client.organization_id, clientId: client.id || cabinetData?.client_id };
+}
+
+function base64ToUint8Array(value) {
+  const padding = "=".repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
+
+async function refreshCabinetPushState() {
+  const toggle = root.querySelector("[data-cabinet-push-toggle]");
+  const status = root.querySelector("[data-cabinet-push-status]");
+  if (!toggle || !status) return null;
+  const { organizationId, clientId } = cabinetPushContext();
+  if (!organizationId || !clientId) {
+    toggle.disabled = true;
+    status.textContent = "\u041a\u043b\u0438\u0435\u043d\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.";
+    return null;
+  }
+  const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.register("/service-worker.js").catch(() => null) : null;
+  const subscription = await registration?.pushManager?.getSubscription?.();
+  const state = await api.pushStatus(organizationId, clientId, subscription?.endpoint || "");
+  toggle.checked = !!state.enabled;
+  toggle.disabled = !state.configured;
+  status.textContent = state.configured ? "" : "Push-\u043a\u043b\u044e\u0447\u0438 VAPID \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u044b \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.";
+  return state;
+}
+
+function formatCabinetNotificationDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("ru-RU");
+}
+
+function cabinetNotificationStamp(item) {
+  return String(item?.sent_at || item?.created_at || item?.id || "");
+}
+
+function cabinetNotificationsSeenKey(clientId) {
+  return `${CABINET_NOTIFICATIONS_SEEN_KEY}:${clientId || "unknown"}`;
+}
+
+function setCabinetNotificationBadge(hasUnread) {
+  const button = root.querySelector("[data-cabinet-notifications-open]");
+  if (!button) return;
+  button.classList.toggle("has-unread", !!hasUnread);
+}
+
+async function refreshCabinetNotificationsList({ markSeen = false } = {}) {
+  const list = root.querySelector("[data-cabinet-notifications-list]");
+  if (!list) return;
+  const { clientId } = cabinetPushContext();
+  if (!clientId) return;
+  const messages = await api.clientPushMessages(clientId);
+  if (!messages.length) {
+    list.textContent = "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.";
+    setCabinetNotificationBadge(false);
+    return;
+  }
+  const latestStamp = cabinetNotificationStamp(messages[0]);
+  const seenKey = cabinetNotificationsSeenKey(clientId);
+  const seenStamp = localStorage.getItem(seenKey) || "";
+  setCabinetNotificationBadge(Boolean(latestStamp && latestStamp !== seenStamp));
+  list.innerHTML = messages.map((item) => `
+    <div class="cabinet-notification-item">
+      <div>${escapeHtml(item.message_text || "")}</div>
+      <small>${escapeHtml(formatCabinetNotificationDate(item.sent_at || item.created_at))}</small>
+    </div>
+  `).join("");
+  if (markSeen) {
+    localStorage.setItem(seenKey, latestStamp);
+    setCabinetNotificationBadge(false);
+  }
+}
+
+async function enableCabinetPushNotifications() {
+  const { organizationId, clientId } = cabinetPushContext();
+  await api.pushPreference({ organization_id: organizationId, client_id: clientId, enabled: true });
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    root.querySelector("[data-cabinet-push-status]").textContent = "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b.";
+    const toggle = root.querySelector("[data-cabinet-push-toggle]");
+    if (toggle) toggle.checked = true;
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    root.querySelector("[data-cabinet-push-status]").textContent = `\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043d\u0438\u0435 \u043d\u0430 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u043d\u0435 \u0432\u044b\u0434\u0430\u043d\u043e: ${permission}.`;
+    return;
+  }
+  try {
+    const state = await api.pushStatus(organizationId, clientId);
+    if (!state?.public_key) throw new Error("Push-\u043a\u043b\u044e\u0447\u0438 VAPID \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u044b \u043d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.");
+    const registration = await navigator.serviceWorker.register("/service-worker.js");
+    const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64ToUint8Array(state.public_key),
+    });
+    await api.pushSubscribe({
+      organization_id: organizationId,
+      client_id: clientId,
+      endpoint: subscription.endpoint,
+      keys: subscription.toJSON().keys,
+      platform: navigator.platform || "",
+      user_agent: navigator.userAgent || "",
+    });
+    root.querySelector("[data-cabinet-push-status]").textContent = "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b.";
+  } catch (error) {
+    root.querySelector("[data-cabinet-push-status]").textContent = error.message || "\u0421\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e, push-\u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0430 \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d\u0430.";
+  }
+  const toggle = root.querySelector("[data-cabinet-push-toggle]");
+  if (toggle) toggle.checked = true;
+}
+
+async function disableCabinetPushNotifications() {
+  const { organizationId, clientId } = cabinetPushContext();
+  await api.pushPreference({ organization_id: organizationId, client_id: clientId, enabled: false });
+  const registration = await navigator.serviceWorker.ready.catch(() => null);
+  const subscription = await registration?.pushManager.getSubscription();
+  if (subscription) {
+    await api.pushUnsubscribe(subscription.endpoint).catch(() => null);
+    await subscription.unsubscribe().catch(() => null);
+  }
+  const toggle = root.querySelector("[data-cabinet-push-toggle]");
+  if (toggle) toggle.checked = false;
+  root.querySelector("[data-cabinet-push-status]").textContent = "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d\u044b.";
+}
+
 async function initCabinetForm() {
   const form = root.querySelector("[data-cabinet-form]");
   if (!form) return;
@@ -317,12 +541,15 @@ async function initCabinetForm() {
   setCabinetRegistrationMode(false);
   if (!token) {
     try {
-      const user = state.me || await api.me();
+      const user = state.me || await currentUser();
+      if (!user) throw new Error();
       cabinetData = await api.cabinet().catch(() => null);
       cabinetClient = cabinetData?.client || null;
       applyCabinetRegistrationFields(form, cabinetData?.registration_fields);
       fillCabinetUser(form, cabinetClient || user);
       renderCabinetHistory(cabinetData?.card_sections ?? DEFAULT_CABINET_CARD_SECTIONS);
+      await refreshCabinetPushState().catch(() => null);
+      await refreshCabinetNotificationsList().catch(() => null);
       setMessage("", "");
     } catch {
       setMessage("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430. \u0412\u043e\u0439\u0434\u0438\u0442\u0435 \u0441\u043d\u043e\u0432\u0430.", "error");
@@ -343,6 +570,8 @@ async function initCabinetForm() {
     applyCabinetRegistrationFields(form, link.registration_fields);
     fillCabinetUser(form, cabinetClient || {});
     renderCabinetHistory(link.card_sections);
+    await refreshCabinetPushState().catch(() => null);
+    await refreshCabinetNotificationsList().catch(() => null);
     button.disabled = false;
   } catch {
     const text = "\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0430.";
@@ -391,6 +620,7 @@ function shell(content, title) {
           ${navLink(`/organizations/${org.id}/clients`, "Клиенты")}
           ${navLink(`/organizations/${org.id}/loyalty`, "Лояльность")}
           ${navLink(`/organizations/${org.id}/settings`, "Настройки организации")}
+          ${navLink(`/organizations/${org.id}/notifications`, "Рассылка")}
           ${navLink(`/organizations/${org.id}/tasks`, "Задачи")}
         </nav>
       </aside>
@@ -414,10 +644,30 @@ function reload() {
   draw({ live: true });
 }
 
-async function ensureSession() {
+async function restoreStoredSession() {
+  const token = localStorage.getItem(SESSION_TOKEN_KEY);
+  if (!token) return null;
   try {
-    state.me = await api.me();
+    const result = await api.restoreSession({ token });
+    if (result?.session_token) localStorage.setItem(SESSION_TOKEN_KEY, result.session_token);
+    return result?.user || null;
   } catch {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    return null;
+  }
+}
+
+async function currentUser() {
+  try {
+    return await api.me();
+  } catch {
+    return await restoreStoredSession();
+  }
+}
+
+async function ensureSession() {
+  state.me = await currentUser();
+  if (!state.me) {
     authRedirect();
     return false;
   }
@@ -450,6 +700,7 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "settings" && !canAny(SETTINGS_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
+  if (routeInfo.page === "notifications") return ["Рассылка", await notifications(ctx)];
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
   if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx)];
   return ["Главная", await dashboard(ctx)];
@@ -610,6 +861,52 @@ root.addEventListener("click", async (event) => {
   if (cabinetTab) {
     event.preventDefault();
     setCabinetTab(cabinetTab.dataset.cabinetTab);
+    closeCabinetMenu();
+    history.replaceState(null, "", "#my-data");
+    return;
+  }
+
+  if (event.target.closest("[data-cabinet-menu-open]")) {
+    openCabinetMenu();
+    return;
+  }
+
+  if (event.target.closest("[data-cabinet-menu-close]") || event.target.matches("[data-cabinet-menu]")) {
+    closeCabinetMenu();
+    return;
+  }
+
+  const cabinetNotificationsOpen = event.target.closest("[data-cabinet-notifications-open]");
+  if (cabinetNotificationsOpen) {
+    root.querySelector("[data-cabinet-notifications-modal]")?.removeAttribute("hidden");
+    await refreshCabinetPushState().catch(() => null);
+    await refreshCabinetNotificationsList({ markSeen: true }).catch(() => null);
+    return;
+  }
+
+  if (event.target.closest("[data-cabinet-notifications-close]") || event.target.matches("[data-cabinet-notifications-modal]")) {
+    root.querySelector("[data-cabinet-notifications-modal]")?.setAttribute("hidden", "");
+    return;
+  }
+
+  const cabinetPushToggle = event.target.closest(".cabinet-notifications-toggle");
+  if (cabinetPushToggle) {
+    event.preventDefault();
+    const pushToggle = root.querySelector("[data-cabinet-push-toggle]");
+    if (!pushToggle || pushToggle.disabled) return;
+    const enable = !pushToggle.checked;
+    pushToggle.checked = enable;
+    pushToggle.disabled = true;
+    try {
+      if (enable) await enableCabinetPushNotifications();
+      else await disableCabinetPushNotifications();
+    } catch (error) {
+      pushToggle.checked = !enable;
+      const status = root.querySelector("[data-cabinet-push-status]");
+      if (status) status.textContent = error.message || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f.";
+    } finally {
+      pushToggle.disabled = false;
+    }
     return;
   }
 
@@ -628,6 +925,7 @@ root.addEventListener("click", async (event) => {
 
   if (event.target.closest("[data-cabinet-logout]")) {
     await api.logout().catch(() => null);
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     location.href = "/auth.html?mode=login";
     return;
   }
@@ -640,11 +938,15 @@ root.addEventListener("click", async (event) => {
 
   if (event.target.closest("[data-logout]")) {
     await api.logout();
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     location.href = "/auth.html";
   }
 });
 
 root.addEventListener("change", (event) => {
+  const pushToggle = event.target.closest("[data-cabinet-push-toggle]");
+  if (pushToggle) return;
+
   const select = event.target.closest("[data-org-switch]");
   if (!select) return;
   localStorage.setItem(LAST_ORG_KEY, select.value);
@@ -664,7 +966,10 @@ window.addEventListener("ajax:end", () => {
 bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
+bindNotifications(root, { get org() { return state.org; }, navigate, reload });
 bindSettings(root, { get org() { return state.org; }, navigate, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
 
-draw();
+redirectClientDomainFromAdminPath().then((redirected) => {
+  if (!redirected) draw();
+});

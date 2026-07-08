@@ -8,6 +8,7 @@ let loginDraft = "";
 let twoFactorTarget = "/";
 let resetPasswordOpen = false;
 let loginContext = { is_client_domain: false };
+const SESSION_TOKEN_KEY = "loyalty.sessionToken";
 
 ensureCss();
 
@@ -94,6 +95,24 @@ function draw() {
   render(root, authHtml());
 }
 
+function saveSession(result) {
+  if (result?.session_token) localStorage.setItem(SESSION_TOKEN_KEY, result.session_token);
+}
+
+async function restoreAndRedirect() {
+  const token = localStorage.getItem(SESSION_TOKEN_KEY);
+  if (!token) return false;
+  try {
+    const result = await api.restoreSession({ token });
+    saveSession(result);
+    location.replace(loginContext.is_client_domain ? "/cabinet.html" : "/");
+    return true;
+  } catch {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    return false;
+  }
+}
+
 function sameHostUrl(url) {
   if (!url) return "";
   try {
@@ -162,7 +181,7 @@ root.addEventListener("submit", async (event) => {
     setMessage(twoFactorForm, "");
     const data = formData(twoFactorForm);
     try {
-      await api.verify2fa({ ticket: twoFactor.ticket, code: data.code });
+      saveSession(await api.verify2fa({ ticket: twoFactor.ticket, code: data.code }));
       location.href = twoFactorTarget;
     } catch (error) {
       setMessage(twoFactorForm, error.message);
@@ -196,14 +215,14 @@ root.addEventListener("submit", async (event) => {
   try {
     if (mode === "register") {
       if (data.password !== data.confirm) throw new Error("\u041f\u0430\u0440\u043e\u043b\u0438 \u043d\u0435 \u0441\u043e\u0432\u043f\u0430\u0434\u0430\u044e\u0442");
-      await api.register({
+      saveSession(await api.register({
         name: data.name,
         email: data.email || undefined,
         phone: data.phone || undefined,
         password: data.password,
-      });
+      }));
     } else {
-      await api.login({ login: data.login, password: data.password });
+      saveSession(await api.login({ login: data.login, password: data.password }));
     }
     location.href = "/";
   } catch (error) {
@@ -216,7 +235,10 @@ api.loginContext()
     loginContext = context || loginContext;
   })
   .catch(() => null)
-  .finally(draw);
+  .then(restoreAndRedirect)
+  .then((redirected) => {
+    if (!redirected) draw();
+  });
 
 
 

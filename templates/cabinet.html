@@ -2,19 +2,29 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Личный кабинет" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</title>
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/cabinet.css" />
   </head>
   <body>
     <main class="cabinet-shell">
-      <aside class="cabinet-sidebar" aria-label="&#1056;&#1072;&#1079;&#1076;&#1077;&#1083;&#1099; &#1083;&#1080;&#1095;&#1085;&#1086;&#1075;&#1086; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;&#1072;">
-        <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</a>
-        <button type="button" class="cabinet-logout" data-cabinet-logout>&#1042;&#1099;&#1093;&#1086;&#1076;</button>
-      </aside>
-
       <section class="cabinet-content">
+        <div class="cabinet-topbar">
+          <button type="button" class="cabinet-menu-button" data-cabinet-menu-open aria-label="Меню">
+            <span></span><span></span><span></span>
+          </button>
+          <button type="button" class="cabinet-notifications-button" data-cabinet-notifications-open aria-label="Уведомления">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </button>
+        </div>
         <div class="cabinet-panel" data-cabinet-view="profile">
           <div class="cabinet-heading">
             <p>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</p>
@@ -27,9 +37,9 @@
             <label class="field" data-cabinet-field="middle_name"><span>&#1054;&#1090;&#1095;&#1077;&#1089;&#1090;&#1074;&#1086;</span><input name="middle_name" type="text" autocomplete="additional-name" /></label>
             <label class="field" data-cabinet-field="phone"><span>&#1053;&#1086;&#1084;&#1077;&#1088; &#1090;&#1077;&#1083;&#1077;&#1092;&#1086;&#1085;&#1072; *</span><input name="phone" type="tel" required autocomplete="tel" /></label>
             <label class="field" data-cabinet-field="gender"><span>&#1055;&#1086;&#1083; *</span><select name="gender" required><option value="">&#1042;&#1099;&#1073;&#1077;&#1088;&#1080;&#1090;&#1077; &#1087;&#1086;&#1083;</option><option value="male">&#1052;&#1091;&#1078;&#1089;&#1082;&#1086;&#1081;</option><option value="female">&#1046;&#1077;&#1085;&#1089;&#1082;&#1080;&#1081;</option></select></label>
-            <label class="field" data-cabinet-field="telegram_id"><span>Telegram ID</span><input name="telegram_id" type="text" inputmode="numeric" /></label>
-            <label class="field" data-cabinet-field="max_id"><span>Max ID</span><input name="max_id" type="text" inputmode="numeric" /></label>
-            <label class="field" data-cabinet-field="vk_id"><span>VK ID</span><input name="vk_id" type="text" inputmode="numeric" /></label>
+            <label class="field" data-cabinet-field="telegram_id" hidden><span>Telegram ID</span><input name="telegram_id" type="text" inputmode="numeric" disabled /></label>
+            <label class="field" data-cabinet-field="max_id" hidden><span>Max ID</span><input name="max_id" type="text" inputmode="numeric" disabled /></label>
+            <label class="field" data-cabinet-field="vk_id" hidden><span>VK ID</span><input name="vk_id" type="text" inputmode="numeric" disabled /></label>
             <label class="field wide" data-cabinet-field="email"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
             <p class="cabinet-message" data-cabinet-message></p>
             <div class="form-actions"><button type="submit" data-cabinet-submit>&#1057;&#1086;&#1093;&#1088;&#1072;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</button></div>
@@ -41,24 +51,232 @@
         </div>
       </section>
     </main>
+    <div class="modal-backdrop cabinet-menu-backdrop" data-cabinet-menu hidden>
+      <aside class="cabinet-drawer" aria-label="Меню личного кабинета">
+        <div class="cabinet-drawer-head">
+          <strong>Кабинет</strong>
+          <button type="button" class="cabinet-drawer-close" data-cabinet-menu-close aria-label="Закрыть">×</button>
+        </div>
+        <nav class="cabinet-drawer-nav">
+          <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">Мои данные</a>
+          <button type="button" class="cabinet-logout" data-cabinet-logout>Выход</button>
+        </nav>
+      </aside>
+    </div>
+    <div class="modal-backdrop" data-cabinet-notifications-modal hidden>
+      <div class="modal-card cabinet-notifications-modal">
+        <div class="modal-head">
+          <h3>Уведомления</h3>
+          <button type="button" class="ghost" data-cabinet-notifications-close>Закрыть</button>
+        </div>
+        <label class="cabinet-notifications-toggle">
+          <span class="cabinet-notifications-toggle-text">Получать уведомления</span>
+          <span class="cabinet-switch">
+            <input type="checkbox" data-cabinet-push-toggle />
+            <span class="cabinet-switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+        <p class="cabinet-message" data-cabinet-push-status></p>
+        <div class="cabinet-notifications-empty" data-cabinet-notifications-list>Уведомлений пока нет.</div>
+      </div>
+    </div>
 
+    <script type="module" src="/js/dom.js"></script>
     <script>
       const form = document.querySelector("[data-cabinet-form]");
       const message = document.querySelector("[data-cabinet-message]");
       const historyList = document.querySelector("[data-cabinet-history]");
       const historySection = document.querySelector("[data-cabinet-history-section]");
       const cabinetTitle = document.querySelector("[data-cabinet-title]");
+      const notificationsModal = document.querySelector("[data-cabinet-notifications-modal]");
+      const pushToggleControl = document.querySelector(".cabinet-notifications-toggle");
+      const pushToggle = document.querySelector("[data-cabinet-push-toggle]");
+      const pushStatus = document.querySelector("[data-cabinet-push-status]");
+      const notificationsList = document.querySelector("[data-cabinet-notifications-list]");
       const token = new URLSearchParams(window.location.search).get("token");
       const submitButton = form.querySelector("button");
-      const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
+      const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
       const defaultCardSections = ["client_name", "bonus_cashback", "client_level", "client_visits", "client_chat"];
       let currentCardSections = defaultCardSections;
       let currentClient = null;
       let cabinetData = null;
       let selectedVisit = null;
+      const SESSION_TOKEN_KEY = "loyalty.sessionToken";
+      const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
+
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/service-worker.js").catch(() => null);
+        });
+      }
 
       function escapeHtml(value) {
         return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+      }
+
+      function pushContext() {
+        const client = cabinetData?.client || currentClient || {};
+        return { organizationId: cabinetData?.organization_id || client.organization_id, clientId: client.id || cabinetData?.client_id };
+      }
+
+      function base64ToUint8Array(value) {
+        const padding = "=".repeat((4 - value.length % 4) % 4);
+        const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+        return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+      }
+
+      async function requestJson(path, options = {}) {
+        const response = await fetch(path, {
+          credentials: "include",
+          cache: options.cache || "default",
+          headers: options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers,
+          ...options,
+        });
+        if (!response.ok) throw new Error("Не удалось обновить уведомления");
+        return response.json();
+      }
+
+      async function restoreStoredSession() {
+        const token = localStorage.getItem(SESSION_TOKEN_KEY);
+        if (!token) return null;
+        try {
+          const result = await requestJson("/auth/session/restore", {
+            method: "POST",
+            body: JSON.stringify({ token }),
+          });
+          if (result?.session_token) localStorage.setItem(SESSION_TOKEN_KEY, result.session_token);
+          return result?.user || null;
+        } catch {
+          localStorage.removeItem(SESSION_TOKEN_KEY);
+          return null;
+        }
+      }
+
+      async function currentUser() {
+        const response = await fetch("/auth/me");
+        if (response.ok) return response.json();
+        return restoreStoredSession();
+      }
+
+      async function refreshPushState() {
+        const { organizationId, clientId } = pushContext();
+        if (!organizationId || !clientId) {
+          pushToggle.disabled = true;
+          pushStatus.textContent = "Клиент не найден.";
+          return null;
+        }
+        const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.register("/service-worker.js").catch(() => null) : null;
+        const subscription = await registration?.pushManager?.getSubscription?.();
+        const endpoint = subscription?.endpoint ? `&endpoint=${encodeURIComponent(subscription.endpoint)}` : "";
+        const state = await requestJson(`/crm-api/client-communications/push/status?organization_id=${organizationId}&client_id=${clientId}${endpoint}`, { cache: "no-store" });
+        pushToggle.checked = !!state.enabled;
+        pushToggle.disabled = !state.configured;
+        pushStatus.textContent = state.configured ? "" : "Push-ключи VAPID не настроены на сервере.";
+        return state;
+      }
+
+      function formatDateTime(value) {
+        if (!value) return "";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("ru-RU");
+      }
+
+      function notificationStamp(item) {
+        return String(item?.sent_at || item?.created_at || item?.id || "");
+      }
+
+      function notificationsSeenKey(clientId) {
+        return `${CABINET_NOTIFICATIONS_SEEN_KEY}:${clientId || "unknown"}`;
+      }
+
+      function setNotificationBadge(hasUnread) {
+        document.querySelector("[data-cabinet-notifications-open]")?.classList.toggle("has-unread", !!hasUnread);
+      }
+
+      async function refreshNotificationsList({ markSeen = false } = {}) {
+        const { clientId } = pushContext();
+        if (!clientId) return;
+        const messages = await requestJson(`/crm-api/client-communications/clients/${clientId}/messages?channel=push&message_type=notification&limit=20`, { cache: "no-store" });
+        if (!messages.length) {
+          notificationsList.textContent = "Уведомлений пока нет.";
+          setNotificationBadge(false);
+          return;
+        }
+        const latestStamp = notificationStamp(messages[0]);
+        const seenKey = notificationsSeenKey(clientId);
+        const seenStamp = localStorage.getItem(seenKey) || "";
+        setNotificationBadge(Boolean(latestStamp && latestStamp !== seenStamp));
+        notificationsList.innerHTML = messages.map((item) => `
+          <div class="cabinet-notification-item">
+            <div>${escapeHtml(item.message_text || "")}</div>
+            <small>${escapeHtml(formatDateTime(item.sent_at || item.created_at))}</small>
+          </div>
+        `).join("");
+        if (markSeen) {
+          localStorage.setItem(seenKey, latestStamp);
+          setNotificationBadge(false);
+        }
+      }
+
+      async function enablePushNotifications() {
+        const { organizationId, clientId } = pushContext();
+        await requestJson("/crm-api/client-communications/push/preference", {
+          method: "POST",
+          body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: true }),
+        });
+        if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+          pushStatus.textContent = "Уведомления включены.";
+          pushToggle.checked = true;
+          return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          pushStatus.textContent = `Разрешение на уведомления не выдано: ${permission}.`;
+          return;
+        }
+        try {
+          const state = await requestJson(`/crm-api/client-communications/push/status?organization_id=${organizationId}&client_id=${clientId}`, { cache: "no-store" });
+          if (!state?.public_key) throw new Error("Push-ключи VAPID не настроены на сервере.");
+          const registration = await navigator.serviceWorker.register("/service-worker.js");
+          const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: base64ToUint8Array(state.public_key),
+          });
+          await requestJson("/crm-api/client-communications/push/subscribe", {
+            method: "POST",
+            body: JSON.stringify({
+              organization_id: organizationId,
+              client_id: clientId,
+              endpoint: subscription.endpoint,
+              keys: subscription.toJSON().keys,
+              platform: navigator.platform || "",
+              user_agent: navigator.userAgent || "",
+            }),
+          });
+          pushStatus.textContent = "Уведомления включены.";
+        } catch (error) {
+          pushStatus.textContent = error.message || "Состояние сохранено, push-подписка не создана.";
+        }
+        pushToggle.checked = true;
+      }
+
+      async function disablePushNotifications() {
+        const { organizationId, clientId } = pushContext();
+        await requestJson("/crm-api/client-communications/push/preference", {
+          method: "POST",
+          body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: false }),
+        });
+        const registration = await navigator.serviceWorker.ready.catch(() => null);
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) {
+          await requestJson("/crm-api/client-communications/push/subscribe", {
+            method: "DELETE",
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          }).catch(() => null);
+          await subscription.unsubscribe().catch(() => null);
+        }
+        pushToggle.checked = false;
+        pushStatus.textContent = "Уведомления выключены.";
       }
 
       function sectionTitle(section) {
@@ -214,6 +432,20 @@
         });
       }
 
+      function openCabinetMenu() {
+        const menu = document.querySelector("[data-cabinet-menu]");
+        if (!menu) return;
+        menu.removeAttribute("hidden");
+        requestAnimationFrame(() => menu.classList.add("is-open"));
+      }
+
+      function closeCabinetMenu() {
+        const menu = document.querySelector("[data-cabinet-menu]");
+        if (!menu || menu.hasAttribute("hidden")) return;
+        menu.classList.remove("is-open");
+        window.setTimeout(() => menu.setAttribute("hidden", ""), 230);
+      }
+
       function setRegistrationMode(enabled) {
         if (cabinetTitle) cabinetTitle.textContent = enabled ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u0430" : "\u041c\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435";
         if (historySection) historySection.hidden = enabled;
@@ -276,15 +508,16 @@
         setRegistrationMode(false);
         if (!token) {
           try {
-            const response = await fetch("/auth/me");
-            if (!response.ok) throw new Error();
-            const result = await response.json();
+            const result = await currentUser();
+            if (!result) throw new Error();
             const cabinetResponse = await fetch("/auth/cabinet");
             cabinetData = cabinetResponse.ok ? await cabinetResponse.json() : null;
             currentClient = cabinetData?.client || null;
             applyRegistrationFields(cabinetData?.registration_fields);
             fillCurrentUserCabinet(currentClient || result);
             renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
+            await refreshPushState().catch(() => null);
+            await refreshNotificationsList().catch(() => null);
             setMessage("", "");
           } catch {
             setMessage("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430. \u0412\u043e\u0439\u0434\u0438\u0442\u0435 \u0441\u043d\u043e\u0432\u0430.", "error");
@@ -303,6 +536,8 @@
           applyRegistrationFields(link.registration_fields);
           fillCurrentUserCabinet(currentClient || {});
           renderHistorySections(link.card_sections);
+          await refreshPushState().catch(() => null);
+          await refreshNotificationsList().catch(() => null);
           submitButton.disabled = false;
         } catch {
           const text = "\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0430.";
@@ -317,10 +552,34 @@
         link.addEventListener("click", (event) => {
           event.preventDefault();
           setCabinetTab(link.dataset.cabinetTab);
+          closeCabinetMenu();
+          history.replaceState(null, "", "#my-data");
         });
       });
 
       document.addEventListener("click", async (event) => {
+        if (event.target.closest("[data-cabinet-menu-open]")) {
+          openCabinetMenu();
+          return;
+        }
+
+        if (event.target.closest("[data-cabinet-menu-close]") || event.target.matches("[data-cabinet-menu]")) {
+          closeCabinetMenu();
+          return;
+        }
+
+        if (event.target.closest("[data-cabinet-notifications-open]")) {
+          notificationsModal.hidden = false;
+          await refreshPushState().catch(() => null);
+          await refreshNotificationsList({ markSeen: true }).catch(() => null);
+          return;
+        }
+
+        if (event.target.closest("[data-cabinet-notifications-close]") || event.target.matches("[data-cabinet-notifications-modal]")) {
+          notificationsModal.hidden = true;
+          return;
+        }
+
         const visitButton = event.target.closest("[data-cabinet-visit]");
         if (visitButton) {
           selectedVisit = (cabinetData?.visits || []).find((item) => String((item.visit || item).id) === String(visitButton.dataset.cabinetVisit)) || null;
@@ -336,7 +595,25 @@
 
         if (event.target.closest("[data-cabinet-logout]")) {
           await fetch("/auth/logout", { method: "POST" }).catch(() => null);
+          localStorage.removeItem(SESSION_TOKEN_KEY);
           location.href = "/auth.html?mode=login";
+        }
+      });
+
+      pushToggleControl.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (pushToggle.disabled) return;
+        const enable = !pushToggle.checked;
+        pushToggle.checked = enable;
+        pushToggle.disabled = true;
+        try {
+          if (enable) await enablePushNotifications();
+          else await disablePushNotifications();
+        } catch (error) {
+          pushToggle.checked = !enable;
+          pushStatus.textContent = error.message || "Не удалось обновить уведомления.";
+        } finally {
+          pushToggle.disabled = false;
         }
       });
 

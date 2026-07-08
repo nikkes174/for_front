@@ -1,4 +1,4 @@
-﻿import { api } from "../api.js";
+import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
 
 import { DateTime } from "https://esm.sh/luxon@3.5.0";
@@ -874,6 +874,30 @@ function auditDetails(item) {
   return item.reason || compactDetails(item.new_value) || compactDetails(item.old_value) || no;
 }
 
+function auditDetailsHtml(item) {
+  if (item.reason) return escapeHtml(item.reason);
+  const value = item.new_value && typeof item.new_value === "object" ? item.new_value : item.old_value;
+  if (!value || typeof value !== "object") return escapeHtml(auditDetails(item));
+  if ((item.entity_type || item.entity) === "client_visit") {
+    const clientId = item.client_id || value.client_id;
+    const clientLabel = value.full_name || (clientId ? `#${clientId}` : no);
+    const summary = String(value.summary || auditDetails(item)).replace(/\s+\u0434\u043b\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u0430\s+.+$/i, "");
+    return [
+      `Клиент: ${clientEventButton(clientId, clientLabel)}`,
+      `<button type="button" class="ghost" data-open-event-visit="audit:${escapeHtml(item.id)}">${escapeHtml(summary)}</button>`,
+    ].join(" \u00b7 ");
+  }
+  const clientId = item.client_id || value.client_id || (item.entity_type === "client" ? item.entity_id : null);
+  const details = compactDetails(value)
+    .split(" · ")
+    .filter((detail) => detail && !(clientId && detail.startsWith("Клиент:")));
+  const fields = clientId
+    ? [`Клиент: ${clientEventButton(clientId, value.full_name || (clientId ? `#${clientId}` : no))}`]
+    : [];
+  fields.push(...details.map((detail) => escapeHtml(detail)));
+  return fields.join(" · ") || no;
+}
+
 function addDetail(fields, value) {
   if (!value || fields.includes(value)) return;
   fields.push(value);
@@ -1170,17 +1194,11 @@ function section(title, body, hint = "") {
 }
 
 function eventEntityCell(item) {
-  if (item.entity_type === "client_visit") {
-    return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(humanizeCode(item.entity_type))}</button>`;
-  }
   return escapeHtml(humanizeCode(item.entity_type));
 }
 
 function auditEntityCell(item) {
   const entityType = item.entity_type || item.entity;
-  if (entityType === "client_visit") {
-    return `<button type="button" class="ghost" data-open-event-visit="audit:${escapeHtml(item.id)}">${escapeHtml(humanizeCode(entityType))}</button>`;
-  }
   return escapeHtml(humanizeCode(entityType));
 }
 
@@ -2193,7 +2211,7 @@ export async function settings(ctx) {
               <tr>
                 <td>${escapeHtml(humanizeCode(item.action))}</td>
                 <td>${auditEntityCell(item)}</td>
-                <td>${escapeHtml(auditDetails(item))}</td>
+                <td>${auditDetailsHtml(item)}</td>
                 <td>${escapeHtml(formatDateTime(item.created_at))}</td>
               </tr>
             `)}

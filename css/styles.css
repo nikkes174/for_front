@@ -580,6 +580,36 @@ button:active { transform: translateY(1px); }
   grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
 }
 
+[data-notifications] .inline-form {
+  align-items: start;
+}
+
+[data-notifications] .wide,
+[data-notifications] [data-message] {
+  grid-column: 1 / -1;
+}
+
+[data-notifications] .notification-message-field {
+  max-width: 50%;
+}
+
+[data-notifications] textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  [data-notifications] .notification-message-field {
+    max-width: 100%;
+  }
+}
+
+[data-notification-counter] {
+  align-self: center;
+  color: #667085;
+}
+
 .visit-form {
   grid-template-columns: repeat(3, minmax(180px, 1fr));
   align-items: start;
@@ -737,12 +767,20 @@ td small { display: block; color: #667085; margin-top: 4px; }
   display: grid;
   place-items: center;
   padding: 24px;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.modal-backdrop[hidden] {
+  display: none;
 }
 
 .modal-card {
   width: min(1040px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: #fff;
   border: 1px solid #dce3ee;
   border-radius: 12px;
