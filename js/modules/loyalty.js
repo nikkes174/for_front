@@ -81,6 +81,7 @@ const L = {
   bonusTypesTitle: "\u0422\u0438\u043f\u044b \u0431\u043e\u043d\u0443\u0441\u043e\u0432",
   createBonusType: "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0442\u0438\u043f",
   bonusTypesEmpty: "\u0422\u0438\u043f\u043e\u0432 \u0431\u043e\u043d\u0443\u0441\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.",
+  accrualRule: "\u041f\u0440\u0430\u0432\u0438\u043b\u043e \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u044f",
   active: "\u0410\u043a\u0442\u0438\u0432\u043d\u043e",
   activeShort: "\u0410\u043a\u0442\u0438\u0432\u0435\u043d",
   disabled: "\u0412\u044b\u043a\u043b\u044e\u0447\u0435\u043d",
@@ -541,7 +542,7 @@ function loyaltyModal(kind, item) {
   const levels = levelOptions(loyaltyState.levels || [], item.client_level || "");
   let fields = "";
   if (kind === "rule") fields = `${field(L.name, "name", item.name)}${select(L.type, "rule_type", typeOptions, item.rule_type)}${select(L.bonusType, "bonus_type", bonusTypes, item.bonus_type || "")}${field(L.ruleAmount, "amount", item.amount, 'type="number"')}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(loyaltyState.levels || [], item.client_level || ""), item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`;
-  if (kind === "level") fields = `${field(L.name, "name", item.name)}${field(L.cashback, "params", item.params?.cashback || "", 'type="number" step="0.01"')}`;
+  if (kind === "level") fields = `${field(L.name, "name", item.name)}`;
   if (kind === "bonus") fields = `<div class="readonly-field"><span>ID</span><b>${escapeHtml(item.id)}</b></div><div class="readonly-field"><span>${L.type}</span><b>${escapeHtml(item.bonus_type || "-")}</b></div>${field(L.reason, "reason", item.reason || "")}${field(L.clientLevel, "client_level", item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}${field(L.restrictions, "usage_restrictions", item.usage_restrictions?.allowed_target_types?.join(",") || "", 'placeholder="service,product"')}${field(L.expiresAt, "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
   if (kind === "subscription") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${field("\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "subscription_name", item.subscription_name || "")}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u0432\u0441\u0435\u0433\u043e", "visits_total", item.visits_total ?? 0, 'type="number"')}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043e\u0441\u0442\u0430\u043b\u043e\u0441\u044c", "visits_left", item.visits_left ?? 0, 'type="number"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u0432\u0441\u0435\u0433\u043e", "deposit_amount", item.deposit_amount ?? 0, 'type="number" step="0.01"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u043e\u0441\u0442\u0430\u0442\u043e\u043a", "deposit_left", item.deposit_left ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}<label class="checkbox modal-full"><input name="auto_renewal_enabled" type="checkbox" ${item.auto_renewal_enabled ? "checked" : ""}> \u0410\u0432\u0442\u043e\u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435</label><label class="checkbox modal-full"><input name="is_frozen" type="checkbox" ${item.is_frozen ? "checked" : ""}> \u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d</label>`;
   if (kind === "certificate") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${select("\u0422\u0438\u043f", "certificate_type", [{ value: "digital", label: "\u042d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0439" }, { value: "paper", label: "\u0411\u0443\u043c\u0430\u0436\u043d\u044b\u0439" }], item.certificate_type || "digital")}${field("\u041a\u043e\u0434", "certificate_code", item.certificate_code || "")}${field("\u041d\u043e\u043c\u0438\u043d\u0430\u043b", "nominal_amount", item.nominal_amount ?? 0, 'type="number" step="0.01"')}${field("\u0411\u0430\u043b\u0430\u043d\u0441", "balance_amount", item.balance_amount ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
@@ -622,7 +623,7 @@ function editPayload(kind, data) {
     level_params: optional(data.level_params) ? { cashback: Number(data.level_params) } : null,
     is_active: data.is_active === "on",
   };
-  if (kind === "level") return { name: data.name, params: optional(data.params) ? { cashback: Number(data.params) } : null };
+  if (kind === "level") return { name: data.name, params: null };
   if (kind === "bonus") return {
     reason: optional(data.reason),
     client_level: optional(data.client_level),
@@ -830,8 +831,26 @@ function transitionRulesSection(ctx, rules, levels, selectedClient) {
     </div>`;
 }
 
-function levelsSection(ctx, levels) {
-  return `<div class="subpanel">${titleWithHint(L.levelsTitle, L.levelsHint)}${canCreate(ctx, "levels") ? `<form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}<button class="primary" disabled>${L.createLevel}</button><p data-message></p></form>` : ""}<table><tbody>${rows(levels, L.levelsEmpty, (item) => `<tr><td>${editButton("level", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "level", item.id)}</td></tr>`)}</tbody></table></div>`;
+function levelCashbackRule(level, rules) {
+  return (rules || []).find((rule) => (
+    rule?.is_active !== false
+    && !isTransitionRule(rule)
+    && rule.bonus_type === "cashback"
+    && rule.client_level === level.name
+    && rule.level_params?.cashback !== undefined
+    && rule.level_params?.cashback !== null
+    && rule.level_params?.cashback !== ""
+  ));
+}
+
+function levelRuleCell(level, rules) {
+  const rule = levelCashbackRule(level, rules);
+  if (!rule) return `<span>${escapeHtml(L.notSet)}</span>`;
+  return `${editButton("rule", rule, rule.name)} <span>${escapeHtml(`${rule.level_params.cashback}%`)}</span>`;
+}
+
+function levelsSection(ctx, levels, rules) {
+  return `<div class="subpanel">${titleWithHint(L.levelsTitle, L.levelsHint)}${canCreate(ctx, "levels") ? `<form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}<button class="primary" disabled>${L.createLevel}</button><p data-message></p></form>` : ""}<table><thead><tr><th>${escapeHtml(L.name)}</th><th>${escapeHtml(L.accrualRule)}</th><th></th></tr></thead><tbody>${rows(levels, L.levelsEmpty, (item) => `<tr><td>${editButton("level", item, item.name)}</td><td>${levelRuleCell(item, rules)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "level", item.id)}</td></tr>`)}</tbody></table></div>`;
 }
 
 function bonusTypesSection(ctx, bonusTypes) {
@@ -1113,7 +1132,7 @@ export async function loyalty(ctx, tab = "rules") {
 
   let body = "";
   if (activeTab === "rules") body = rulesSection(ctx, rules, selectedClient, bonusTypes, levels);
-  if (activeTab === "levels") body = levelsSection(ctx, levels);
+  if (activeTab === "levels") body = levelsSection(ctx, levels, rules);
   if (activeTab === "transactions") body = transactionsSection(ctx, clients, selectedClient, balance, history, bonusTypes);
   if (activeTab === "cards") body = cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalances, levels, metric, clientVisits);
   if (activeTab === "subscriptions") body = subscriptionsSection(clients, selectedClient, subscriptions);

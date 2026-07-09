@@ -219,7 +219,7 @@ function selectedClientAuthLinkForm() {
     <form class="inline-form compact" data-client-one-time-auth-link-create>
       <button class="primary">\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443</button>
       ${link ? `
-        <label><span>\u041e\u0434\u043d\u043e\u0440\u0430\u0437\u043e\u0432\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430 \u0432 \u043b\u0438\u0447\u043d\u044b\u0439 \u043a\u0430\u0431\u0438\u043d\u0435\u0442</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
+        <label><span>\u0421\u0441\u044b\u043b\u043a\u0430 \u0432 \u043b\u0438\u0447\u043d\u044b\u0439 \u043a\u0430\u0431\u0438\u043d\u0435\u0442, \u0430\u043a\u0442\u0438\u0432\u043d\u0430 5 \u043c\u0438\u043d\u0443\u0442</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
         <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button>
       ` : ""}
       <p data-message></p>
@@ -397,6 +397,10 @@ function visitSelectField(label, name, items, selected = "", placeholder = "Не
 
 function checkbox(label, name, checked) {
   return `<label class="checkbox modal-full"><input name="${escapeHtml(name)}" type="checkbox" ${checked ? "checked" : ""}> ${escapeHtml(label)}</label>`;
+}
+
+function readonlyCheckbox(label, checked) {
+  return `<label class="checkbox modal-full"><input type="checkbox" ${checked ? "checked" : ""} disabled> ${escapeHtml(label)}</label>`;
 }
 
 function parseVisitComment(value) {
@@ -705,6 +709,7 @@ function clientCardData(client) {
     note: client.note ?? "",
     importance_class: String(client.importance_class ?? 0),
     online_booking_enabled: !!client.online_booking_enabled,
+    push_notifications_enabled: !!client.push_notifications_enabled,
     referrer_client_id: client.referrer_client_id ? String(client.referrer_client_id) : "",
     api_field_1: client.api_field_1 ?? "",
     api_field_2: client.api_field_2 ?? "",
@@ -714,7 +719,7 @@ function clientCardData(client) {
 }
 
 async function loadClientDetails(client, orgId) {
-  const [profile, metric, visits, accounts, categories, additionalFields, clientBranches, bonusTypes, bonusBalance, bonusHistory] = await Promise.all([
+  const [profile, metric, visits, accounts, categories, additionalFields, clientBranches, bonusTypes, bonusBalance, bonusHistory, pushStatus] = await Promise.all([
     api.clientProfile(client.id, orgId).catch(() => null),
     api.clientProfileMetric(client.id).catch(() => null),
     api.clientHistoryVisits(client.id).catch(() => []),
@@ -725,11 +730,16 @@ async function loadClientDetails(client, orgId) {
     api.bonusTypes(orgId).catch(() => []),
     api.bonusBalance(client.id).catch(() => null),
     api.bonusHistory(client.id).catch(() => []),
+    api.pushStatus(orgId, client.id).catch(() => ({ enabled: false })),
   ]);
+  const clientWithPushState = {
+    ...client,
+    push_notifications_enabled: !!pushStatus?.enabled,
+  };
 
   return {
-    ...client,
-    card: clientCardData(client),
+    ...clientWithPushState,
+    card: clientCardData(clientWithPushState),
     profile,
     metric: mergeMetrics(metric || profile?.metrics, buildMetricsFromVisits(visits)),
     visits,
@@ -784,6 +794,7 @@ function modal(client) {
             <option value="archived" ${card.status === "archived" ? "selected" : ""}>В архиве</option>
           </select></label>
           ${checkbox("Возможность онлайн-записи", "online_booking_enabled", card.online_booking_enabled)}
+          ${readonlyCheckbox("Уведомления", card.push_notifications_enabled)}
           ${readonly("Дата создания", dateTime(client.created_at))}
           ${readonly("Дата последнего изменения", dateTime(client.updated_at))}
           
@@ -1195,7 +1206,8 @@ export function bindClients(root, ctx) {
         state.clientAuthLink = await api.createClientAuthLink(clean({
           organization_id: ctx.org.id,
           client_id: state.selectedClient.id,
-          one_time: true,
+          expires_in_seconds: 300,
+          one_time: false,
           registration_fields: Array.isArray(registrationSettings?.fields) ? registrationSettings.fields : enabledRegistrationFields(ctx.org.id),
         }));
       } else if (form.matches("[data-client-create]")) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "cabinet-pwa-v5-drawer-menu";
+const CACHE_NAME = "cabinet-pwa-v6-push-title";
 const APP_SHELL = [
   "/cabinet.html",
   "/auth.html",

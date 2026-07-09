@@ -398,6 +398,25 @@ function fillCabinetUser(form, user) {
   });
 }
 
+function cabinetSubmitPayload(form) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  const toNumber = (value) => {
+    const trimmed = String(value || "").trim();
+    return trimmed ? Number(trimmed) : null;
+  };
+  return {
+    last_name: String(data.last_name || "").trim() || null,
+    first_name: String(data.first_name || "").trim() || null,
+    middle_name: String(data.middle_name || "").trim() || null,
+    primary_phone: String(data.phone || "").trim() || null,
+    gender: String(data.gender || "").trim() || null,
+    telegram_id: toNumber(data.telegram_id),
+    max_id: toNumber(data.max_id),
+    vk_id: toNumber(data.vk_id),
+    email: String(data.email || "").trim() || null,
+  };
+}
+
 function cabinetPushContext() {
   const client = cabinetData?.client || cabinetClient || {};
   return { organizationId: cabinetData?.organization_id || client.organization_id, clientId: client.id || cabinetData?.client_id };
@@ -438,6 +457,25 @@ function cabinetNotificationStamp(item) {
   return String(item?.sent_at || item?.created_at || item?.id || "");
 }
 
+function linkifyCabinetText(value) {
+  const text = String(value ?? "");
+  const pattern = /https?:\/\/[^\s<>"']+/g;
+  let html = "";
+  let lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(text))) {
+    const url = match[0];
+    html += escapeHtml(text.slice(lastIndex, match.index));
+    html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+    lastIndex = match.index + url.length;
+  }
+  return html + escapeHtml(text.slice(lastIndex));
+}
+
+function cabinetNotificationTitle(item) {
+  return String(item?.message_title || item?.message_text || "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435").trim().slice(0, 120) || "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435";
+}
+
 function cabinetNotificationsSeenKey(clientId) {
   return `${CABINET_NOTIFICATIONS_SEEN_KEY}:${clientId || "unknown"}`;
 }
@@ -464,10 +502,11 @@ async function refreshCabinetNotificationsList({ markSeen = false } = {}) {
   const seenStamp = localStorage.getItem(seenKey) || "";
   setCabinetNotificationBadge(Boolean(latestStamp && latestStamp !== seenStamp));
   list.innerHTML = messages.map((item) => `
-    <div class="cabinet-notification-item">
-      <div>${escapeHtml(item.message_text || "")}</div>
+    <details class="cabinet-notification-item">
+      <summary>${escapeHtml(cabinetNotificationTitle(item))}</summary>
+      <div>${linkifyCabinetText(item.message_text || "")}</div>
       <small>${escapeHtml(formatCabinetNotificationDate(item.sent_at || item.created_at))}</small>
-    </div>
+    </details>
   `).join("");
   if (markSeen) {
     localStorage.setItem(seenKey, latestStamp);
@@ -551,10 +590,11 @@ async function initCabinetForm() {
       await refreshCabinetPushState().catch(() => null);
       await refreshCabinetNotificationsList().catch(() => null);
       setMessage("", "");
+      button.disabled = false;
     } catch {
       setMessage("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430. \u0412\u043e\u0439\u0434\u0438\u0442\u0435 \u0441\u043d\u043e\u0432\u0430.", "error");
+      button.disabled = true;
     }
-    button.disabled = true;
     return;
   }
   applyCabinetRegistrationFields(form, []);
@@ -803,33 +843,31 @@ root.addEventListener("submit", async (event) => {
     message.textContent = text;
     message.dataset.kind = kind;
   };
-  const optionalNumber = (value) => {
-    const trimmed = String(value || "").trim();
-    return trimmed ? Number(trimmed) : null;
-  };
-  if (!token) {
-    setMessage("\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u0430 \u0438\u043b\u0438 \u0443\u0441\u0442\u0430\u0440\u0435\u043b\u0430.", "error");
-    return;
-  }
-  const data = Object.fromEntries(new FormData(form).entries());
-  const textValue = (name) => String(data[name] || "").trim();
   button.disabled = true;
   setMessage("\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c \u0434\u0430\u043d\u043d\u044b\u0435...");
   try {
-    const response = await fetch(`/public-api/client-auth-links/${encodeURIComponent(token)}/submit`, {
-      method: "POST",
+    const profile = cabinetSubmitPayload(form);
+    const endpoint = token
+      ? `/public-api/client-auth-links/${encodeURIComponent(token)}/submit`
+      : cabinetClient?.id
+        ? `/crm-api/clients-core/clients/${encodeURIComponent(cabinetClient.id)}`
+        : "";
+    if (!endpoint) throw new Error("\u041a\u043b\u0438\u0435\u043d\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.");
+    const body = token ? {
+      last_name: profile.last_name,
+      first_name: profile.first_name,
+      middle_name: profile.middle_name,
+      phone: profile.primary_phone,
+      gender: profile.gender,
+      telegram_id: profile.telegram_id,
+      max_id: profile.max_id,
+      vk_id: profile.vk_id,
+      email: profile.email,
+    } : profile;
+    const response = await fetch(endpoint, {
+      method: token ? "POST" : "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        last_name: textValue("last_name") || null,
-        first_name: textValue("first_name") || null,
-        middle_name: textValue("middle_name") || null,
-        phone: textValue("phone") || null,
-        gender: textValue("gender") || null,
-        telegram_id: optionalNumber(data.telegram_id),
-        max_id: optionalNumber(data.max_id),
-        vk_id: optionalNumber(data.vk_id),
-        email: textValue("email") || null,
-      }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -840,9 +878,10 @@ root.addEventListener("submit", async (event) => {
       location.href = result.redirect_url;
       return;
     }
-    cabinetClient = result.client || null;
+    cabinetClient = result.client || result || null;
     renderCabinetHistory(cabinetCardSections);
     setMessage("\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.", "success");
+    button.disabled = false;
   } catch (error) {
     setMessage(error.message, "error");
     button.disabled = false;

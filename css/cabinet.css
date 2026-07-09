@@ -187,6 +187,21 @@
   color: #172033;
 }
 
+.cabinet-notification-item summary {
+  cursor: pointer;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cabinet-notification-item div {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cabinet-notification-item a {
+  color: #2563eb;
+}
+
 .cabinet-notification-item + .cabinet-notification-item {
   border-top: 1px solid #dce3ee;
 }

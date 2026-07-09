@@ -589,8 +589,13 @@ button:active { transform: translateY(1px); }
   grid-column: 1 / -1;
 }
 
+[data-notifications] .notification-title-field,
 [data-notifications] .notification-message-field {
   max-width: 50%;
+}
+
+[data-notifications] .notification-title-field input {
+  width: 100%;
 }
 
 [data-notifications] textarea {
@@ -601,6 +606,10 @@ button:active { transform: translateY(1px); }
 
 @media (max-width: 900px) {
   [data-notifications] .notification-message-field {
+    max-width: 100%;
+  }
+
+  [data-notifications] .notification-title-field {
     max-width: 100%;
   }
 }
