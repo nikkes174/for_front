@@ -193,6 +193,8 @@ export const api = {
   pushUnsubscribe: (endpoint) => request("/crm-api/client-communications/push/subscribe", { method: "DELETE", body: JSON.stringify({ endpoint }) }),
   clientPushMessages: (clientId) => request(`/crm-api/client-communications/clients/${clientId}/messages?channel=push&message_type=notification&limit=20`, { cache: "no-store" }),
   sendPushNotification: (body) => request("/crm-api/client-communications/push/send", { method: "POST", body: JSON.stringify(body) }),
+  startPushNotificationJob: (body) => request("/crm-api/client-communications/push/send-jobs", { method: "POST", body: JSON.stringify(body) }),
+  pushNotificationJobs: (organizationId) => request(`/crm-api/client-communications/push/send-jobs?organization_id=${organizationId}`, { cache: "no-store" }),
 
   rules: (orgId) => request(`/loyalty-api/organizations/${orgId}/rules`),
   createRule: (body) => request("/loyalty-api/client-bonuses/rules", { method: "POST", body: JSON.stringify(body) }),
@@ -202,6 +204,7 @@ export const api = {
   applyRuleToAll: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   startApplyRuleToAllJob: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all-jobs`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   workerJobs: (organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`),
+  applyLevelTransitions: (clientId, organizationId) => request(`/loyalty-api/client-bonuses/clients/${clientId}/apply-level-transitions`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   bonusLevels: (orgId) => request(`/loyalty-api/organizations/${orgId}/bonus-levels`),
   createBonusLevel: (body) => request("/loyalty-api/client-bonuses/levels", { method: "POST", body: JSON.stringify(body) }),
   updateBonusLevel: (id, body) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),

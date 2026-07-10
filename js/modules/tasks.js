@@ -19,7 +19,17 @@ function formatDate(value) {
 function jobName(job) {
   if (job.name) return job.name;
   if (job.type === "apply_rule_to_all") return `Применение правила «${job.rule_name || `#${job.rule_id}`}» ко всем`;
+  if (["push_broadcast", "push_notification", "send_push_notification", "notification_broadcast"].includes(job.type)) {
+    return `Рассылка «${job.title || job.message_title || "без темы"}»`;
+  }
   return job.type || "Задача";
+}
+
+function jobResult(job) {
+  if (["push_broadcast", "push_notification", "send_push_notification", "notification_broadcast"].includes(job.type)) {
+    return `Отправлено ${job.sent || job.applied || 0}, проверено ${job.total || job.recipients || job.checked || 0}`;
+  }
+  return `Переведено ${job.applied || 0}, проверено ${job.total || job.checked || 0}`;
 }
 
 function progressBar(job) {
@@ -39,7 +49,7 @@ function taskRows(jobs) {
         <td>${escapeHtml(jobName(job))}</td>
         <td>${escapeHtml(statusLabels[job.status] || job.status || "-")}</td>
         <td>${progressBar(job)}</td>
-        <td>${escapeHtml(`Переведено ${job.applied || 0}, проверено ${job.total || job.checked || 0}`)}</td>
+        <td>${escapeHtml(jobResult(job))}</td>
         <td>${escapeHtml(job.message || "-")}</td>
         <td>${escapeHtml(formatDate(job.updated_at))}</td>
       </tr>
@@ -47,8 +57,16 @@ function taskRows(jobs) {
     : `<tr><td colspan="6">Фоновых задач пока нет.</td></tr>`;
 }
 
+async function loadJobs(orgId) {
+  const [workerJobs, notificationJobs] = await Promise.all([
+    api.workerJobs(orgId).catch(() => []),
+    (api.pushNotificationJobs?.(orgId) || Promise.resolve([])).catch(() => []),
+  ]);
+  return [...workerJobs, ...notificationJobs].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+}
+
 export async function tasks(ctx) {
-  const jobs = await api.workerJobs(ctx.org.id).catch(() => []);
+  const jobs = await loadJobs(ctx.org.id);
 
   return `
     <section class="panel" data-tasks>
@@ -78,7 +96,7 @@ export function bindTasks(root, ctx) {
     if (!location.pathname.includes("/tasks") || !tableBody || isRefreshing) return;
     isRefreshing = true;
     try {
-      tableBody.innerHTML = taskRows(await api.workerJobs(ctx.org.id).catch(() => []));
+      tableBody.innerHTML = taskRows(await loadJobs(ctx.org.id));
     } finally {
       isRefreshing = false;
     }

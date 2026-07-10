@@ -1,7 +1,6 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
 
-import { DateTime } from "https://esm.sh/luxon@3.5.0";
 
 const no = "Не указано";
 let cache = {};
@@ -21,6 +20,15 @@ let auditPageSize = 10;
 let eventsPageSize = 10;
 const USER_PAGE_SIZE = 20;
 const LOG_PAGE_SIZE_OPTIONS = [10, 20, 50];
+const SETTINGS_TABS = [
+  { slug: "legal", label: "Юр лица", permissions: ["settings.legal.view", "settings.legal.create"] },
+  { slug: "branches", label: "Филиалы", permissions: ["settings.branches.view", "settings.branches.create"] },
+  { slug: "departments", label: "Подразделения", permissions: ["settings.departments.view", "settings.departments.create"] },
+  { slug: "workplaces", label: "Рабочие места", permissions: ["settings.workplaces.view", "settings.workplaces.create"] },
+  { slug: "roles", label: "Роли и права", permissions: ["settings.roles.manage"] },
+  { slug: "users", label: "Пользователи", permissions: ["settings.users.view", "settings.users.create", "settings.users.assign_roles"] },
+  { slug: "logs", label: "Логи работы", permissions: ["settings.audit.view", "settings.events.view"] },
+];
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
   { value: "УСН Доходы - Расходы", label: "УСН Доходы - Расходы" },
@@ -720,8 +728,12 @@ function humanizeCode(value) {
     visit_created: "Создание визита",
     "visit.completed": "Завершение визита",
     "visit.complete": "Завершение визита",
+    "visit.cancelled": "Отмена визита",
+    "visit.cancel": "Отмена визита",
     visit_completed: "Завершение визита",
     visit_complete: "Завершение визита",
+    visit_cancelled: "Отмена визита",
+    visit_cancel: "Отмена визита",
     subscription_create: "Создание абонемента",
     subscription_renew: "Продление абонемента",
     subscription_transfer: "Перенос абонемента",
@@ -777,6 +789,18 @@ function dateTimeInput(value) {
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
+}
+
+function timezoneOffsetLabel(timezone) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+    return parts.find((part) => part.type === "timeZoneName")?.value?.replace("GMT", "UTC") || "UTC";
+  } catch {
+    return "UTC";
+  }
 }
 
 function visitStatusLabel(status) {
@@ -1084,7 +1108,7 @@ function timezoneOptions(selected = DEFAULT_TIMEZONE) {
   return `
     <label><span>Часовой пояс</span><select name="timezone">
       ${zones.map((zone) => {
-        const offset = DateTime.now().setZone(zone.value).toFormat("'UTC'ZZ");
+        const offset = timezoneOffsetLabel(zone.value);
         return `<option value="${escapeHtml(zone.value)}" ${zone.value === selected ? "selected" : ""}>${escapeHtml(`${zone.label} (${offset})`)}</option>`;
       }).join("")}
     </select></label>
@@ -1191,6 +1215,165 @@ function section(title, body, hint = "") {
     ? `<span class="title-hint" tabindex="0" aria-label="${escapeHtml(hint)}" data-tooltip="${escapeHtml(hint)}">?</span>`
     : "";
   return `<div class="subpanel"><h3 class="subpanel-title">${escapeHtml(title)}${hintMarkup}</h3>${body}</div>`;
+}
+
+function canOpenSettingsTab(ctx, tab) {
+  return tab.permissions.some((permission) => ctx.can(permission));
+}
+
+function activeSettingsTab(ctx, tabSlug = "") {
+  const visibleTabs = SETTINGS_TABS.filter((tab) => canOpenSettingsTab(ctx, tab));
+  if (!visibleTabs.length) return SETTINGS_TABS[0]?.slug || "legal";
+  const normalized = visibleTabs.find((tab) => tab.slug === tabSlug);
+  return normalized?.slug || visibleTabs[0].slug;
+}
+
+export async function loadSettingsData(orgId) {
+  const [
+    branches,
+    brands,
+    legalEntities,
+    categories,
+    productItems,
+    achievements,
+    departments,
+    workplaces,
+    modules,
+    users,
+    roles,
+    permissions,
+    memberships,
+    branchMemberships,
+    auditLogs,
+    events,
+  ] = await Promise.all([
+    api.branches(orgId).catch(() => []),
+    api.brands(orgId).catch(() => []),
+    api.legalEntities(orgId).catch(() => []),
+    (api.productCategories?.(orgId) || Promise.resolve([])).catch(() => []),
+    (api.productItems?.(orgId) || Promise.resolve([])).catch(() => []),
+    (api.achievements?.(orgId) || Promise.resolve([])).catch(() => []),
+    api.departments(orgId).catch(() => []),
+    api.workplaces(orgId).catch(() => []),
+    api.modules(orgId).catch(() => []),
+    api.users(orgId, 500).catch(() => []),
+    api.roles(orgId).catch(() => []),
+    api.permissions(orgId).catch(() => []),
+    api.memberships(orgId).catch(() => []),
+    api.branchMemberships(orgId).catch(() => []),
+    api.auditLogs(orgId).catch(() => []),
+    api.events(orgId).catch(() => []),
+  ]);
+  const rolePermissions = Object.fromEntries(await Promise.all(
+    roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
+  ));
+  const userIds = new Set(users.map((user) => String(user.id)));
+  const missingActorIds = [...new Set(events
+    .map((item) => item.actor_id || item.payload?.actor_id)
+    .filter(Boolean)
+    .map((id) => String(id))
+    .filter((id) => !userIds.has(id)))];
+  const actorUsers = await Promise.all(missingActorIds.map((id) => api.user(id).catch(() => null)));
+  const usersWithActors = [
+    ...users,
+    ...actorUsers.filter(Boolean).filter((user) => !userIds.has(String(user.id))),
+  ];
+  return {
+    branches,
+    brands,
+    legalEntities,
+    categories,
+    productItems,
+    achievements,
+    departments,
+    workplaces,
+    modules,
+    users,
+    usersWithActors,
+    roles,
+    permissions,
+    memberships,
+    branchMemberships,
+    rolePermissions,
+    auditLogs,
+    events,
+  };
+}
+
+export function hydrateSettingsCache(orgId, data) {
+  cache = {
+    organizationId: orgId,
+    ...data,
+    users: data.usersWithActors || data.users || [],
+  };
+}
+
+export function renderCatalogTab(tabSlug = "products", data = cache) {
+  const categories = data.categories || [];
+  const productItems = data.productItems || [];
+  const activeTab = tabSlug === "services" ? "services" : "products";
+  const type = activeTab === "services" ? "service" : "product";
+  const title = activeTab === "services" ? "Услуги" : "Товары";
+  const categoriesTitle = activeTab === "services" ? "Категории услуг" : "Категории товаров";
+  const categoriesHint = activeTab === "services"
+    ? "Категории услуг доступны только для услуг организации."
+    : "Категории товаров доступны только для товаров организации.";
+  const itemsHint = activeTab === "services"
+    ? "Услуги привязаны к категориям услуг организации."
+    : "Товары привязаны к товарным категориям организации.";
+  const scopedCategories = categories.filter((category) => category.type === type);
+  const selectedCategoryId = activeTab === "services" ? serviceFilterCategoryId : productFilterCategoryId;
+  const scopedItems = productItems
+    .filter((item) => categoryTypeById(item.category_id) === type)
+    .filter((item) => !selectedCategoryId || String(item.category_id) === String(selectedCategoryId));
+  return `
+    <div id="categories" data-permission="settings.categories.view">
+      ${section(categoriesTitle, `
+        <form class="inline-form compact" data-category-create data-permission="settings.categories.create">
+          <input type="hidden" name="type" value="${escapeHtml(type)}">
+          <label><span>Название категории</span><input name="name" required></label>
+          <button class="primary" disabled>Добавить категорию</button>
+          <p data-message></p>
+        </form>
+        ${entityList(scopedCategories, "Категорий пока нет", "category", (item) => item.name, (item) => categoryTypeLabel(item.type), {
+          deleteLabel: "Удалить",
+        })}
+      `, categoriesHint)}
+    </div>
+
+    <div id="product-items" data-permission="settings.items.view">
+      ${section(title, `
+        ${productItemCreateForm(scopedCategories, activeTab === "services" ? "услугу" : "товар")}
+        <form class="inline-form compact">
+          ${productItemCategoryFilterOptions(scopedCategories, selectedCategoryId, activeTab === "services" ? "data-service-filter-category" : "data-product-filter-category")}
+        </form>
+        ${entityList(scopedItems, activeTab === "services" ? "Услуг пока нет" : "Товаров пока нет", "productItem", (item) => item.title, productItemDetails, {
+          deleteLabel: "Удалить",
+        })}
+      `, itemsHint)}
+    </div>
+  `;
+}
+
+export function renderAchievementsPanel(achievementsList = cache.achievements || []) {
+  return `
+    <div id="achievements" data-permission="settings.achievements.view">
+      ${section("Достижения", `
+        <form class="inline-form compact" data-achievement-create data-permission="settings.achievements.create">
+          <label><span>Название</span><input name="name" required></label>
+          <label><span>Клиент должен выполнить</span><select name="logic">
+            ${ACHIEVEMENT_LOGIC_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
+          </select></label>
+          ${achievementConditionsFields()}
+          <button class="primary" disabled>Добавить достижение</button>
+          <p data-message></p>
+        </form>
+        ${entityList(achievementsList, "Достижений пока нет", "achievement", (item) => item.name, achievementDetails, {
+          deleteLabel: "Удалить",
+        })}
+      `, "Достижения собираются из одного или нескольких параметров клиента.")}
+    </div>
+  `;
 }
 
 function eventEntityCell(item) {
@@ -1616,9 +1799,7 @@ function modalFields(type, item) {
     <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
     ${timezoneOptions(item.timezone || DEFAULT_TIMEZONE)}
     ${selectField("Юридическое лицо", "legal_entity_id", cache.legalEntities, item.legal_entity_id)}
-    ${branchProductItemFields(item)}
-    ${branchAchievementFields(item)}
-    <label class="checkbox modal-full"><input type="checkbox" name="online_booking_enabled" ${item.online_booking_enabled ? "checked" : ""}> Онлайн-запись</label>
+        <label class="checkbox modal-full"><input type="checkbox" name="online_booking_enabled" ${item.online_booking_enabled ? "checked" : ""}> Онлайн-запись</label>
   `;
   if (type === "department") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
@@ -1836,8 +2017,6 @@ async function saveEntity(type, id, data, form = null) {
     timezone: optional(data.timezone),
     brand_id: numberOrNull(data.brand_id),
     legal_entity_id: numberOrNull(data.legal_entity_id),
-    product_item_ids: data.product_item_ids || [],
-    achievement_ids: data.achievement_ids || [],
   });
   if (type === "department") return api.updateDepartment(id, { name: data.name });
   if (type === "workplace") return api.updateWorkplace(id, {
@@ -1924,8 +2103,9 @@ async function deleteEntity(type, id) {
   throw new Error("Неизвестная сущность");
 }
 
-export async function settings(ctx) {
-  const [
+export async function settings(ctx, tabSlug = "") {
+  const settingsData = await loadSettingsData(ctx.org.id);
+  const {
     branches,
     brands,
     legalEntities,
@@ -1942,38 +2122,7 @@ export async function settings(ctx) {
     branchMemberships,
     auditLogs,
     events,
-  ] = await Promise.all([
-    api.branches(ctx.org.id).catch(() => []),
-    api.brands(ctx.org.id).catch(() => []),
-    api.legalEntities(ctx.org.id).catch(() => []),
-    (api.productCategories?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
-    (api.productItems?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
-    (api.achievements?.(ctx.org.id) || Promise.resolve([])).catch(() => []),
-    api.departments(ctx.org.id).catch(() => []),
-    api.workplaces(ctx.org.id).catch(() => []),
-    api.modules(ctx.org.id).catch(() => []),
-    api.users(ctx.org.id, 500).catch(() => []),
-    api.roles(ctx.org.id).catch(() => []),
-    api.permissions(ctx.org.id).catch(() => []),
-    api.memberships(ctx.org.id).catch(() => []),
-    api.branchMemberships(ctx.org.id).catch(() => []),
-    api.auditLogs(ctx.org.id).catch(() => []),
-    api.events(ctx.org.id).catch(() => []),
-  ]);
-  const rolePermissions = Object.fromEntries(await Promise.all(
-    roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
-  ));
-  const userIds = new Set(users.map((user) => String(user.id)));
-  const missingActorIds = [...new Set(events
-    .map((item) => item.actor_id || item.payload?.actor_id)
-    .filter(Boolean)
-    .map((id) => String(id))
-    .filter((id) => !userIds.has(id)))];
-  const actorUsers = await Promise.all(missingActorIds.map((id) => api.user(id).catch(() => null)));
-  const usersWithActors = [
-    ...users,
-    ...actorUsers.filter(Boolean).filter((user) => !userIds.has(String(user.id))),
-  ];
+  } = settingsData;
   const filteredDepartments = departmentFilterBranchId
     ? departments.filter((item) => String(item.branch_id) === String(departmentFilterBranchId))
     : departments;
@@ -1981,15 +2130,8 @@ export async function settings(ctx) {
     ? workplaces.filter((item) => String(item.branch_id) === String(workplaceFilterBranchId))
     : workplaces;
 
-  cache = { organizationId: ctx.org.id, branches, brands, legalEntities, categories, productItems, achievements, departments, workplaces, modules, users: usersWithActors, roles, permissions, memberships, branchMemberships, rolePermissions, auditLogs, events };
-  const productCategories = categories.filter((category) => category.type === "product");
-  const serviceCategories = categories.filter((category) => category.type === "service");
-  const products = productItems
-    .filter((item) => categoryTypeById(item.category_id) === "product")
-    .filter((item) => !productFilterCategoryId || String(item.category_id) === String(productFilterCategoryId));
-  const services = productItems
-    .filter((item) => categoryTypeById(item.category_id) === "service")
-    .filter((item) => !serviceFilterCategoryId || String(item.category_id) === String(serviceFilterCategoryId));
+  hydrateSettingsCache(ctx.org.id, settingsData);
+  const currentTab = activeSettingsTab(ctx, tabSlug);
   const filteredUsers = users.filter((user) => userMatchesFilters(user, memberships, branchMemberships));
   const pagedUsersData = paginate(filteredUsers, userPage, USER_PAGE_SIZE);
   const pagedAuditData = paginate(auditLogs, auditPage, auditPageSize);
@@ -1999,9 +2141,10 @@ export async function settings(ctx) {
   eventsPage = pagedEventsData.currentPage;
 
   return `
-    <section class="panel" data-settings>
+    <section class="panel" data-settings data-settings-section="${escapeHtml(currentTab)}">
       <h2>${escapeHtml(ctx.org.name)}</h2>
 
+      ${currentTab === "legal" ? `
       <div id="legal" data-permission="settings.legal.view">
         ${section("Юридические лица", `
           <form class="inline-form compact" data-legal-create data-permission="settings.legal.create">
@@ -2032,63 +2175,9 @@ export async function settings(ctx) {
         `, "Юридические лица — это функциональная зона или отдел внутри бизнеса.")}
       </div>
 
-      <div id="categories" data-permission="settings.categories.view">
-        ${section("Категории товаров и услуг", `
-          <form class="inline-form compact" data-category-create data-permission="settings.categories.create">
-            <label><span>Название категории</span><input name="name" required></label>
-            <label><span>Тип</span><select name="type">
-              ${PRODUCT_CATEGORY_TYPE_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
-            </select></label>
-            <button class="primary" disabled>Добавить категорию</button>
-            <p data-message></p>
-          </form>
-          ${entityList(categories, "Категорий пока нет", "category", (item) => item.name, (item) => categoryTypeLabel(item.type), {
-            deleteLabel: "Удалить",
-          })}
-        `, "Категории товаров и услуг — это категории, приписанные к организации.")}
-      </div>
+      ` : ""}
 
-      <div id="product-items" data-permission="settings.items.view">
-        ${section("Товары", `
-          ${productItemCreateForm(productCategories, "товар")}
-          <form class="inline-form compact">
-            ${productItemCategoryFilterOptions(productCategories, productFilterCategoryId, "data-product-filter-category")}
-          </form>
-          ${entityList(products, "Товаров пока нет", "productItem", (item) => item.title, productItemDetails, {
-            deleteLabel: "Удалить",
-          })}
-        `, "Товары привязаны к товарным категориям организации.")}
-      </div>
-
-      <div id="service-items" data-permission="settings.items.view">
-        ${section("Услуги", `
-          ${productItemCreateForm(serviceCategories, "услугу")}
-          <form class="inline-form compact">
-            ${productItemCategoryFilterOptions(serviceCategories, serviceFilterCategoryId, "data-service-filter-category")}
-          </form>
-          ${entityList(services, "Услуг пока нет", "productItem", (item) => item.title, productItemDetails, {
-            deleteLabel: "Удалить",
-          })}
-        `, "Услуги привязаны к категориям услуг организации.")}
-      </div>
-
-      <div id="achievements" data-permission="settings.achievements.view">
-        ${section("Достижения", `
-          <form class="inline-form compact" data-achievement-create data-permission="settings.achievements.create">
-            <label><span>Название</span><input name="name" required></label>
-            <label><span>Клиент должен выполнить</span><select name="logic">
-              ${ACHIEVEMENT_LOGIC_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
-            </select></label>
-            ${achievementConditionsFields()}
-            <button class="primary" disabled>Добавить достижение</button>
-            <p data-message></p>
-          </form>
-          ${entityList(achievements, "Достижений пока нет", "achievement", (item) => item.name, achievementDetails, {
-            deleteLabel: "Удалить",
-          })}
-        `, "Достижения собираются из одного или нескольких параметров клиента.")}
-      </div>
-
+      ${currentTab === "branches" ? `
       <div id="branches" data-permission="settings.branches.view">
         ${section("Филиалы", `
           <form class="inline-form compact" data-branch-create data-permission="settings.branches.create">
@@ -2107,6 +2196,9 @@ export async function settings(ctx) {
         `, "Филиалы — это отдельные точки или локации организации.")}
       </div>
 
+      ` : ""}
+
+      ${currentTab === "departments" ? `
       <div id="departments" data-permission="settings.departments.view">
         ${section("Подразделения", `
           <form class="inline-form compact" data-department-create data-permission="settings.departments.create">
@@ -2124,6 +2216,9 @@ export async function settings(ctx) {
         `, "Подразделения — это отделы внутри филиала, например администрация или мастера.")}
       </div>
 
+      ` : ""}
+
+      ${currentTab === "workplaces" ? `
       <div id="workplaces" data-permission="settings.workplaces.view">
         ${section("Рабочие места", `
           <form class="inline-form compact" data-workplace-create data-permission="settings.workplaces.create">
@@ -2142,6 +2237,9 @@ export async function settings(ctx) {
         `, "Рабочие места — это конкретные места оказания услуг внутри подразделений.")}
       </div>
 
+      ` : ""}
+
+      ${currentTab === "roles" ? `
       <div id="roles-rights" data-permission="settings.roles.manage">
         ${section("Роли и права", `
           <form class="inline-form compact" data-role-create>
@@ -2157,6 +2255,9 @@ export async function settings(ctx) {
         `, "Роли и права определяют, что пользователи могут видеть и изменять.")}
       </div>
 
+      ` : ""}
+
+      ${currentTab === "users" ? `
       <div id="users" data-permission="settings.users.view">
         ${section("Пользователи и доступ", `
           <form class="inline-form compact" data-user-create data-permission="settings.users.create">
@@ -2204,27 +2305,9 @@ export async function settings(ctx) {
         `, "Пользователи и доступ — это сотрудники и их роли в организации или филиалах.")}
       </div>
 
-      <div id="audit" data-permission="settings.audit.view">
-        ${section("Аудит и события", `
-          <table><thead><tr><th>Действие</th><th>Сущность</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
-            ${rows(pagedAuditData.pageItems, "Записей аудита пока нет", (item) => `
-              <tr>
-                <td>${escapeHtml(humanizeCode(item.action))}</td>
-                <td>${auditEntityCell(item)}</td>
-                <td>${auditDetailsHtml(item)}</td>
-                <td>${escapeHtml(formatDateTime(item.created_at))}</td>
-              </tr>
-            `)}
-          </tbody></table>
-          ${paginationControls(pagedAuditData.currentPage, pagedAuditData.totalPages, auditLogs.length, {
-            pageAttr: "data-audit-page",
-            pageSizeAttr: "data-audit-page-size",
-            pageSize: auditPageSize,
-            pageSizeLabel: "Отображать записей",
-          })}
-        `, "Аудит и события показывает важные действия и изменения в системе.")}
-      </div>
+      ` : ""}
 
+      ${currentTab === "logs" ? `
       <div id="events" data-permission="settings.events.view">
         ${section("События", `
           <table><thead><tr><th>Событие</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
@@ -2244,6 +2327,7 @@ export async function settings(ctx) {
           })}
         `, "События — это системные записи о произошедших действиях.")}
       </div>
+      ` : ""}
       ${eventVisitModal()}
     </section>
   `;
@@ -2632,18 +2716,6 @@ export function bindSettings(root, ctx) {
       }
       if (form.dataset.type === "user") {
         payload.user_branch_ids = new FormData(form).getAll("user_branch_ids");
-      }
-      if (form.dataset.type === "branch") {
-        payload.product_item_ids = [
-          ...new FormData(form).getAll("branch_service_item_ids"),
-          ...new FormData(form).getAll("branch_product_item_ids"),
-        ]
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id));
-        payload.achievement_ids = new FormData(form)
-          .getAll("branch_achievement_ids")
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id));
       }
       await saveEntity(form.dataset.type, form.dataset.id, payload, form);
       form.closest("[data-settings-modal]")?.remove();

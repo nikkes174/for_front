@@ -1,5 +1,7 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, rows, setMessage } from "../dom.js";
+import { notifications } from "./notifications.js";
+import { hydrateSettingsCache, loadSettingsData, renderAchievementsPanel } from "./settings.js";
 
 const CLIENTS_PAGE_SIZE = 10;
 const REGISTRATION_FIELDS_STORAGE_PREFIX = "loyalty.registrationFields.";
@@ -189,6 +191,8 @@ const loyaltyTabs = [
   ["certificates", "\u0421\u0435\u0440\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u044b", true],
   ["referrals", "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044b", true],
   ["promotions", "\u0410\u043a\u0446\u0438\u0438", true],
+  ["notifications", "Рассылка"],
+  ["achievements", "Достижения"],
 ];
 const permissions = {
   rules: "loyalty.rules.view",
@@ -199,6 +203,8 @@ const permissions = {
   certificates: "loyalty.certificates.view",
   subscriptions: "loyalty.subscriptions.view",
   referrals: "loyalty.referrals.view",
+  notifications: "notifications.notifications.view",
+  achievements: "settings.achievements.view",
 };
 
 const createPermissions = {
@@ -209,6 +215,8 @@ const createPermissions = {
   certificates: "loyalty.certificates.create",
   subscriptions: "loyalty.subscriptions.create",
   referrals: "loyalty.referrals.create",
+  notifications: "notifications.notifications.create",
+  achievements: "settings.achievements.create",
 };
 
 const deletePermissions = {
@@ -322,6 +330,14 @@ function clientName(client) {
 
 function field(label, name, value = "", attrs = "") {
   return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}" ${attrs}></label>`;
+}
+
+function ruleCheckboxSelect(label, name, options, selected = []) {
+  const selectedValues = new Set((Array.isArray(selected) ? selected : [selected]).map(String));
+  const items = options.length
+    ? options.map((item) => `<label class="checkbox rule-checkbox-option"><input name="${escapeHtml(name)}" type="checkbox" value="${escapeHtml(item.value)}" ${selectedValues.has(String(item.value)) ? "checked" : ""}> <span>${escapeHtml(item.label)}</span></label>`).join("")
+    : `<p class="empty">${escapeHtml(L.rulesEmpty)}</p>`;
+  return `<div class="modal-full rule-checkbox-select"><span>${escapeHtml(label)}</span><div class="rule-checkbox-window">${items}</div></div>`;
 }
 
 function select(label, name, options, selected = "") {
@@ -463,6 +479,7 @@ function createPermissionForForm(form) {
   if (form.matches("[data-loyalty-certificate-create]")) return createPermissions.certificates;
   if (form.matches("[data-loyalty-referral-create]")) return createPermissions.referrals;
   if (form.matches("[data-loyalty-promotion-create]")) return createPermissions.promotions;
+  if (form.matches("[data-achievement-create]")) return createPermissions.achievements;
   return "";
 }
 
@@ -542,7 +559,11 @@ function loyaltyModal(kind, item) {
   const levels = levelOptions(loyaltyState.levels || [], item.client_level || "");
   let fields = "";
   if (kind === "rule") fields = `${field(L.name, "name", item.name)}${select(L.type, "rule_type", typeOptions, item.rule_type)}${select(L.bonusType, "bonus_type", bonusTypes, item.bonus_type || "")}${field(L.ruleAmount, "amount", item.amount, 'type="number"')}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(loyaltyState.levels || [], item.client_level || ""), item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`;
-  if (kind === "level") fields = `${field(L.name, "name", item.name)}`;
+  if (kind === "level") {
+    const linkedRuleIds = levelRules(item, loyaltyState.rules || []).map((rule) => rule.id);
+    const ruleOptions = (loyaltyState.rules || []).map((rule) => ({ value: rule.id, label: (rule.name || L.rule) + (isTransitionRule(rule) ? " (\u043f\u0435\u0440\u0435\u0445\u043e\u0434)" : "") }));
+    fields = field(L.name, "name", item.name) + ruleCheckboxSelect("\u041f\u0440\u0430\u0432\u0438\u043b\u0430 \u0443\u0440\u043e\u0432\u043d\u044f", "level_rule_ids", ruleOptions, linkedRuleIds);
+  }
   if (kind === "bonus") fields = `<div class="readonly-field"><span>ID</span><b>${escapeHtml(item.id)}</b></div><div class="readonly-field"><span>${L.type}</span><b>${escapeHtml(item.bonus_type || "-")}</b></div>${field(L.reason, "reason", item.reason || "")}${field(L.clientLevel, "client_level", item.client_level || "")}${field(L.levelCashback, "level_params", item.level_params?.cashback || "", 'type="number" step="0.01"')}${field(L.restrictions, "usage_restrictions", item.usage_restrictions?.allowed_target_types?.join(",") || "", 'placeholder="service,product"')}${field(L.expiresAt, "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
   if (kind === "subscription") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${field("\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "subscription_name", item.subscription_name || "")}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u0432\u0441\u0435\u0433\u043e", "visits_total", item.visits_total ?? 0, 'type="number"')}${field("\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043e\u0441\u0442\u0430\u043b\u043e\u0441\u044c", "visits_left", item.visits_left ?? 0, 'type="number"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u0432\u0441\u0435\u0433\u043e", "deposit_amount", item.deposit_amount ?? 0, 'type="number" step="0.01"')}${field("\u0414\u0435\u043f\u043e\u0437\u0438\u0442 \u043e\u0441\u0442\u0430\u0442\u043e\u043a", "deposit_left", item.deposit_left ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}<label class="checkbox modal-full"><input name="auto_renewal_enabled" type="checkbox" ${item.auto_renewal_enabled ? "checked" : ""}> \u0410\u0432\u0442\u043e\u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435</label><label class="checkbox modal-full"><input name="is_frozen" type="checkbox" ${item.is_frozen ? "checked" : ""}> \u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d</label>`;
   if (kind === "certificate") fields = `${select(L.client, "client_id", clientOptions(loyaltyState.clients || [], null), item.client_id || "")}${select("\u0422\u0438\u043f", "certificate_type", [{ value: "digital", label: "\u042d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0439" }, { value: "paper", label: "\u0411\u0443\u043c\u0430\u0436\u043d\u044b\u0439" }], item.certificate_type || "digital")}${field("\u041a\u043e\u0434", "certificate_code", item.certificate_code || "")}${field("\u041d\u043e\u043c\u0438\u043d\u0430\u043b", "nominal_amount", item.nominal_amount ?? 0, 'type="number" step="0.01"')}${field("\u0411\u0430\u043b\u0430\u043d\u0441", "balance_amount", item.balance_amount ?? 0, 'type="number" step="0.01"')}${field("\u0421\u0440\u043e\u043a \u0434\u043e", "expires_at", item.expires_at ? item.expires_at.slice(0, 16) : "", 'type="datetime-local"')}`;
@@ -831,26 +852,29 @@ function transitionRulesSection(ctx, rules, levels, selectedClient) {
     </div>`;
 }
 
-function levelCashbackRule(level, rules) {
-  return (rules || []).find((rule) => (
-    rule?.is_active !== false
-    && !isTransitionRule(rule)
-    && rule.bonus_type === "cashback"
-    && rule.client_level === level.name
-    && rule.level_params?.cashback !== undefined
-    && rule.level_params?.cashback !== null
-    && rule.level_params?.cashback !== ""
+function levelRules(level, rules) {
+  return (rules || []).filter((rule) => (
+    rule?.is_active !== false && rule.client_level === level.name
   ));
 }
 
-function levelRuleCell(level, rules) {
-  const rule = levelCashbackRule(level, rules);
-  if (!rule) return `<span>${escapeHtml(L.notSet)}</span>`;
-  return `${editButton("rule", rule, rule.name)} <span>${escapeHtml(`${rule.level_params.cashback}%`)}</span>`;
+function levelRuleList(rules, emptyText) {
+  if (!rules.length) return `<span>${escapeHtml(emptyText)}</span>`;
+  return `<div class="loyalty-level-rules">${rules.map((rule) => {
+    const cashback = rule.level_params?.cashback;
+    const amount = cashback !== undefined && cashback !== null && cashback !== ""
+      ? `, ${escapeHtml(`${cashback}%`)} \u043a\u044d\u0448\u0431\u0435\u043a\u0430`
+      : "";
+    const transition = isTransitionRule(rule) ? ", \u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u043e\u0434\u0438\u043d \u0440\u0430\u0437" : "";
+    return `<div class="loyalty-level-rule">${editButton("rule", rule, rule.name)}<span>${escapeHtml(`${rule.name || L.rule}${amount}${transition}`)}</span></div>`;
+  }).join("")}</div>`;
 }
 
 function levelsSection(ctx, levels, rules) {
-  return `<div class="subpanel">${titleWithHint(L.levelsTitle, L.levelsHint)}${canCreate(ctx, "levels") ? `<form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}<button class="primary" disabled>${L.createLevel}</button><p data-message></p></form>` : ""}<table><thead><tr><th>${escapeHtml(L.name)}</th><th>${escapeHtml(L.accrualRule)}</th><th></th></tr></thead><tbody>${rows(levels, L.levelsEmpty, (item) => `<tr><td>${editButton("level", item, item.name)}</td><td>${levelRuleCell(item, rules)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "level", item.id)}</td></tr>`)}</tbody></table></div>`;
+  return `<div class="subpanel">${titleWithHint(L.levelsTitle, "\u0423\u0440\u043e\u0432\u0435\u043d\u044c \u0441\u0432\u044f\u0437\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u0441 \u043b\u044e\u0431\u044b\u043c \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e\u043c \u043f\u0440\u0430\u0432\u0438\u043b \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u044f \u0438 \u043f\u0435\u0440\u0435\u0445\u043e\u0434\u0430. \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043f\u0440\u0438\u043c\u0435\u043d\u044f\u044e\u0442\u0441\u044f \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u044f, \u0437\u0430\u0442\u0435\u043c \u043f\u0435\u0440\u0435\u0445\u043e\u0434; \u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f \u043e\u0434\u0438\u043d \u0440\u0430\u0437 \u0434\u043b\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u0430.")}${canCreate(ctx, "levels") ? `<form class="inline-form compact" data-loyalty-level-create>${field(L.name, "name")}<button class="primary" disabled>${L.createLevel}</button><p data-message></p></form>` : ""}<table><thead><tr><th>${escapeHtml(L.name)}</th><th>\u041f\u0440\u0430\u0432\u0438\u043b\u0430 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u044f</th><th>\u041f\u0440\u0430\u0432\u0438\u043b\u0430 \u043f\u0435\u0440\u0435\u0445\u043e\u0434\u0430</th><th></th></tr></thead><tbody>${rows(levels, L.levelsEmpty, (item) => {
+    const linked = levelRules(item, rules);
+    return `<tr><td>${editButton("level", item, item.name)}</td><td>${levelRuleList(linked.filter((rule) => !isTransitionRule(rule)), L.notSet)}</td><td>${levelRuleList(linked.filter(isTransitionRule), L.notSet)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "level", item.id)}</td></tr>`;
+  })}</tbody></table></div>`;
 }
 
 function bonusTypesSection(ctx, bonusTypes) {
@@ -1120,11 +1144,40 @@ function selectedClientBanner(selectedClient) {
 export async function loyalty(ctx, tab = "rules") {
   const visibleTabs = loyaltyTabs.filter(([key]) => !ctx.can || ctx.can(permissions[key]));
   const activeTab = visibleTabs.some(([key]) => key === tab) ? tab : (visibleTabs[0]?.[0] || "rules");
+  if (activeTab === "achievements") {
+    const settingsData = await loadSettingsData(ctx.org.id);
+    hydrateSettingsCache(ctx.org.id, settingsData);
+    return `
+      <section class="panel" data-loyalty data-tab="${escapeHtml(activeTab)}">
+        <h2>Лояльность</h2>
+        <nav class="tabs">
+          ${visibleTabs.map(([key, title, disabled]) => disabled
+            ? `<span class="tab-disabled">${escapeHtml(title)}</span>`
+            : `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
+        </nav>
+        <div data-settings>${renderAchievementsPanel(settingsData.achievements || [])}</div>
+      </section>
+    `;
+  }
+  if (activeTab === "notifications") {
+    return `
+      <section class="panel" data-loyalty data-tab="${escapeHtml(activeTab)}">
+        <h2>Лояльность</h2>
+        <nav class="tabs">
+          ${visibleTabs.map(([key, title, disabled]) => disabled
+            ? `<span class="tab-disabled">${escapeHtml(title)}</span>`
+            : `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
+        </nav>
+        <div data-notifications>${await notifications(ctx, { embedded: true })}</div>
+      </section>
+    `;
+  }
   const data = await loadClientContext(ctx.org.id);
   const { clients, selectedClient, rules, levels, bonusTypes, balance, history, subscriptions, certificates, referralStats, referrals, promotions, metric, clientVisits, bonusTypeBalances, registrationFields, clientCardSections, filters, hasNextPage } = data;
   loyaltyState.clients = clients;
   loyaltyState.bonusTypes = bonusTypes;
   loyaltyState.levels = levels;
+  loyaltyState.rules = rules;
   loyaltyState.referrals = referrals;
   loyaltyState.selectedClientMetric = metric;
   loyaltyState.registrationFields = registrationFields;
@@ -1211,11 +1264,15 @@ export function bindLoyalty(root, ctx) {
   }
 
   root.addEventListener("submit", async (event) => {
-    const form = event.target.closest("[data-loyalty] form");
+    if (event.target.closest("[data-settings], [data-notifications]")) return;
+    const form = event.target.closest("form[data-loyalty-edit-form], [data-loyalty] form");
     if (!form) return;
     event.preventDefault();
     setMessage(form, "");
     const data = formData(form);
+    if (form.matches("[data-loyalty-edit-form][data-kind=\"level\"]")) {
+      data.level_rule_ids = [...form.querySelectorAll("[name=\"level_rule_ids\"]:checked")].map((option) => option.value);
+    }
 
     try {
       if (form.matches("[data-loyalty-client-search]")) {
@@ -1240,7 +1297,14 @@ export function bindLoyalty(root, ctx) {
         const id = Number(form.dataset.id);
         const payload = editPayload(kind, data);
         if (kind === "rule") await api.updateRule(id, payload);
-        else if (kind === "level") await api.updateBonusLevel(id, payload);
+        else if (kind === "level") {
+          await api.updateBonusLevel(id, payload);
+          const selectedRuleIds = new Set((data.level_rule_ids || []).map(String));
+          const currentLevel = (loyaltyState.levels || []).find((level) => String(level.id) === String(id));
+          const oldLevelName = currentLevel?.name || data.name || "";
+          const linkedRules = (loyaltyState.rules || []).filter((rule) => rule.client_level === oldLevelName);
+          await Promise.all((loyaltyState.rules || []).filter((rule) => linkedRules.some((linked) => String(linked.id) === String(rule.id)) || selectedRuleIds.has(String(rule.id))).map((rule) => api.updateRule(rule.id, { client_level: selectedRuleIds.has(String(rule.id)) ? data.name : null })));
+        }
         else if (kind === "bonus") await api.updateBonus(id, payload);
         else if (kind === "subscription") await api.updateSubscription(id, payload);
         else if (kind === "certificate") await api.updateCertificate(id, payload);

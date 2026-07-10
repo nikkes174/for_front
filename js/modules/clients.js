@@ -3,6 +3,7 @@ import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMes
 
 const CLIENTS_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_CLIENTS_PAGE_SIZE = 10;
+const CLIENT_FILTER_STORAGE_PREFIX = "loyalty.clients.filters.";
 const REGISTRATION_FIELDS_STORAGE_PREFIX = "loyalty.registrationFields.";
 const REGISTRATION_FIELD_NAMES = [
   "last_name",
@@ -124,19 +125,63 @@ function sortClients(items, sort, direction) {
   });
 }
 
-function clientSortUrl(ctx, search, pageSize, sort, currentSort, currentDirection) {
+function clientFilterStorageKey(orgId) {
+  return `${CLIENT_FILTER_STORAGE_PREFIX}${orgId || "default"}`;
+}
+
+function loadClientListFilters(orgId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(clientFilterStorageKey(orgId)) || "null");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveClientListFilters(orgId, filters) {
+  localStorage.setItem(clientFilterStorageKey(orgId), JSON.stringify(clean(filters)));
+}
+
+function filterClientsBySearch(items, search) {
+  const query = String(search || "").trim().toLowerCase();
+  if (!query) return items;
+  return items.filter((client) => [
+    client.full_name,
+    client.last_name,
+    client.first_name,
+    client.middle_name,
+    client.primary_phone,
+    client.secondary_phone,
+    client.phone,
+    client.email,
+    client.telegram_id,
+  ].some((value) => String(value || "").toLowerCase().includes(query)));
+}
+
+function clientListUrl(ctx, filters = {}) {
   const params = new URLSearchParams();
-  if (search) params.set("q", search);
-  params.set("sort", sort);
-  params.set("dir", currentSort === sort && currentDirection === "asc" ? "desc" : "asc");
-  if (pageSize !== DEFAULT_CLIENTS_PAGE_SIZE) params.set("page_size", pageSize);
+  if (filters.search) params.set("q", filters.search);
+  if (filters.sort) params.set("sort", filters.sort);
+  if (filters.direction && filters.direction !== "asc") params.set("dir", filters.direction);
+  if (filters.pageSize && filters.pageSize !== DEFAULT_CLIENTS_PAGE_SIZE) params.set("page_size", filters.pageSize);
+  if (filters.page && filters.page > 1) params.set("page", filters.page);
   const qs = params.toString();
   return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
 }
 
+function clientSortUrl(ctx, search, pageSize, sort, currentSort, currentDirection) {
+  return clientListUrl(ctx, {
+    search,
+    pageSize,
+    sort,
+    direction: currentSort === sort && currentDirection === "asc" ? "desc" : "asc",
+    page: state.clientList?.currentPage || 1,
+  });
+}
+
 function clientTableHeader(ctx, search, pageSize, sort, direction, key, label) {
   const marker = sort === key ? (direction === "asc" ? " ↑" : " ↓") : "";
-  return `<a class="pagination-link" href="${clientSortUrl(ctx, search, pageSize, key, sort, direction)}">${escapeHtml(label + marker)}</a>`;
+  return `<a class="pagination-link" data-client-sort-link href="${clientSortUrl(ctx, search, pageSize, key, sort, direction)}">${escapeHtml(label + marker)}</a>`;
 }
 
 function clientTable(items, ctx, search, pageSize, sort, direction) {
@@ -172,6 +217,49 @@ function clientPageSizeControl(pageSize) {
       ${CLIENTS_PAGE_SIZE_OPTIONS.map((size) => `<option value="${size}" ${pageSize === size ? "selected" : ""}>${size}</option>`).join("")}
     </select></label>
   `;
+}
+
+function clientListMarkup(ctx, filters) {
+  const search = filters.search || "";
+  const pageSize = filters.pageSize || DEFAULT_CLIENTS_PAGE_SIZE;
+  const sort = filters.sort || "name";
+  const direction = filters.direction === "desc" ? "desc" : "asc";
+  const filteredItems = filterClientsBySearch(state.clients || [], search);
+  const sortedItems = sortClients(filteredItems, sort, direction);
+  const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
+  const currentPage = Math.min(Math.max(1, Number(filters.page || 1)), pageCount);
+  const offset = (currentPage - 1) * pageSize;
+  const pageItems = sortedItems.slice(offset, offset + pageSize);
+  const hasNextPage = currentPage < pageCount;
+  state.clientList = { search, pageSize, sort, direction, currentPage };
+  saveClientListFilters(ctx.org.id, state.clientList);
+  const pageUrl = (nextPage) => clientListUrl(ctx, { ...state.clientList, page: nextPage });
+
+  return `
+    ${clientTable(pageItems, ctx, search, pageSize, sort, direction)}
+    <div class="pagination">
+      <span>Страница ${escapeHtml(currentPage)} из ${escapeHtml(pageCount)}</span>
+      <div>
+        ${clientPageSizeControl(pageSize)}
+        ${currentPage > 1 ? `<a class="ghost pagination-link" data-client-page-link href="${pageUrl(currentPage - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
+        ${hasNextPage ? `<a class="ghost pagination-link" data-client-page-link href="${pageUrl(currentPage + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
+      </div>
+    </div>
+  `;
+}
+
+function clientFiltersFromUrl(orgId) {
+  const saved = loadClientListFilters(orgId);
+  const params = new URLSearchParams(location.search);
+  const requestedPageSize = Number(params.get("page_size") || saved.pageSize || DEFAULT_CLIENTS_PAGE_SIZE);
+  const requestedPage = Number(params.get("page") || saved.currentPage || saved.page || 1);
+  return {
+    search: params.has("q") ? params.get("q") || "" : saved.search || "",
+    sort: params.get("sort") || saved.sort || "name",
+    direction: params.has("dir") ? (params.get("dir") === "desc" ? "desc" : "asc") : saved.direction === "desc" ? "desc" : "asc",
+    pageSize: CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE,
+    page: Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1,
+  };
 }
 
 function returnToSettingsUrl(ctx) {
@@ -946,17 +1034,12 @@ function editableVisitModal(client) {
 }
 
 export async function clients(ctx) {
+  const filters = clientFiltersFromUrl(ctx.org.id);
   const params = new URLSearchParams(location.search);
-  const search = params.get("q") || "";
+  const search = filters.search;
   const selectedClientId = params.get("client_id") || "";
-  const sort = params.get("sort") || "name";
-  const direction = params.get("dir") === "desc" ? "desc" : "asc";
-  const requestedPageSize = Number(params.get("page_size") || DEFAULT_CLIENTS_PAGE_SIZE);
-  const pageSize = CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE;
-  const requestedPage = Number(params.get("page") || 1);
-  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
   const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink] = await Promise.all([
-    api.clients(ctx.org.id, { query: search, offset: 0, limit: 1000 }).catch(() => []),
+    api.clients(ctx.org.id, { offset: 0, limit: 1000 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
@@ -970,27 +1053,9 @@ export async function clients(ctx) {
     api.clientRegistrationLink(ctx.org.id).catch(() => null),
   ]);
 
-  const sortedItems = sortClients(items, sort, direction);
-  const knownClients = sortedItems;
-  const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const offset = (currentPage - 1) * pageSize;
-  const pageItems = sortedItems.slice(offset, offset + pageSize);
-  const hasNextPage = currentPage < pageCount;
-  const pageUrl = (nextPage) => {
-    const nextParams = new URLSearchParams();
-    if (search) nextParams.set("q", search);
-    if (sort) nextParams.set("sort", sort);
-    if (direction !== "asc") nextParams.set("dir", direction);
-    if (pageSize !== DEFAULT_CLIENTS_PAGE_SIZE) nextParams.set("page_size", pageSize);
-    if (nextPage > 1) nextParams.set("page", nextPage);
-    const qs = nextParams.toString();
-    return `/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`;
-  };
-
-  state = { ...state, clients: knownClients, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink };
+  state = { ...state, clients: items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink };
   if (selectedClientId && String(state.selectedClient?.id || "") !== String(selectedClientId)) {
-    const selectedClient = knownClients.find((item) => String(item.id) === String(selectedClientId))
+    const selectedClient = items.find((item) => String(item.id) === String(selectedClientId))
       || await api.client(selectedClientId, ctx.org.id).catch(() => null);
     if (selectedClient) {
       clearPhotoPreview();
@@ -1003,46 +1068,90 @@ export async function clients(ctx) {
     }
   }
 
-  return `
-    <section class="panel" data-clients>
-      <form class="inline-form" data-client-create data-permission="clients.clients.create">
-        ${field("Имя", "first_name")}
-        ${field("Фамилия", "last_name")}
-        ${field("Отчество", "middle_name")}
-        ${field("Основной телефон", "primary_phone")}
-        ${field("Доп. телефон", "secondary_phone")}
-        <label><span>Пол</span><select name="gender"><option value="">Не указан</option><option value="male">Мужской</option><option value="female">Женский</option></select></label>
-        ${field("Email", "email")}
-       
-        <button class="primary">Добавить клиента</button>
-        <p data-message></p>
-      </form>
-      <form class="client-search" data-client-search>
-        <label><span>Поиск</span><input name="q" value="${escapeHtml(search)}" placeholder="Фамилия, телефон или email"></label>
-        <button class="primary">Найти</button>
-        ${search ? `<a class="ghost pagination-link" href="/organizations/${ctx.org.id}/clients">Сбросить</a>` : ""}
-      </form>
-      ${clientTable(pageItems, ctx, search, pageSize, sort, direction)}
-      <div class="pagination">
-        <span>Страница ${escapeHtml(currentPage)} из ${escapeHtml(pageCount)}</span>
-        <div>
-          ${clientPageSizeControl(pageSize)}
-          ${currentPage > 1 ? `<a class="ghost pagination-link" href="${pageUrl(currentPage - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
-          ${hasNextPage ? `<a class="ghost pagination-link" href="${pageUrl(currentPage + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
-        </div>
-      </div>
-      ${clientRegistrationLinkBlock()}
-      <div class="subpanel">
-        <h3>Сервис сегментации</h3>
-        ${simpleList(segments, "Сегменты пока не настроены.", (item) => `${item.name}${item.is_dynamic ? " · динамический" : ""}`)}
-      </div>
-      ${modal(state.selectedClient)}
-    </section>
-  `;
+return `
+  <section class="panel" data-clients>
+    <form
+      class="inline-form"
+      data-client-create
+      data-permission="clients.clients.create"
+    >
+      ${field("Имя", "first_name")}
+      ${field("Фамилия", "last_name")}
+      ${field("Отчество", "middle_name")}
+      ${field("Основной телефон", "primary_phone")}
+      ${field("Доп. телефон", "secondary_phone")}
+
+      <label>
+        <span>Пол</span>
+        <select name="gender">
+          <option value="">Не указан</option>
+          <option value="male">Мужской</option>
+          <option value="female">Женский</option>
+        </select>
+      </label>
+
+      ${field("Email", "email")}
+
+      <button class="primary">Добавить клиента</button>
+      <p data-message></p>
+    </form>
+
+    <form class="client-search" data-client-search>
+      <label>
+        <span>Поиск</span>
+        <input
+          name="q"
+          value="${escapeHtml(search)}"
+          placeholder="Фамилия, телефон или email"
+        >
+      </label>
+
+      <button class="primary">Найти</button>
+
+      ${search
+        ? `
+          <button
+            type="button"
+            class="ghost pagination-link"
+            data-client-search-reset
+          >
+            Сбросить
+          </button>
+        `
+        : ""}
+    </form>
+
+    <div data-client-list>
+      ${clientListMarkup(ctx, filters)}
+    </div>
+
+    ${clientRegistrationLinkBlock()}
+
+    ${modal(state.selectedClient)}
+  </section>
+`;
 }
 
 export function bindClients(root, ctx) {
   const syncClientForms = () => syncClientCreateForm(root);
+  const updateClientList = (nextFilters = {}) => {
+    const list = root.querySelector("[data-client-list]");
+    if (!list) return;
+    const filters = {
+      ...(state.clientList || clientFiltersFromUrl(ctx.org.id)),
+      ...nextFilters,
+    };
+    list.innerHTML = clientListMarkup(ctx, filters);
+    const searchInput = root.querySelector("[data-client-search] input[name='q']");
+    if (searchInput) searchInput.value = state.clientList.search || "";
+    const resetButton = root.querySelector("[data-client-search-reset]");
+    const searchForm = root.querySelector("[data-client-search]");
+    if (searchForm && !state.clientList.search && resetButton) resetButton.remove();
+    if (searchForm && state.clientList.search && !resetButton) {
+      searchForm.insertAdjacentHTML("beforeend", '<button type="button" class="ghost pagination-link" data-client-search-reset>Сбросить</button>');
+    }
+    history.replaceState(null, "", clientListUrl(ctx, state.clientList));
+  };
   syncClientForms();
   const clientFormsObserver = new MutationObserver(() => {
     syncClientForms();
@@ -1123,11 +1232,10 @@ export function bindClients(root, ctx) {
 
   root.addEventListener("change", (event) => {
     if (event.target.matches("[data-client-page-size]")) {
-      const params = new URLSearchParams(location.search);
-      params.set("page_size", event.target.value);
-      params.delete("page");
-      const qs = params.toString();
-      ctx.navigate(`/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`);
+      updateClientList({
+        pageSize: Number(event.target.value),
+        page: state.clientList?.currentPage || 1,
+      });
       return;
     }
     if (event.target.closest("[data-client-create]")) {
@@ -1183,14 +1291,10 @@ export function bindClients(root, ctx) {
     if (search) {
       event.preventDefault();
       const data = formData(search);
-      const params = new URLSearchParams();
-      if (data.q) params.set("q", data.q);
-      const currentParams = new URLSearchParams(location.search);
-      if (currentParams.get("sort")) params.set("sort", currentParams.get("sort"));
-      if (currentParams.get("dir")) params.set("dir", currentParams.get("dir"));
-      if (currentParams.get("page_size")) params.set("page_size", currentParams.get("page_size"));
-      const qs = params.toString();
-      ctx.navigate(`/organizations/${ctx.org.id}/clients${qs ? `?${qs}` : ""}`);
+      updateClientList({
+        search: String(data.q || "").trim(),
+        page: state.clientList?.currentPage || 1,
+      });
       return;
     }
 
@@ -1288,6 +1392,7 @@ export function bindClients(root, ctx) {
           source: optional(data.source),
           comment: optional(buildVisitComment(data)),
         }));
+
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
         state.visitDraft = {};
         state.visitErrors = {};
@@ -1304,6 +1409,7 @@ export function bindClients(root, ctx) {
           source: optional(data.source),
           comment: optional(buildVisitComment(data)),
         }));
+
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
         state.selectedVisit = (state.selectedClient.visits || []).find((item) => String((item.visit || item).id) === String(currentVisit.id)) || null;
         state.selectedVisitDraft = {};
@@ -1315,6 +1421,28 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const resetSearchButton = event.target.closest("[data-client-search-reset]");
+    if (resetSearchButton) {
+      event.preventDefault();
+      updateClientList({ search: "", page: state.clientList?.currentPage || 1 });
+      return;
+    }
+
+    const listLink = event.target.closest("[data-client-page-link], [data-client-sort-link]");
+    if (listLink) {
+      event.preventDefault();
+      const params = new URL(listLink.href, window.location.origin).searchParams;
+      const requestedPageSize = Number(params.get("page_size") || state.clientList?.pageSize || DEFAULT_CLIENTS_PAGE_SIZE);
+      updateClientList({
+        search: params.get("q") || "",
+        sort: params.get("sort") || state.clientList?.sort || "name",
+        direction: params.get("dir") === "desc" ? "desc" : "asc",
+        pageSize: CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE,
+        page: Number(params.get("page") || 1),
+      });
+      return;
+    }
+
     const copyAuthLinkButton = event.target.closest("[data-copy-auth-link]");
     if (copyAuthLinkButton) {
       const link = copyAuthLinkButton.dataset.copyAuthLink;

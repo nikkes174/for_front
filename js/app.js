@@ -3,8 +3,9 @@ import { ensureCss, escapeHtml, render, root } from "./dom.js";
 import { dashboard } from "./modules/dashboard.js";
 import { onboarding, bindOnboarding } from "./modules/onboarding.js";
 import { clients, bindClients } from "./modules/clients.js";
+import { catalog, bindCatalog } from "./modules/catalog.js";
 import { loyalty, bindLoyalty } from "./modules/loyalty.js";
-import { notifications, bindNotifications } from "./modules/notifications.js";
+import { bindNotifications } from "./modules/notifications.js";
 import { settings, bindSettings } from "./modules/settings.js";
 import { tasks, bindTasks } from "./modules/tasks.js";
 
@@ -28,6 +29,35 @@ const SETTINGS_PERMISSIONS = [
   "settings.audit.view",
   "settings.events.view",
 ];
+const LOYALTY_PERMISSIONS = [
+  "loyalty.rules.view",
+  "loyalty.levels.view",
+  "loyalty.transactions.view",
+  "loyalty.promotions.view",
+  "loyalty.certificates.view",
+  "loyalty.subscriptions.view",
+  "loyalty.referrals.view",
+  "notifications.notifications.view",
+  "settings.achievements.view",
+];
+const TASK_PERMISSIONS = [
+  "loyalty.rules.view",
+  "notifications.notifications.view",
+];
+const SETTINGS_MENU_SECTIONS = [
+  { slug: "legal", label: "Юр лица", permissions: ["settings.legal.view", "settings.legal.create"] },
+  { slug: "branches", label: "Филиалы", permissions: ["settings.branches.view", "settings.branches.create"] },
+  { slug: "departments", label: "Подразделения", permissions: ["settings.departments.view", "settings.departments.create"] },
+  { slug: "workplaces", label: "Рабочие места", permissions: ["settings.workplaces.view", "settings.workplaces.create"] },
+  { slug: "roles", label: "Роли и права", permissions: ["settings.roles.manage"] },
+  { slug: "users", label: "Пользователи", permissions: ["settings.users.view", "settings.users.create", "settings.users.assign_roles"] },
+  { slug: "logs", label: "События", permissions: ["settings.audit.view", "settings.events.view"] },
+];
+const CATALOG_MENU_SECTIONS = [
+  { slug: "products", label: "Товары", permissions: ["settings.categories.view", "settings.items.view"] },
+  { slug: "services", label: "Услуги", permissions: ["settings.categories.view", "settings.items.view"] },
+];
+let sidebarOpen = false;
 
 function can(permission) {
   if (state.org?.owner_user_id === state.me?.id) return true;
@@ -624,22 +654,114 @@ async function initCabinetForm() {
 
 function navLink(href, label) {
   if (href.includes("/settings") && !canAny(SETTINGS_PERMISSIONS)) return "";
+  if (href.includes("/catalog") && !canAny(["settings.categories.view", "settings.items.view"])) return "";
   if (href.includes("/settings")) {
+    const active = location.pathname === href;
+    return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
+  }
+  if (href.includes("/catalog")) {
     const active = location.pathname === href;
     return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
   }
   const permission = href.includes("/clients")
     ? "clients.clients.view"
     : href.includes("/loyalty")
-      ? "loyalty.rules.view"
+      ? ""
       : href.includes("/tasks")
-        ? "loyalty.rules.view"
+        ? ""
         : href.includes("/settings")
-          ? "settings.roles.manage"
-          : "overview.view";
-  if (!can(permission)) return "";
+            ? "settings.roles.manage"
+            : "overview.view";
+  if (href.includes("/loyalty") && !canAny(LOYALTY_PERMISSIONS)) return "";
+  if (href.includes("/tasks") && !canAny(TASK_PERMISSIONS)) return "";
+  if (permission && !can(permission)) return "";
   const active = location.pathname === href || (href.includes("/loyalty") && location.pathname.includes("/loyalty"));
   return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
+}
+
+function activeSettingsSectionSlug() {
+  const parts = location.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "organizations" || parts[2] !== "settings") return "";
+  const slug = parts[3] || SETTINGS_MENU_SECTIONS[0]?.slug || "";
+  return SETTINGS_MENU_SECTIONS.some((section) => section.slug === slug) ? slug : (SETTINGS_MENU_SECTIONS[0]?.slug || "");
+}
+
+function activeCatalogSectionSlug() {
+  const parts = location.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "organizations" || parts[2] !== "catalog") return "";
+  const slug = parts[3] || CATALOG_MENU_SECTIONS[0]?.slug || "";
+  return CATALOG_MENU_SECTIONS.some((section) => section.slug === slug) ? slug : (CATALOG_MENU_SECTIONS[0]?.slug || "");
+}
+
+function catalogSidebarMenu(orgId) {
+  if (!canAny(["settings.categories.view", "settings.items.view"])) return "";
+  const visibleSections = CATALOG_MENU_SECTIONS.filter((section) => canAny(section.permissions));
+  if (!visibleSections.length) return "";
+  const isCatalogPage = location.pathname.includes(`/organizations/${orgId}/catalog`);
+  const routeSlug = activeCatalogSectionSlug();
+  const activeSlug = visibleSections.some((section) => section.slug === routeSlug) ? routeSlug : visibleSections[0].slug;
+  return `
+    <div class="sidebar-group ${isCatalogPage ? "active" : ""}">
+      <button
+        type="button"
+        class="sidebar-group-toggle ${isCatalogPage ? "active" : ""}"
+        data-catalog-menu-toggle
+        aria-expanded="${isCatalogPage ? "true" : "false"}"
+        aria-controls="catalog-submenu"
+      >
+        <span>Товары и услуги</span>
+        <span class="sidebar-group-chevron" aria-hidden="true"></span>
+      </button>
+      <div
+        id="catalog-submenu"
+        class="sidebar-submenu"
+        data-catalog-submenu
+        ${isCatalogPage ? "" : "hidden"}
+      >
+        ${visibleSections.map((section) => `
+          <a
+            class="${activeSlug === section.slug ? "active" : ""}"
+            href="/organizations/${orgId}/catalog/${section.slug}"
+          >${escapeHtml(section.label)}</a>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function settingsSidebarMenu(orgId) {
+  if (!canAny(SETTINGS_PERMISSIONS)) return "";
+  const visibleSections = SETTINGS_MENU_SECTIONS.filter((section) => canAny(section.permissions));
+  if (!visibleSections.length) return "";
+  const isSettingsPage = location.pathname.includes(`/organizations/${orgId}/settings`);
+  const routeSlug = activeSettingsSectionSlug();
+  const activeSlug = visibleSections.some((section) => section.slug === routeSlug) ? routeSlug : visibleSections[0].slug;
+  return `
+    <div class="sidebar-group ${isSettingsPage ? "active" : ""}">
+      <button
+        type="button"
+        class="sidebar-group-toggle ${isSettingsPage ? "active" : ""}"
+        data-settings-menu-toggle
+        aria-expanded="${isSettingsPage ? "true" : "false"}"
+        aria-controls="settings-submenu"
+      >
+        <span>Настройки организации</span>
+        <span class="sidebar-group-chevron" aria-hidden="true"></span>
+      </button>
+      <div
+        id="settings-submenu"
+        class="sidebar-submenu ${isSettingsPage ? "is-open" : ""}"
+        ${isSettingsPage ? "" : "hidden"}
+      >
+        ${visibleSections.map((section) => `
+          <a
+            class="${activeSlug === section.slug ? "active" : ""}"
+            href="/organizations/${orgId}/settings/${section.slug}"
+          >${escapeHtml(section.label)}</a>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function shell(content, title) {
@@ -649,30 +771,96 @@ function shell(content, title) {
   `).join("");
 
   return `
-    <div class="app">
+    <div class="app ${sidebarOpen ? "sidebar-open" : ""}">
       <div class="ajax-indicator" aria-hidden="true"><span></span></div>
-      <aside class="sidebar">
+      <aside class="sidebar ${sidebarOpen ? "is-open" : ""}" data-sidebar aria-label="Основное меню" aria-hidden="${sidebarOpen ? "false" : "true"}">
+        <div class="sidebar-head">
         <strong class="brand">Лояльность</strong>
+          <button type="button" class="sidebar-close" data-sidebar-close aria-label="Закрыть меню">×</button>
+        </div>
         <select aria-label="Организация" data-org-switch>${orgOptions}</select>
         <button class="ghost" data-open-onboarding>Создать организацию</button>
         <nav>
           ${navLink(`/organizations/${org.id}`, "Главная")}
           ${navLink(`/organizations/${org.id}/clients`, "Клиенты")}
           ${navLink(`/organizations/${org.id}/loyalty`, "Лояльность")}
-          ${navLink(`/organizations/${org.id}/settings`, "Настройки организации")}
-          ${navLink(`/organizations/${org.id}/notifications`, "Рассылка")}
+          ${catalogSidebarMenu(org.id)}
+          ${settingsSidebarMenu(org.id)}
           ${navLink(`/organizations/${org.id}/tasks`, "Задачи")}
         </nav>
       </aside>
       <main class="content">
         <header class="topbar">
-          <div><span data-org-title>${escapeHtml(org.name)}</span><h1 data-page-title>${escapeHtml(title)}</h1></div>
+          <div class="topbar-title">
+            <button
+              type="button"
+              class="sidebar-toggle"
+              data-sidebar-toggle
+              aria-label="${sidebarOpen ? "Меню открыто" : "Открыть меню"}"
+              aria-expanded="${sidebarOpen ? "true" : "false"}"
+            >
+              <span class="sidebar-toggle-box" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </span>
+            </button>
+            <div><span data-org-title>${escapeHtml(org.name)}</span><h1 data-page-title>${escapeHtml(title)}</h1></div>
+          </div>
           <button class="ghost" data-logout>Выйти</button>
         </header>
         <div data-page-content>${content}</div>
       </main>
     </div>
   `;
+}
+
+function syncSidebarState() {
+  const app = root.querySelector(".app");
+  const sidebar = root.querySelector("[data-sidebar]");
+  const toggle = root.querySelector("[data-sidebar-toggle]");
+
+  app?.classList.toggle("sidebar-open", sidebarOpen);
+  sidebar?.classList.toggle("is-open", sidebarOpen);
+  sidebar?.setAttribute("aria-hidden", sidebarOpen ? "false" : "true");
+
+  toggle?.setAttribute("aria-expanded", sidebarOpen ? "true" : "false");
+  toggle?.setAttribute(
+    "aria-label",
+    sidebarOpen ? "Меню открыто" : "Открыть меню",
+  );
+}
+
+function openSidebar() {
+  sidebarOpen = true;
+  syncSidebarState();
+}
+
+function closeSidebar({ restoreFocus = false } = {}) {
+  sidebarOpen = false;
+  syncSidebarState();
+
+  if (restoreFocus) {
+    root.querySelector("[data-sidebar-toggle]")?.focus();
+  }
+}
+
+function toggleSettingsSidebarMenu() {
+  const toggle = root.querySelector("[data-settings-menu-toggle]");
+  const submenu = root.querySelector("#settings-submenu");
+  if (!toggle || !submenu) return;
+  const isOpen = toggle.getAttribute("aria-expanded") === "true";
+  toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+  submenu.hidden = isOpen;
+  submenu.classList.toggle("is-open", !isOpen);
+}
+
+function toggleCatalogSidebarMenu() {
+  const toggle = root.querySelector("[data-catalog-menu-toggle]");
+  const submenu = root.querySelector("#catalog-submenu");
+  if (!toggle || !submenu) return;
+  const isOpen = toggle.getAttribute("aria-expanded") === "true";
+  toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+  submenu.hidden = isOpen;
+  submenu.classList.toggle("is-open", !isOpen);
 }
 
 function navigate(path) {
@@ -735,14 +923,16 @@ function chooseOrg(routeInfo) {
 
 async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "clients" && !ctx.can("clients.clients.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
-  if (routeInfo.page === "loyalty" && !ctx.can("loyalty.rules.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
-  if (routeInfo.page === "tasks" && !ctx.can("loyalty.rules.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
+  if (routeInfo.page === "loyalty" && !canAny(LOYALTY_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
+  if (routeInfo.page === "tasks" && !canAny(TASK_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "settings" && !canAny(SETTINGS_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
+  if (routeInfo.page === "catalog" && !canAny(["settings.categories.view", "settings.items.view"])) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
+  if (routeInfo.page === "catalog") return ["Товары и услуги", await catalog(ctx, routeInfo.extra || "products")];
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
-  if (routeInfo.page === "notifications") return ["Рассылка", await notifications(ctx)];
+  if (routeInfo.page === "notifications") return ["Лояльность", await loyalty(ctx, "notifications")];
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
-  if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx)];
+  if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx, routeInfo.extra || "")];
   return ["Главная", await dashboard(ctx)];
 }
 
@@ -827,6 +1017,7 @@ async function draw(options = {}) {
     return;
   }
   render(root, shell(content, title));
+  syncSidebarState();
   animateUpdate(root.querySelector("[data-page-content]") || root);
   applyPermissions();
 }
@@ -889,6 +1080,26 @@ root.addEventListener("submit", async (event) => {
 });
 
 root.addEventListener("click", async (event) => {
+  if (event.target.closest("[data-sidebar-toggle]")) {
+    openSidebar();
+    return;
+  }
+
+  if (event.target.closest("[data-sidebar-close]")) {
+    closeSidebar({ restoreFocus: true });
+    return;
+  }
+
+  if (event.target.closest("[data-settings-menu-toggle]")) {
+    toggleSettingsSidebarMenu();
+    return;
+  }
+
+  if (event.target.closest("[data-catalog-menu-toggle]")) {
+    toggleCatalogSidebarMenu();
+    return;
+  }
+
   const link = event.target.closest("a[href^='/']");
   if (link) {
     event.preventDefault();
@@ -1004,6 +1215,7 @@ window.addEventListener("ajax:end", () => {
 
 bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
+bindCatalog(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
 bindNotifications(root, { get org() { return state.org; }, navigate, reload });
 bindSettings(root, { get org() { return state.org; }, navigate, reload });
