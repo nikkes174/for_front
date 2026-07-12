@@ -17,7 +17,7 @@ export async function notifications(ctx, { embedded = false } = {}) {
           <textarea name="message" maxlength="${MAX_MESSAGE_LENGTH}" rows="4" required placeholder="Введите текст сообщения ..."></textarea>
         </label>
         <p data-notification-counter>0 / ${MAX_MESSAGE_LENGTH}</p>
-        <button class="primary" disabled>Поставить в очередь</button>
+        <button class="primary" disabled>Отправить</button>
         <p data-message></p>
       </form>
     </div>
