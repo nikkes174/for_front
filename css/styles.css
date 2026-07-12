@@ -787,6 +787,25 @@ button:active { transform: translateY(1px); }
   width: 100%;
 }
 
+.visit-form .visit-item-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.visit-form .visit-item-picker input,
+.visit-form .visit-item-picker button,
+.visit-form textarea {
+  min-width: 0;
+}
+
+.visit-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
 .loyalty-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

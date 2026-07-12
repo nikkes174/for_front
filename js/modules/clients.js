@@ -181,7 +181,8 @@ function clientSortUrl(ctx, search, pageSize, sort, currentSort, currentDirectio
 
 function clientTableHeader(ctx, search, pageSize, sort, direction, key, label) {
   const marker = sort === key ? (direction === "asc" ? " ↑" : " ↓") : "";
-  return `<a class="pagination-link" data-client-sort-link href="${clientSortUrl(ctx, search, pageSize, key, sort, direction)}">${escapeHtml(label + marker)}</a>`;
+  const nextDirection = sort === key && direction === "asc" ? "desc" : "asc";
+  return `<button type="button" class="pagination-link" data-client-sort-link data-client-sort="${escapeHtml(key)}" data-client-direction="${nextDirection}">${escapeHtml(label + marker)}</button>`;
 }
 
 function clientTable(items, ctx, search, pageSize, sort, direction) {
@@ -224,25 +225,22 @@ function clientListMarkup(ctx, filters) {
   const pageSize = filters.pageSize || DEFAULT_CLIENTS_PAGE_SIZE;
   const sort = filters.sort || "name";
   const direction = filters.direction === "desc" ? "desc" : "asc";
-  const filteredItems = filterClientsBySearch(state.clients || [], search);
-  const sortedItems = sortClients(filteredItems, sort, direction);
+  const sortedItems = sortClients(state.clients || [], sort, direction);
   const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
   const currentPage = Math.min(Math.max(1, Number(filters.page || 1)), pageCount);
   const offset = (currentPage - 1) * pageSize;
-  const pageItems = sortedItems.slice(offset, offset + pageSize);
+  const pageItems = filterClientsBySearch(sortedItems.slice(offset, offset + pageSize), search);
   const hasNextPage = currentPage < pageCount;
   state.clientList = { search, pageSize, sort, direction, currentPage };
   saveClientListFilters(ctx.org.id, state.clientList);
-  const pageUrl = (nextPage) => clientListUrl(ctx, { ...state.clientList, page: nextPage });
-
   return `
     ${clientTable(pageItems, ctx, search, pageSize, sort, direction)}
     <div class="pagination">
       <span>Страница ${escapeHtml(currentPage)} из ${escapeHtml(pageCount)}</span>
       <div>
         ${clientPageSizeControl(pageSize)}
-        ${currentPage > 1 ? `<a class="ghost pagination-link" data-client-page-link href="${pageUrl(currentPage - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
-        ${hasNextPage ? `<a class="ghost pagination-link" data-client-page-link href="${pageUrl(currentPage + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
+        ${currentPage > 1 ? `<button type="button" class="ghost pagination-link" data-client-page-link data-client-page="${currentPage - 1}">Назад</button>` : `<button class="ghost" disabled>Назад</button>`}
+        ${hasNextPage ? `<button type="button" class="ghost pagination-link" data-client-page-link data-client-page="${currentPage + 1}">Вперед</button>` : `<button class="ghost" disabled>Вперед</button>`}
       </div>
     </div>
   `;
@@ -493,11 +491,13 @@ function readonlyCheckbox(label, checked) {
 
 function parseVisitComment(value) {
   const lines = String(value ?? "").split("\n");
-  const meta = { serviceNames: "", productNames: "", comment: "" };
+  const meta = { serviceNames: "", productNames: "", serviceCost: "", productCost: "", comment: "" };
   const commentLines = [];
   for (const line of lines) {
     if (line.startsWith("__services:")) meta.serviceNames = line.slice("__services:".length).trim();
     else if (line.startsWith("__products:")) meta.productNames = line.slice("__products:".length).trim();
+    else if (line.startsWith("__service_cost:")) meta.serviceCost = line.slice("__service_cost:".length).trim();
+    else if (line.startsWith("__product_cost:")) meta.productCost = line.slice("__product_cost:".length).trim();
     else commentLines.push(line);
   }
   meta.comment = commentLines.join("\n").trim();
@@ -508,6 +508,8 @@ function buildVisitComment(data) {
   return [
     data.service_names?.trim() ? `__services:${data.service_names.trim()}` : "",
     data.product_names?.trim() ? `__products:${data.product_names.trim()}` : "",
+    data.service_cost !== undefined ? `__service_cost:${Number(data.service_cost || 0)}` : "",
+    data.product_cost !== undefined ? `__product_cost:${Number(data.product_cost || 0)}` : "",
     data.comment?.trim() || "",
   ].filter(Boolean).join("\n");
 }
@@ -577,6 +579,8 @@ function visitDraftDefaults() {
     workplace_id: "",
     employee_id: "",
     visit_status: "completed",
+    service_cost: "0",
+    product_cost: "0",
     total_cost: "0",
     discount_amount: "0",
     discount_type: "amount",
@@ -612,23 +616,49 @@ function branchProductItems(branchId = "", type = "") {
 function visitProductInputField(label, name, branchId, type, value = "", error = "", listKey = "") {
   const options = branchProductItems(branchId, type);
   const listId = `${listKey || name}-${type}-options`;
-  return visitField(label, `
-    <input name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}" list="${escapeHtml(listId)}" placeholder="${escapeHtml(branchId ? "Начните вводить название" : "Сначала выберите филиал")}">
+  const searchName = `${name}_search`;
+  return `<label style="grid-column: 1 / -1;"><span>${escapeHtml(label)}</span>
+    <div class="visit-item-picker">
+      <input name="${escapeHtml(searchName)}" list="${escapeHtml(listId)}" placeholder="${escapeHtml(branchId ? "\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0432\u0432\u043e\u0434\u0438\u0442\u044c \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435" : "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0438\u043b\u0438\u0430\u043b")}" ${branchId ? "" : "disabled"}>
+      <button type="button" class="ghost" data-visit-add-item="${escapeHtml(name)}">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>
+    </div>
     <datalist id="${escapeHtml(listId)}">
       ${options.map((item) => `<option value="${escapeHtml(item.title)}"></option>`).join("")}
     </datalist>
-  `, error);
+    <textarea name="${escapeHtml(name)}" rows="3" placeholder="\u0412\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438">${escapeHtml(value ?? "")}</textarea>
+    ${error ? `<small class="field-error">${escapeHtml(error)}</small>` : ""}
+  </label>`;
+}
+
+function visitItemPrice(item) {
+  return Number(item?.price ?? item?.price_min ?? item?.price_max ?? 0);
+}
+
+function visitSelectedItemsTotal(branchId, type, value = "") {
+  const names = String(value || "").split(/[,;\n]/).map((name) => name.trim()).filter(Boolean);
+  if (!names.length) return null;
+  const items = branchProductItems(branchId, type);
+  let total = 0;
+  for (const name of names) {
+    const item = items.find((candidate) => String(candidate.title || "").trim().toLowerCase() === name.toLowerCase());
+    if (!item) return null;
+    total += visitItemPrice(item);
+  }
+  return total;
 }
 
 function visitEditDraftDefaults(visit) {
   const source = visitData(visit);
   const parsed = parseVisitComment(source.comment);
+  const splitCosts = visitSplitCosts(visit);
   return {
     visit_at: dateTimeInput(source.visit_at),
     branch_id: source.branch_id ? String(source.branch_id) : "",
     employee_id: source.employee_id ? String(source.employee_id) : "",
     visit_status: source.visit_status || "completed",
-    total_cost: String(source.total_cost ?? 0),
+    service_cost: String(splitCosts.serviceCost),
+    product_cost: String(splitCosts.productCost),
+    total_cost: String(splitCosts.totalCost),
     discount_amount: String(source.discount_amount ?? 0),
     discount_type: "amount",
     paid_amount: String(source.paid_amount ?? 0),
@@ -653,6 +683,90 @@ function calculatePaidAmount(totalCost, discountAmount, discountType = "amount")
   const total = Number(totalCost || 0);
   const resolvedDiscount = resolveDiscountAmount(total, discountAmount, discountType);
   return String(Math.max(total - resolvedDiscount, 0));
+}
+
+function visitLineTotal(item) {
+  const explicitTotal = Number(item?.total_amount);
+  if (!Number.isNaN(explicitTotal)) return explicitTotal;
+  const price = Number(item?.price || 0);
+  const quantity = Number(item?.quantity || 1);
+  const discount = Number(item?.discount_amount || 0);
+  return Math.max(price * quantity - discount, 0);
+}
+
+function visitItemsTotal(visit, key) {
+  const items = visit?.[key] || visitData(visit)[key] || [];
+  return items.reduce((sum, item) => sum + visitLineTotal(item), 0);
+}
+
+function visitSplitCosts(visit) {
+  const source = visitData(visit);
+  const parsed = parseVisitComment(source.comment);
+  const serviceItemsCost = visitItemsTotal(visit, "services");
+  const productItemsCost = visitItemsTotal(visit, "products");
+  const hasItemsCost = serviceItemsCost > 0 || productItemsCost > 0;
+  const hasMetaCost = String(parsed.serviceCost || parsed.productCost).trim() !== "";
+  const serviceCost = hasItemsCost ? serviceItemsCost : (hasMetaCost ? Number(parsed.serviceCost || 0) : Number(source.total_cost || 0));
+  const productCost = hasItemsCost ? productItemsCost : Number(parsed.productCost || 0);
+  return {
+    serviceCost,
+    productCost,
+    totalCost: serviceCost + productCost,
+  };
+}
+
+function visitFormData(form) {
+  const data = formData(form);
+  delete data.service_names_search;
+  delete data.product_names_search;
+  return data;
+}
+
+function calculateVisitTotalCost(data) {
+  return Number(data.service_cost || 0) + Number(data.product_cost || 0);
+}
+
+function syncVisitAmounts(form) {
+  const totalCost = calculateVisitTotalCost(visitFormData(form));
+  form.elements.total_cost.value = String(totalCost);
+  form.elements.paid_amount.value = calculatePaidAmount(
+    totalCost,
+    form.elements.discount_amount.value,
+    form.elements.discount_type?.value,
+  );
+}
+
+function syncVisitItemCost(form, name) {
+  const config = {
+    service_names: { type: "service", costName: "service_cost" },
+    product_names: { type: "product", costName: "product_cost" },
+  }[name];
+  if (!config) return false;
+  const total = visitSelectedItemsTotal(form.elements.branch_id?.value, config.type, visitFormData(form)[name]);
+  if (total === null || !form.elements[config.costName]) return false;
+  form.elements[config.costName].value = String(total);
+  syncVisitAmounts(form);
+  return true;
+}
+
+function addVisitSelectedItem(form, name) {
+  const config = {
+    service_names: { type: "service", searchName: "service_names_search" },
+    product_names: { type: "product", searchName: "product_names_search" },
+  }[name];
+  const search = config ? form.elements[config.searchName] : null;
+  const selected = form.elements[name];
+  if (!search || !selected) return false;
+  const value = String(search.value || "").trim();
+  const exists = branchProductItems(form.elements.branch_id?.value, config.type)
+    .some((item) => String(item.title || "").trim().toLowerCase() === value.toLowerCase());
+  if (!value || !exists) return false;
+  const names = String(selected.value || "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
+  if (!names.some((item) => item.toLowerCase() === value.toLowerCase())) names.push(value);
+  selected.value = names.join(", ");
+  search.value = "";
+  syncVisitItemCost(form, name);
+  return true;
 }
 
 function masterOptions(branchId = "", departmentId = "", workplaceId = "") {
@@ -741,8 +855,10 @@ function visitCreateFormMarkup() {
       <option value="cancelled" ${visitDraft.visit_status === "cancelled" ? "selected" : ""}>Отменен</option>
       <option value="no_show" ${visitDraft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
     </select>`, errors.visit_status)}
-    ${visitInputField("Стоимость", "total_cost", visitDraft.total_cost, 'type="number"', errors.total_cost)}
-    ${visitField("Скидка", `<div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div>`, errors.discount_amount)}
+    ${visitInputField("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0443\u0441\u043b\u0443\u0433", "service_cost", visitDraft.service_cost, 'type="number" min="0" step="0.01"', errors.service_cost)}
+    ${visitInputField("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0442\u043e\u0432\u0430\u0440\u043e\u0432", "product_cost", visitDraft.product_cost, 'type="number" min="0" step="0.01"', errors.product_cost)}
+    ${visitInputField("\u041e\u0431\u0449\u0430\u044f \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c", "total_cost", visitDraft.total_cost, 'type="number" readonly', errors.total_cost)}
+    ${visitField("Скидка", `<div class="visit-item-picker"><input name="discount_amount" type="number" value="${escapeHtml(visitDraft.discount_amount)}"><select name="discount_type"><option value="amount" ${visitDraft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${visitDraft.discount_type === "percent" ? "selected" : ""}>%</option></select></div>`, errors.discount_amount)}
     ${visitInputField("Оплачено", "paid_amount", visitDraft.paid_amount, 'type="number" readonly', errors.paid_amount)}
     ${visitProductInputField("Услуги", "service_names", visitDraft.branch_id, "service", visitDraft.service_names, errors.service_names, "visit-create-services")}
     ${visitProductInputField("Товары", "product_names", visitDraft.branch_id, "product", visitDraft.product_names, errors.product_names, "visit-create-products")}
@@ -967,6 +1083,7 @@ function visitModal(client) {
   if (!selected) return "";
   const visit = selected.visit || selected;
   const parsed = parseVisitComment(visit.comment);
+  const splitCosts = visitSplitCosts(selected);
   return `
     <div class="modal-backdrop" data-visit-modal>
       <div class="modal-card">
@@ -981,7 +1098,9 @@ function visitModal(client) {
           ${readonly("Услуги", parsed.serviceNames || selected.service_ids?.join(", "))}
           ${readonly("Товары", parsed.productNames || selected.product_ids?.join(", "))}
           ${readonly("Статус визита", visitStatusLabel(visit.visit_status))}
-          ${readonly("Стоимость", money(visit.total_cost))}
+          ${readonly("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0443\u0441\u043b\u0443\u0433", money(splitCosts.serviceCost))}
+          ${readonly("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0442\u043e\u0432\u0430\u0440\u043e\u0432", money(splitCosts.productCost))}
+          ${readonly("\u041e\u0431\u0449\u0430\u044f \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c", money(splitCosts.totalCost))}
           ${readonly("Скидка", money(visit.discount_amount))}
           ${readonly("Оплачено", money(visit.paid_amount))}
           ${readonly("Задолженность", money(visit.debt_amount))}
@@ -1017,8 +1136,10 @@ function editableVisitModal(client) {
             <option value="cancelled" ${draft.visit_status === "cancelled" ? "selected" : ""}>Отменен</option>
             <option value="no_show" ${draft.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
           </select></label>
-          <label><span>Стоимость</span><input name="total_cost" type="number" value="${escapeHtml(draft.total_cost)}"></label>
-          <label><span>Скидка</span><div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px;"><input name="discount_amount" type="number" value="${escapeHtml(draft.discount_amount)}"><select name="discount_type"><option value="amount" ${draft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${draft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
+          <label><span>\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0443\u0441\u043b\u0443\u0433</span><input name="service_cost" type="number" min="0" step="0.01" value="${escapeHtml(draft.service_cost)}"></label>
+          <label><span>\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0442\u043e\u0432\u0430\u0440\u043e\u0432</span><input name="product_cost" type="number" min="0" step="0.01" value="${escapeHtml(draft.product_cost)}"></label>
+          <label><span>\u041e\u0431\u0449\u0430\u044f \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</span><input name="total_cost" type="number" value="${escapeHtml(draft.total_cost)}" readonly></label>
+          <label><span>Скидка</span><div class="visit-item-picker"><input name="discount_amount" type="number" value="${escapeHtml(draft.discount_amount)}"><select name="discount_type"><option value="amount" ${draft.discount_type === "amount" ? "selected" : ""}>₽</option><option value="percent" ${draft.discount_type === "percent" ? "selected" : ""}>%</option></select></div></label>
           <label><span>Оплачено</span><input name="paid_amount" type="number" value="${escapeHtml(draft.paid_amount)}" readonly></label>
           ${visitProductInputField("Услуги", "service_names", draft.branch_id, "service", draft.service_names, "", "visit-edit-services")}
           ${visitProductInputField("Товары", "product_names", draft.branch_id, "product", draft.product_names, "", "visit-edit-products")}
@@ -1183,10 +1304,17 @@ export function bindClients(root, ctx) {
     const form = event.target.closest("[data-visit-create], [data-visit-edit]");
     if (form) {
       if (form.matches("[data-visit-create]")) {
-        state.visitDraft = { ...state.visitDraft, ...formData(form) };
+        state.visitDraft = { ...state.visitDraft, ...visitFormData(form) };
         if (event.target.name) state.visitErrors = { ...state.visitErrors, [event.target.name]: "" };
       } else {
-        state.selectedVisitDraft = { ...state.selectedVisitDraft, ...formData(form) };
+        state.selectedVisitDraft = { ...state.selectedVisitDraft, ...visitFormData(form) };
+      }
+      if (event.target.name === "service_names_search") addVisitSelectedItem(form, "service_names");
+      if (event.target.name === "product_names_search") addVisitSelectedItem(form, "product_names");
+      if (syncVisitItemCost(form, event.target.name)) {
+        const data = visitFormData(form);
+        if (form.matches("[data-visit-create]")) state.visitDraft = { ...state.visitDraft, ...data };
+        else state.selectedVisitDraft = { ...state.selectedVisitDraft, ...data };
       }
       if (event.target.name === "branch_id" && form.matches("[data-visit-create]")) {
         state.visitDraft.department_id = "";
@@ -1217,15 +1345,13 @@ export function bindClients(root, ctx) {
         return;
       }
     }
-    if (!form || !["total_cost", "discount_amount", "discount_type"].includes(event.target.name)) return;
-    form.elements.paid_amount.value = calculatePaidAmount(
-      form.elements.total_cost.value,
-      form.elements.discount_amount.value,
-      form.elements.discount_type?.value,
-    );
+    if (!form || !["service_cost", "product_cost", "discount_amount", "discount_type"].includes(event.target.name)) return;
+    syncVisitAmounts(form);
     if (form.matches("[data-visit-create]")) {
+      state.visitDraft.total_cost = form.elements.total_cost.value;
       state.visitDraft.paid_amount = form.elements.paid_amount.value;
     } else {
+      state.selectedVisitDraft.total_cost = form.elements.total_cost.value;
       state.selectedVisitDraft.paid_amount = form.elements.paid_amount.value;
     }
   });
@@ -1248,20 +1374,23 @@ export function bindClients(root, ctx) {
     const form = event.target.closest("[data-visit-create], [data-visit-edit]");
     if (!form) return;
     if (form.matches("[data-visit-create]")) {
-      state.visitDraft = { ...state.visitDraft, ...formData(form) };
+      state.visitDraft = { ...state.visitDraft, ...visitFormData(form) };
       if (event.target.name) state.visitErrors = { ...state.visitErrors, [event.target.name]: "" };
     } else {
-      state.selectedVisitDraft = { ...state.selectedVisitDraft, ...formData(form) };
+      state.selectedVisitDraft = { ...state.selectedVisitDraft, ...visitFormData(form) };
     }
-    if (["total_cost", "discount_amount", "discount_type"].includes(event.target.name)) {
-      form.elements.paid_amount.value = calculatePaidAmount(
-        form.elements.total_cost.value,
-        form.elements.discount_amount.value,
-        form.elements.discount_type?.value,
-      );
+    if (syncVisitItemCost(form, event.target.name)) {
+      const data = visitFormData(form);
+      if (form.matches("[data-visit-create]")) state.visitDraft = { ...state.visitDraft, ...data };
+      else state.selectedVisitDraft = { ...state.selectedVisitDraft, ...data };
+    }
+    if (["service_cost", "product_cost", "discount_amount", "discount_type"].includes(event.target.name)) {
+      syncVisitAmounts(form);
       if (form.matches("[data-visit-create]")) {
+        state.visitDraft.total_cost = form.elements.total_cost.value;
         state.visitDraft.paid_amount = form.elements.paid_amount.value;
       } else {
+        state.selectedVisitDraft.total_cost = form.elements.total_cost.value;
         state.selectedVisitDraft.paid_amount = form.elements.paid_amount.value;
       }
     }
@@ -1291,8 +1420,9 @@ export function bindClients(root, ctx) {
     if (search) {
       event.preventDefault();
       const data = formData(search);
+      const query = String(data.q || "").trim();
       updateClientList({
-        search: String(data.q || "").trim(),
+        search: query,
         page: state.clientList?.currentPage || 1,
       });
       return;
@@ -1302,7 +1432,7 @@ export function bindClients(root, ctx) {
     if (!form) return;
     event.preventDefault();
     setMessage(form, "");
-    const data = formData(form);
+    const data = form.matches("[data-visit-create], [data-visit-edit]") ? visitFormData(form) : formData(form);
 
     try {
       if (form.matches("[data-client-one-time-auth-link-create]") && state.selectedClient) {
@@ -1373,6 +1503,8 @@ export function bindClients(root, ctx) {
         else await api.accrueBonus(body);
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
       } else if (form.matches("[data-visit-create]") && state.selectedClient) {
+        data.total_cost = String(calculateVisitTotalCost(data));
+        data.paid_amount = calculatePaidAmount(data.total_cost, data.discount_amount, data.discount_type);
         const errors = validateVisitData(data);
         if (Object.keys(errors).length) {
           state.visitErrors = errors;
@@ -1397,6 +1529,8 @@ export function bindClients(root, ctx) {
         state.visitDraft = {};
         state.visitErrors = {};
       } else if (form.matches("[data-visit-edit]") && state.selectedClient && state.selectedVisit) {
+        data.total_cost = String(calculateVisitTotalCost(data));
+        data.paid_amount = calculatePaidAmount(data.total_cost, data.discount_amount, data.discount_type);
         const currentVisit = state.selectedVisit.visit || state.selectedVisit;
         await api.updateClientVisit(currentVisit.id, clean({
           visit_at: data.visit_at ? new Date(data.visit_at).toISOString() : undefined,
@@ -1421,6 +1555,18 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const addVisitItemButton = event.target.closest("[data-visit-add-item]");
+    if (addVisitItemButton) {
+      event.preventDefault();
+      const form = addVisitItemButton.closest("[data-visit-create], [data-visit-edit]");
+      if (form && addVisitSelectedItem(form, addVisitItemButton.dataset.visitAddItem)) {
+        const data = visitFormData(form);
+        if (form.matches("[data-visit-create]")) state.visitDraft = { ...state.visitDraft, ...data };
+        else state.selectedVisitDraft = { ...state.selectedVisitDraft, ...data };
+      }
+      return;
+    }
+
     const resetSearchButton = event.target.closest("[data-client-search-reset]");
     if (resetSearchButton) {
       event.preventDefault();
@@ -1431,14 +1577,10 @@ export function bindClients(root, ctx) {
     const listLink = event.target.closest("[data-client-page-link], [data-client-sort-link]");
     if (listLink) {
       event.preventDefault();
-      const params = new URL(listLink.href, window.location.origin).searchParams;
-      const requestedPageSize = Number(params.get("page_size") || state.clientList?.pageSize || DEFAULT_CLIENTS_PAGE_SIZE);
       updateClientList({
-        search: params.get("q") || "",
-        sort: params.get("sort") || state.clientList?.sort || "name",
-        direction: params.get("dir") === "desc" ? "desc" : "asc",
-        pageSize: CLIENTS_PAGE_SIZE_OPTIONS.includes(requestedPageSize) ? requestedPageSize : DEFAULT_CLIENTS_PAGE_SIZE,
-        page: Number(params.get("page") || 1),
+        sort: listLink.dataset.clientSort || state.clientList?.sort || "name",
+        direction: listLink.dataset.clientDirection || state.clientList?.direction || "asc",
+        page: Number(listLink.dataset.clientPage || state.clientList?.currentPage || 1),
       });
       return;
     }

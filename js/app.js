@@ -57,7 +57,14 @@ const CATALOG_MENU_SECTIONS = [
   { slug: "products", label: "Товары", permissions: ["settings.categories.view", "settings.items.view"] },
   { slug: "services", label: "Услуги", permissions: ["settings.categories.view", "settings.items.view"] },
 ];
-let sidebarOpen = false;
+
+const LOYALTY_MENU_SECTIONS = [
+  { slug: "", label: "Система лояльности", permissions: LOYALTY_PERMISSIONS },
+  { slug: "cards", label: "Карточки", permissions: ["loyalty.transactions.view"] },
+  { slug: "achievements", label: "Достижения", permissions: ["settings.achievements.view"] },
+  { slug: "notifications", label: "Рассылки", permissions: ["notifications.notifications.view"] },
+];
+let sidebarOpen = true;
 
 function can(permission) {
   if (state.org?.owner_user_id === state.me?.id) return true;
@@ -693,6 +700,46 @@ function activeCatalogSectionSlug() {
   return CATALOG_MENU_SECTIONS.some((section) => section.slug === slug) ? slug : (CATALOG_MENU_SECTIONS[0]?.slug || "");
 }
 
+function activeLoyaltySectionSlug() {
+  const parts = location.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "organizations" || parts[2] !== "loyalty") return "";
+  const slug = parts[3] || "";
+  return LOYALTY_MENU_SECTIONS.some((section) => section.slug === slug) ? slug : "";
+}
+
+function loyaltySidebarMenu(orgId) {
+  const visibleSections = LOYALTY_MENU_SECTIONS.filter((section) => canAny(section.permissions));
+  if (!visibleSections.length) return "";
+  const isLoyaltyPage = location.pathname.includes(`/organizations/${orgId}/loyalty`);
+  const activeSlug = activeLoyaltySectionSlug();
+  return `
+    <div class="sidebar-group ${isLoyaltyPage ? "active" : ""}">
+      <button
+        type="button"
+        class="sidebar-group-toggle ${isLoyaltyPage ? "active" : ""}"
+        data-loyalty-menu-toggle
+        aria-expanded="${isLoyaltyPage ? "true" : "false"}"
+        aria-controls="loyalty-submenu"
+      >
+        <span>Лояльность</span>
+        <span class="sidebar-group-chevron" aria-hidden="true"></span>
+      </button>
+      <div
+        id="loyalty-submenu"
+        class="sidebar-submenu ${isLoyaltyPage ? "is-open" : ""}"
+        ${isLoyaltyPage ? "" : "hidden"}
+      >
+        ${visibleSections.map((section) => `
+          <a
+            class="${activeSlug === section.slug ? "active" : ""}"
+            href="/organizations/${orgId}/loyalty${section.slug ? `/${section.slug}` : ""}"
+          >${escapeHtml(section.label)}</a>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function catalogSidebarMenu(orgId) {
   if (!canAny(["settings.categories.view", "settings.items.view"])) return "";
   const visibleSections = CATALOG_MENU_SECTIONS.filter((section) => canAny(section.permissions));
@@ -783,7 +830,7 @@ function shell(content, title) {
         <nav>
           ${navLink(`/organizations/${org.id}`, "Главная")}
           ${navLink(`/organizations/${org.id}/clients`, "Клиенты")}
-          ${navLink(`/organizations/${org.id}/loyalty`, "Лояльность")}
+          ${loyaltySidebarMenu(org.id)}
           ${catalogSidebarMenu(org.id)}
           ${settingsSidebarMenu(org.id)}
           ${navLink(`/organizations/${org.id}/tasks`, "Задачи")}
@@ -856,6 +903,16 @@ function toggleSettingsSidebarMenu() {
 function toggleCatalogSidebarMenu() {
   const toggle = root.querySelector("[data-catalog-menu-toggle]");
   const submenu = root.querySelector("#catalog-submenu");
+  if (!toggle || !submenu) return;
+  const isOpen = toggle.getAttribute("aria-expanded") === "true";
+  toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+  submenu.hidden = isOpen;
+  submenu.classList.toggle("is-open", !isOpen);
+}
+
+function toggleLoyaltySidebarMenu() {
+  const toggle = root.querySelector("[data-loyalty-menu-toggle]");
+  const submenu = root.querySelector("#loyalty-submenu");
   if (!toggle || !submenu) return;
   const isOpen = toggle.getAttribute("aria-expanded") === "true";
   toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
@@ -1087,6 +1144,11 @@ root.addEventListener("click", async (event) => {
 
   if (event.target.closest("[data-sidebar-close]")) {
     closeSidebar({ restoreFocus: true });
+    return;
+  }
+
+  if (event.target.closest("[data-loyalty-menu-toggle]")) {
+    toggleLoyaltySidebarMenu();
     return;
   }
 

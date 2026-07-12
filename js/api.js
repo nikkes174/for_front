@@ -160,7 +160,7 @@ export const api = {
     return request(`/crm-api/clients-core/clients/search?${params}`);
   },
   client: (id, orgId) => request(`/crm-api/clients-core/clients/${id}${orgId ? `?organization_id=${orgId}` : ""}`),
-  createClient: (body) => request("/crm-api/clients", { method: "POST", body: JSON.stringify(body) }),
+  createClient: (body) => request("/crm-api/clients-core/clients", { method: "POST", body: JSON.stringify(body) }),
   updateClient: (id, body) => request(`/crm-api/clients-core/clients/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   uploadClientPhoto: (id, file) => {
     const data = new FormData();
