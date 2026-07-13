@@ -337,6 +337,14 @@ function ruleCheckboxSelect(label, name, options, selected = []) {
   return `<div class="modal-full rule-checkbox-select"><span>${escapeHtml(label)}</span><div class="rule-checkbox-window">${items}</div></div>`;
 }
 
+function accrualRuleTypeField(selected = ["service"]) {
+  const selectedTypes = new Set(Array.isArray(selected) && selected.length ? selected : ["service"]);
+  const welcomeSelected = selectedTypes.has("welcome");
+  const itemTypesSelected = selectedTypes.has("service") || selectedTypes.has("product");
+  const selectedLabel = ["service", "product", "welcome"].filter((type) => selectedTypes.has(type)).map((type) => ruleTypes[type]).join(", ") || "Выберите тип";
+  return `<div class="rule-checkbox-select"><span>Тип правил начисления</span><details class="branch-multiselect-dropdown"><summary><span data-accrual-rule-types-summary>${escapeHtml(selectedLabel)}</span></summary><div class="rule-checkbox-window">${["service", "product", "welcome"].map((type) => `<label class="checkbox rule-checkbox-option"><input name="accrual_rule_types" type="checkbox" value="${type}" ${selectedTypes.has(type) ? "checked" : ""} ${type === "welcome" ? (itemTypesSelected ? "disabled" : "") : (welcomeSelected ? "disabled" : "")}> <span>${escapeHtml(ruleTypes[type])}</span></label>`).join("")}</div></details></div>`;
+}
+
 function select(label, name, options, selected = "") {
   return `
     <label>
@@ -348,9 +356,9 @@ function select(label, name, options, selected = "") {
   `;
 }
 
-function accrualUnitField(unit = "amount", amount = "0", percent = "") {
-  const isPercent = unit === "percent";
-  return `${select("Единица начисления", "accrual_unit", [{ value: "amount", label: "Количество" }, { value: "percent", label: "Процент" }], unit)}<label data-accrual-value-field><span data-accrual-value-label>${isPercent ? "Процент начисления" : "Бонусов начислить"}</span><input data-accrual-amount name="amount" value="${escapeHtml(amount ?? "0")}" type="number" min="0" ${isPercent ? "hidden disabled" : ""}><input data-accrual-percent name="level_params" value="${escapeHtml(percent ?? "")}" type="number" min="0" step="0.01" ${isPercent ? "" : "hidden disabled"}></label>`;
+function accrualUnitField(unit = "amount", amount = "0", percent = "", percentDisabled = false) {
+  const isPercent = !percentDisabled && unit === "percent";
+  return `<label><span>Единица начисления</span><select name="accrual_unit"><option value="amount" ${isPercent ? "" : "selected"}>Количество</option><option value="percent" ${isPercent ? "selected" : ""} ${percentDisabled ? "disabled" : ""}>Процент</option></select></label><label data-accrual-value-field><span data-accrual-value-label>${isPercent ? "Процент начисления" : "Бонусов начислить"}</span><input data-accrual-amount name="amount" value="${escapeHtml(amount ?? "0")}" type="number" min="0" ${isPercent ? "hidden disabled" : ""}><input data-accrual-percent name="level_params" value="${escapeHtml(percent ?? "")}" type="number" min="0" step="0.01" ${isPercent ? "" : "hidden disabled"}></label>`;
 }
 
 function labelWithHint(label, hint = "") {
@@ -520,6 +528,7 @@ function loyaltyRequiredControls(form) {
   return [...form.querySelectorAll("input, select, textarea")].filter((control) => {
     const type = String(control.type || "").toLowerCase();
     if (control.disabled || control.readOnly) return false;
+    if (control.dataset.optional === "true") return false;
     return !["button", "submit", "reset", "hidden", "checkbox", "radio"].includes(type);
   });
 }
@@ -529,6 +538,7 @@ function syncLoyaltyCreateForms(root) {
     ? root.querySelectorAll("form:not([data-loyalty-client-search]):not([data-loyalty-edit-form])")
     : root.querySelectorAll("[data-loyalty] form:not([data-loyalty-client-search]):not([data-loyalty-edit-form])");
   forms.forEach((form) => {
+    if (form.closest("[data-settings], [data-notifications]")) return;
     const controls = loyaltyRequiredControls(form);
     controls.forEach((control) => {
       control.required = true;
@@ -560,7 +570,7 @@ function loyaltyModal(kind, item) {
   const bonusTypes = currentBonusTypeOptions(loyaltyState.bonusTypes || [], item.bonus_type || item.reward_bonus_type || "");
   const levels = levelOptions(loyaltyState.levels || [], item.client_level || "");
   let fields = "";
-  if (kind === "rule") fields = `${field(L.name, "name", item.name)}${select(L.type, "rule_type", typeOptions, item.rule_type)}${select(L.bonusType, "bonus_type", bonusTypes, item.bonus_type || "")}${select("Условие", "trigger_type", [{ value: "purchase_amount", label: "Сумма покупок" }, { value: "event_created", label: "Событие: создание" }], item.usage_restrictions?.trigger_type || "purchase_amount")}${accrualUnitField(item.level_params?.cashback !== undefined && item.level_params?.cashback !== null && item.level_params?.cashback !== "" ? "percent" : "amount", item.amount, item.level_params?.cashback)}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(loyaltyState.levels || [], item.client_level || ""), item.client_level || "")}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`;
+  if (kind === "rule") { const types = item.usage_restrictions?.accrual_rule_types || [item.rule_type]; fields = `${field(L.name, "name", item.name)}${accrualRuleTypeField(types)}${select(L.bonusType, "bonus_type", bonusTypes, item.bonus_type || "")}${accrualUnitField(item.level_params?.cashback !== undefined && item.level_params?.cashback !== null && item.level_params?.cashback !== "" ? "percent" : "amount", item.amount, item.level_params?.cashback, types.includes("welcome"))}${field(L.termDays, "expires_in_days", item.expires_in_days || "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(loyaltyState.levels || [], item.client_level || ""), item.client_level || "")}<label class="checkbox modal-full"><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}> ${L.active}</label>`; }
   if (kind === "level") {
     const linkedRuleIds = levelRules(item, loyaltyState.rules || []).map((rule) => rule.id);
     const ruleOptions = (loyaltyState.rules || []).map((rule) => ({ value: rule.id, label: (rule.name || L.rule) + (isTransitionRule(rule) ? " (\u043f\u0435\u0440\u0435\u0445\u043e\u0434)" : "") }));
@@ -636,17 +646,17 @@ function saveReferralDraft(form) {
 }
 
 function editPayload(kind, data) {
-  if (kind === "rule") return {
+  if (kind === "rule") { const types = data.accrual_rule_types || ["service"]; const isWelcome = types.includes("welcome"); return {
     name: data.name,
-    rule_type: data.rule_type,
+    rule_type: isWelcome ? "welcome" : types[0],
     bonus_type: data.bonus_type,
     amount: data.accrual_unit === "percent" ? 0 : Number(data.amount || 0),
     expires_in_days: data.expires_in_days ? Number(data.expires_in_days) : null,
     client_level: optional(data.client_level),
     level_params: data.accrual_unit === "percent" && optional(data.level_params) ? { cashback: Number(data.level_params) } : null,
-    usage_restrictions: { trigger_type: data.trigger_type || "purchase_amount" },
+    usage_restrictions: { trigger_type: isWelcome ? "event_created" : "purchase_amount", accrual_rule_types: types },
     is_active: data.is_active === "on",
-  };
+  }; }
   if (kind === "level") return { name: data.name, params: null };
   if (kind === "bonus") return {
     reason: optional(data.reason),
@@ -823,7 +833,7 @@ function rulesSection(ctx, rules, selectedClient, bonusTypes, levels) {
   const bonusRules = (rules || []).filter((item) => !isTransitionRule(item));
   return `
     <div class="subpanel">${titleWithHint(L.rulesTitle, L.rulesHint)}
-      ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${select(L.type, "rule_type", Object.entries(ruleTypes).map(([value, label]) => ({ value, label })), "service")}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${select("Условие", "trigger_type", [{ value: "purchase_amount", label: "Сумма покупок" }, { value: "event_created", label: "Событие: создание" }], "purchase_amount")}${accrualUnitField("amount", "0", loyaltyState.ruleExtras.level_params)}${field(L.termDays, "expires_in_days", "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(levels, loyaltyState.ruleExtras.client_level), loyaltyState.ruleExtras.client_level)}<button class="primary" disabled>${L.createRule}</button><p data-message></p></form>` : ""}
+      ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${accrualRuleTypeField()}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${accrualUnitField("amount", "0", loyaltyState.ruleExtras.level_params)}${field(L.termDays, "expires_in_days", "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(levels, loyaltyState.ruleExtras.client_level), loyaltyState.ruleExtras.client_level).replace('name="client_level"', 'name="client_level" data-optional="true"')}<button class="primary" disabled>${L.createRule}</button><p data-message></p></form>` : ""}
       <table><tbody>${rows(bonusRules, L.rulesEmpty, (item) => `<tr><td>${editButton("rule", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`)}</tbody></table>
     </div>
     ${transitionRulesSection(ctx, rules, levels, selectedClient)}`;
@@ -835,14 +845,13 @@ function isTransitionRule(item) {
 
 function transitionRulesSection(ctx, rules, levels, selectedClient) {
   const transitionRules = (rules || []).filter(isTransitionRule);
-  const hasLevels = (levels || []).length > 0;
   return `
     <div class="subpanel">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-transition-rule-create>
         ${select("Условие перехода", "trigger_type", [{ value: "purchase_amount", label: "Сумма покупок клиента больше" }, { value: "event_created", label: "Событие" }], "purchase_amount")}
         <label data-transition-condition-field><span data-transition-condition-label>Сумма покупок клиента больше</span><input data-transition-purchase-threshold name="purchase_threshold" value="0" type="number" step="0.01" min="0"><select data-transition-event-type name="event_type" hidden><option value="created">Создание</option></select></label>
-        ${hasLevels ? select("\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u043d\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c", "client_level", levelOptions(levels), "") : `<a class="primary inline-action-link" href="/organizations/${escapeHtml(ctx.org.id)}/loyalty/levels">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0443\u0440\u043e\u0432\u0435\u043d\u044c</a>`}
-        ${hasLevels ? `<button class="primary" disabled>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u0430\u0432\u0438\u043b\u043e</button>` : ""}
+        ${select("\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u043d\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c", "client_level", levelOptions(levels), "").replace('name="client_level"', 'name="client_level" data-optional="true"')}
+        <button class="primary" disabled>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u0430\u0432\u0438\u043b\u043e</button>
         <p data-message></p>
       </form>` : ""}
       <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
@@ -1220,15 +1229,28 @@ export function bindLoyalty(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
-    const ruleType = event.target.closest('[name="rule_type"]');
+    const ruleType = event.target.closest('[name="accrual_rule_types"]');
     if (ruleType) {
       const form = ruleType.closest("form");
-      const isWelcome = ruleType.value === "welcome";
+      const welcome = form.querySelector('[name="accrual_rule_types"][value="welcome"]');
+      const itemTypes = [...form.querySelectorAll('[name="accrual_rule_types"]')].filter((input) => input.value !== "welcome");
+      if (ruleType.value === "welcome" && ruleType.checked) itemTypes.forEach((input) => { input.checked = false; });
+      const hasItemType = itemTypes.some((input) => input.checked);
+      welcome.disabled = hasItemType;
+      itemTypes.forEach((input) => { input.disabled = welcome.checked; });
+      const summary = form.querySelector("[data-accrual-rule-types-summary]");
+      if (summary) {
+        summary.textContent = [...form.querySelectorAll('[name="accrual_rule_types"]:checked')]
+          .map((input) => ruleTypes[input.value])
+          .join(", ") || "Выберите тип";
+      }
+      const isWelcome = welcome.checked;
       const unit = form.querySelector('[name="accrual_unit"]');
       const unitField = unit?.closest("label");
       if (unit && unitField) {
         if (isWelcome) unit.value = "amount";
-        unitField.hidden = isWelcome;
+        unit.querySelector('option[value="percent"]').disabled = isWelcome;
+        unitField.hidden = false;
         form.querySelector("[data-accrual-value-label]").textContent = isWelcome || unit.value === "amount" ? "Бонусов начислить" : "Процент начисления";
         form.querySelector("[data-accrual-amount]").hidden = !isWelcome && unit.value === "percent";
         form.querySelector("[data-accrual-percent]").hidden = isWelcome || unit.value !== "percent";
@@ -1303,6 +1325,9 @@ export function bindLoyalty(root, ctx) {
     event.preventDefault();
     setMessage(form, "");
     const data = formData(form);
+    if (form.matches("[data-loyalty-rule-create], [data-loyalty-edit-form][data-kind=\"rule\"]")) {
+      data.accrual_rule_types = [...form.querySelectorAll('[name="accrual_rule_types"]:checked')].map((input) => input.value);
+    }
     if (form.matches("[data-loyalty-edit-form][data-kind=\"level\"]")) {
       data.level_rule_ids = [...form.querySelectorAll("[name=\"level_rule_ids\"]:checked")].map((option) => option.value);
     }
@@ -1349,18 +1374,20 @@ export function bindLoyalty(root, ctx) {
       }
 
       if (form.matches("[data-loyalty-rule-create]")) {
-        const accrualUnit = data.rule_type === "welcome" ? "amount" : data.accrual_unit || "amount";
+        const ruleTypes = data.accrual_rule_types || ["service"];
+        const isWelcome = ruleTypes.includes("welcome");
+        const accrualUnit = isWelcome ? "amount" : data.accrual_unit || "amount";
         const rule = await api.createRule({
           organization_id: ctx.org.id,
           name: data.name,
-          rule_type: data.rule_type,
+          rule_type: isWelcome ? "welcome" : ruleTypes[0],
           bonus_type: data.bonus_type,
           amount: accrualUnit === "percent" ? 0 : Number(data.amount),
           expires_in_days: data.expires_in_days ? Number(data.expires_in_days) : undefined,
           is_active: true,
           client_level: optional(data.client_level),
           level_params: accrualUnit === "percent" && optional(data.level_params) ? { cashback: Number(data.level_params) } : undefined,
-          usage_restrictions: { trigger_type: data.rule_type === "welcome" ? "event_created" : data.trigger_type || "purchase_amount" },
+          usage_restrictions: { trigger_type: isWelcome ? "event_created" : "purchase_amount", accrual_rule_types: ruleTypes },
         });
         if (loyaltyState.selectedClientId) {
           await api.applyRule(rule.id, loyaltyState.selectedClientId, ctx.org.id);

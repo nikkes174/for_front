@@ -225,11 +225,12 @@ function clientListMarkup(ctx, filters) {
   const pageSize = filters.pageSize || DEFAULT_CLIENTS_PAGE_SIZE;
   const sort = filters.sort || "name";
   const direction = filters.direction === "desc" ? "desc" : "asc";
-  const sortedItems = sortClients(state.clients || [], sort, direction);
+  const filteredItems = filterClientsBySearch(state.clients || [], search);
+  const sortedItems = sortClients(filteredItems, sort, direction);
   const pageCount = Math.max(1, Math.ceil(sortedItems.length / pageSize));
   const currentPage = Math.min(Math.max(1, Number(filters.page || 1)), pageCount);
   const offset = (currentPage - 1) * pageSize;
-  const pageItems = filterClientsBySearch(sortedItems.slice(offset, offset + pageSize), search);
+  const pageItems = sortedItems.slice(offset, offset + pageSize);
   const hasNextPage = currentPage < pageCount;
   state.clientList = { search, pageSize, sort, direction, currentPage };
   saveClientListFilters(ctx.org.id, state.clientList);
@@ -402,14 +403,28 @@ function bonusTypeName(items, code) {
   return item?.name || code || "";
 }
 
-function currentLoyaltyLevel(history) {
-  return (history || []).find((item) => item.client_level)?.client_level || "";
+function currentLoyaltyLevel(history, levels) {
+  const state = (history || []).find((item) => ["level_assignment", "level_transition"].includes(item.target_type));
+  const levelName = state ? state.client_level || "" : (history || []).find((item) => item.client_level)?.client_level || "";
+  return (levels || []).some((level) => level.name === levelName) ? levelName : "";
 }
 
 function lastLoyaltyAction(history) {
   const item = (history || [])[0];
   if (!item) return "";
   return [dateTime(item.created_at), item.reason || item.transaction_type].filter(Boolean).join(" · ");
+}
+
+function bonusOperationDetails(item, visits) {
+  const reason = item.reason || `${item.bonus_type || "bonus"} #${item.id}`;
+  if (item.target_type !== "client_history_visit") return reason;
+  const visit = (visits || []).map((entry) => entry.visit || entry)
+    .find((entry) => String(entry.id) === String(item.target_id));
+  if (!visit) return `${reason} · Визит #${item.target_id}`;
+  const master = state.users.find((user) => String(user.id) === String(visit.employee_id));
+  return [reason, dateTime(visit.visit_at), master ? `Мастер: ${displayUser(master)}` : `Мастер #${visit.employee_id || "-"}`]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function readonly(label, value) {
@@ -631,7 +646,7 @@ function visitProductInputField(label, name, branchId, type, value = "", error =
 }
 
 function visitItemPrice(item) {
-  return Number(item?.price ?? item?.price_min ?? item?.price_max ?? 0);
+  return Number(item?.price ?? item?.sale_price ?? item?.unit_price ?? item?.cost ?? item?.price_min ?? item?.price_max ?? 0);
 }
 
 function visitSelectedItemsTotal(branchId, type, value = "") {
@@ -923,15 +938,17 @@ function clientCardData(client) {
 }
 
 async function loadClientDetails(client, orgId) {
-  const [profile, metric, visits, accounts, categories, additionalFields, clientBranches, bonusTypes, bonusBalance, bonusHistory, pushStatus] = await Promise.all([
+  const [profile, metric, visits, accounts, categories, achievements, additionalFields, clientBranches, bonusTypes, bonusLevels, bonusBalance, bonusHistory, pushStatus] = await Promise.all([
     api.clientProfile(client.id, orgId).catch(() => null),
     api.clientProfileMetric(client.id).catch(() => null),
     api.clientHistoryVisits(client.id).catch(() => []),
     api.clientAccounts(client.id).catch(() => null),
     api.clientCategories(client.id).catch(() => []),
+    api.clientAchievements(client.id).catch(() => []),
     api.clientAdditionalFieldValues(client.id).catch(() => []),
     api.clientBranches(client.id).catch(() => []),
     api.bonusTypes(orgId).catch(() => []),
+    api.bonusLevels(orgId).catch(() => []),
     api.bonusBalance(client.id).catch(() => null),
     api.bonusHistory(client.id).catch(() => []),
     api.pushStatus(orgId, client.id).catch(() => ({ enabled: false })),
@@ -949,9 +966,11 @@ async function loadClientDetails(client, orgId) {
     visits,
     accounts,
     categories,
+    achievements,
     additionalFields,
     clientBranches: clientBranches?.length ? clientBranches : branchesFromVisits(visits),
     bonusTypes,
+    bonusLevels,
     bonusBalance,
     bonusHistory,
   };
@@ -963,7 +982,7 @@ function modal(client) {
   const accounts = client.accounts;
   const branches = state.branches;
   const card = client.card;
-  const loyaltyLevel = currentLoyaltyLevel(client.bonusHistory);
+  const loyaltyLevel = currentLoyaltyLevel(client.bonusHistory, client.bonusLevels);
   const loyaltyBonusType = client.bonusBalance?.bonus_type || client.bonusTypes?.[0]?.code || "";
 
   return `
@@ -1048,9 +1067,10 @@ function modal(client) {
             ${readonly("Баланс бонусов", client.bonusBalance ? money(client.bonusBalance.balance) : "")}
           </div>
           <div class="modal-grid">
-            ${readonly("Уровень клиента", loyaltyLevel)}
+            <label><span>Уровень клиента</span><select data-client-level-select>${[{ value: "", label: "Без уровня" }, ...(client.bonusLevels || []).map((level) => ({ value: level.name, label: level.name }))].map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === loyaltyLevel ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>
             ${readonly("Тип бонусов", bonusTypeName(client.bonusTypes, loyaltyBonusType))}
             ${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}
+            ${readonly("Достижения", (client.achievements || []).map((item) => item.name).join(", "))}
           </div>
           <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
             ${selectField("Операция", "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), state.bonusTransactionType)}
@@ -1062,8 +1082,8 @@ function modal(client) {
           </form>
           <table><tbody>
             ${rows(client.bonusHistory || [], "История бонусов пока пуста.", (item) => `<tr>
-              <td>${escapeHtml(item.reason || `${item.bonus_type || "bonus"} #${item.id}`)}</td>
-              <td>${escapeHtml(item.transaction_type || item.operation || "")}</td>
+              <td>${escapeHtml(bonusOperationDetails(item, client.visits))}</td>
+              <td>${escapeHtml(bonusTransactionTypes[item.transaction_type || item.operation] || item.transaction_type || item.operation || "")}</td>
               <td>${escapeHtml(money(item.amount))}</td>
             </tr>`)}
           </tbody></table>
@@ -1126,6 +1146,7 @@ function editableVisitModal(client) {
           <h3>Визит</h3>
           <button type="button" class="ghost" data-close-visit>Закрыть</button>
         </div>
+        <p>ID визита: ${escapeHtml(String(visit.id ?? "-"))}</p>
         <form class="modal-grid" data-visit-edit data-permission="clients.visits.create">
           <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(draft.visit_at)}"></label>
           ${selectField("Филиал", "branch_id", branches, draft.branch_id, "Выберите филиал")}
@@ -1160,7 +1181,7 @@ export async function clients(ctx) {
   const search = filters.search;
   const selectedClientId = params.get("client_id") || "";
   const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink] = await Promise.all([
-    api.clients(ctx.org.id, { offset: 0, limit: 1000 }).catch(() => []),
+    api.clients(ctx.org.id, { offset: 0, limit: 10000 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
@@ -1357,6 +1378,14 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.matches("[data-client-level-select]") && state.selectedClient) {
+      const select = event.target;
+      select.disabled = true;
+      void api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value)
+        .then(() => ctx.reload())
+        .catch(() => { select.disabled = false; });
+      return;
+    }
     if (event.target.matches("[data-client-page-size]")) {
       updateClientList({
         pageSize: Number(event.target.value),

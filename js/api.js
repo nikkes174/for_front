@@ -100,6 +100,11 @@ export const api = {
   achievements: (orgId) => request(`/organizations/${orgId}/achievements`),
   createAchievement: (body) => request("/organizations/achievements", { method: "POST", body: JSON.stringify(body) }),
   updateAchievement: (id, body) => request(`/organizations/achievements/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  uploadAchievementPhoto: (id, file) => {
+    const data = new FormData();
+    data.append("file", file);
+    return upload(`/organizations/achievements/${id}/photo`, data);
+  },
   deleteAchievement: (id) => request(`/organizations/achievements/${id}`, { method: "DELETE" }),
 
   departments: (orgId) => request(`/organizations/${orgId}/departments`),
@@ -178,6 +183,7 @@ export const api = {
   updateClientCardSections: (organizationId, sections) => request("/auth/client-card-sections", { method: "PUT", body: JSON.stringify({ organization_id: organizationId, sections }) }),
   clientProfile: (id, orgId) => request(`/crm-api/client-profile/clients/${id}?organization_id=${orgId}`),
   clientProfileMetric: (id) => request(`/crm-api/client-profile/clients/${id}/metrics`),
+  clientAchievements: (id) => request(`/crm-api/clients-core/clients/${id}/achievements`),
   clientHistoryVisits: (id) => request(`/crm-api/client-history/visits?client_id=${id}&include_services=true&include_products=true`),
   createClientVisit: (body) => request("/crm-api/client-history/visits", { method: "POST", body: JSON.stringify(body) }),
   updateClientVisit: (id, body) => request(`/crm-api/client-history/visits/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -205,6 +211,7 @@ export const api = {
   startApplyRuleToAllJob: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all-jobs`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   workerJobs: (organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`),
   applyLevelTransitions: (clientId, organizationId) => request(`/loyalty-api/client-bonuses/clients/${clientId}/apply-level-transitions`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
+  setClientLevel: (clientId, organizationId, clientLevel) => request(`/loyalty-api/client-bonuses/clients/${clientId}/level`, { method: "PUT", body: JSON.stringify({ organization_id: organizationId, client_level: clientLevel || null }) }),
   bonusLevels: (orgId) => request(`/loyalty-api/organizations/${orgId}/bonus-levels`),
   createBonusLevel: (body) => request("/loyalty-api/client-bonuses/levels", { method: "POST", body: JSON.stringify(body) }),
   updateBonusLevel: (id, body) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),

@@ -18,6 +18,7 @@ let auditPage = 1;
 let eventsPage = 1;
 let auditPageSize = 10;
 let eventsPageSize = 10;
+let eventTypeFilters = new Set();
 const USER_PAGE_SIZE = 20;
 const LOG_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const SETTINGS_TABS = [
@@ -55,6 +56,7 @@ const ACHIEVEMENT_PARAMETER_OPTIONS = [
   { value: "has_photo", label: "Наличие фото" },
   { value: "visit_frequency", label: "Частота посещений" },
   { value: "client_profit", label: "Прибыль от клиента" },
+  { value: "level_transition", label: "Переход на уровень" },
 ];
 const ACHIEVEMENT_OPERATOR_OPTIONS = [
   { value: "gt", label: "Больше" },
@@ -253,16 +255,28 @@ function achievementValueField(condition = {}) {
   `;
 }
 
+function achievementConditionControls(condition = {}) {
+  if (condition.parameter === "level_transition") {
+    return `<span data-achievement-condition-controls>
+      <input type="hidden" name="condition_operator" value="eq">
+      ${selectField("Уровень", "condition_value", (cache.bonusLevels || []).map((level) => ({ value: level.name, label: level.name })), condition.value || cache.bonusLevels?.[0]?.name || "", "Выберите уровень")}
+    </span>`;
+  }
+  return `<span data-achievement-condition-controls>
+    <label><span>Оператор</span><select name="condition_operator" required>
+      ${ACHIEVEMENT_OPERATOR_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${condition.operator === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
+    </select></label>
+    ${achievementValueField(condition)}
+  </span>`;
+}
+
 function achievementConditionRow(condition = {}) {
   return `
     <div class="achievement-condition-row" data-achievement-condition-row>
       <label><span>Параметр</span><select name="condition_parameter" required>
         ${ACHIEVEMENT_PARAMETER_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${condition.parameter === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
       </select></label>
-      <label><span>Оператор</span><select name="condition_operator" required>
-        ${ACHIEVEMENT_OPERATOR_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${condition.operator === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
-      </select></label>
-      ${achievementValueField(condition)}
+      ${achievementConditionControls(condition)}
       <button type="button" class="ghost" data-remove-achievement-condition>Удалить</button>
     </div>
   `;
@@ -302,13 +316,17 @@ function achievementPayload(data, form) {
     name: data.name,
     logic: data.logic || "and",
     conditions,
+    notification_enabled: formObject?.get("notification_enabled") === "on",
+    notification_channel: formObject?.get("notification_channel") || "application",
   };
 }
 
 function achievementDetails(item) {
   const separator = ` ${achievementLogicLabel(item.logic)} `;
   return (item.conditions || [])
-    .map((condition) => `${achievementParameterLabel(condition.parameter)} ${achievementOperatorLabel(condition.operator)} ${condition.value}`)
+    .map((condition) => condition.parameter === "level_transition"
+      ? `${achievementParameterLabel(condition.parameter)} ${condition.value}`
+      : `${achievementParameterLabel(condition.parameter)} ${achievementOperatorLabel(condition.operator)} ${condition.value}`)
     .join(separator);
 }
 
@@ -359,13 +377,31 @@ function handleProductAmountClick(event, syncRoot = null) {
 function syncAchievementConditionValueField(control) {
   const row = control.closest("[data-achievement-condition-row]");
   if (!row) return;
-  const valueLabel = row.querySelector('[name="condition_value"]')?.closest("label");
-  if (!valueLabel) return;
-  valueLabel.outerHTML = achievementValueField({
+  const controls = row.querySelector("[data-achievement-condition-controls]");
+  if (!controls) return;
+  controls.outerHTML = achievementConditionControls({
     parameter: control.value,
-    operator: row.querySelector('[name="condition_operator"]')?.value,
-    value: "",
+    value: control.value === "level_transition" ? cache.bonusLevels?.[0]?.name || "" : "",
   });
+}
+
+function achievementPhotoUrl(item) {
+  if (!item?.id || !item.photo_file_id) return "";
+  const version = item.updated_at ? encodeURIComponent(item.updated_at) : encodeURIComponent(item.photo_file_id);
+  return `/organizations/achievements/${item.id}/photo?v=${version}`;
+}
+
+function achievementPhotoField(item) {
+  const photoUrl = achievementPhotoUrl(item);
+  return `
+    <div class="achievement-photo-field">
+      <label class="photo-upload-control">
+        <input name="photo_file" type="file" accept="image/*" hidden>
+        <span class="photo-upload-button">${photoUrl ? "Заменить фото" : "Добавить фото"}</span>
+      </label>
+      ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Фото достижения" class="achievement-photo-preview">` : ""}
+    </div>
+  `;
 }
 
 function syncBranchAchievementSummary(control) {
@@ -1088,6 +1124,10 @@ function syncRequiredPanelForms(root) {
     ? root.querySelectorAll("form:not([data-entity-edit])")
     : root.querySelectorAll("[data-settings] form:not([data-entity-edit])");
   forms.forEach((form) => {
+    if (form.matches("[data-achievement-create]")) {
+      syncAchievementCreateForm(form);
+      return;
+    }
     const controls = requiredPanelControls(form);
     controls.forEach((control) => {
       control.required = true;
@@ -1097,6 +1137,17 @@ function syncRequiredPanelForms(root) {
       submit.disabled = controls.some((control) => !String(control.value || "").trim());
     }
   });
+}
+
+function syncAchievementCreateForm(form) {
+  const controls = requiredPanelControls(form);
+  controls.forEach((control) => {
+    control.required = true;
+  });
+  const submit = form.querySelector('button[type="submit"], button.primary');
+  if (!submit) return;
+  // This form changes its condition controls dynamically; validate on submit instead.
+  submit.disabled = false;
 }
 
 function timezoneOptions(selected = DEFAULT_TIMEZONE) {
@@ -1236,6 +1287,7 @@ export async function loadSettingsData(orgId) {
     categories,
     productItems,
     achievements,
+    bonusLevels,
     departments,
     workplaces,
     modules,
@@ -1253,6 +1305,7 @@ export async function loadSettingsData(orgId) {
     (api.productCategories?.(orgId) || Promise.resolve([])).catch(() => []),
     (api.productItems?.(orgId) || Promise.resolve([])).catch(() => []),
     (api.achievements?.(orgId) || Promise.resolve([])).catch(() => []),
+    (api.bonusLevels?.(orgId) || Promise.resolve([])).catch(() => []),
     api.departments(orgId).catch(() => []),
     api.workplaces(orgId).catch(() => []),
     api.modules(orgId).catch(() => []),
@@ -1285,6 +1338,7 @@ export async function loadSettingsData(orgId) {
     categories,
     productItems,
     achievements,
+    bonusLevels,
     departments,
     workplaces,
     modules,
@@ -1393,6 +1447,59 @@ function eventNameCell(item) {
     return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
   }
   return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${visitWord}</button>${escapeHtml(label.slice(visitWord.length))}`;
+}
+
+function eventActionType(item) {
+  const value = [item.event_type, item.event_name, item.name, item.action, item.status]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (/cancel|cancelled|void|отмен/.test(value)) return "cancel";
+  if (/create|created|register|создан/.test(value)) return "create";
+  if (/complete|completed|perform|paid|accrual|write_off|соверш|оплат|начисл/.test(value)) return "complete";
+  return "";
+}
+
+function eventsFilterPanel() {
+  const options = [
+    { value: "create", label: "Создание" },
+    { value: "complete", label: "Завершение" },
+    { value: "cancel", label: "Отмена" },
+  ];
+  const selected = options.filter((item) => eventTypeFilters.has(item.value)).map((item) => item.label).join(", ") || "\u0412\u0441\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f";
+  return `<div class="events-filter-control"><span>\u0424\u0438\u043b\u044c\u0442\u0440 \u043f\u043e \u0442\u0438\u043f\u0443</span><details class="branch-multiselect-dropdown"><summary><span>${escapeHtml(selected)}</span></summary><div class="branch-multiselect-options">${options.map((item) => `<label class="checkbox"><input type="checkbox" data-event-type-filter value="${item.value}" ${eventTypeFilters.has(item.value) ? "checked" : ""}> ${item.label}</label>`).join("")}</div></details></div>`;
+}
+
+function eventsContent() {
+  const events = cache.events || [];
+  const filteredEvents = eventTypeFilters.size
+    ? events.filter((item) => eventTypeFilters.has(eventActionType(item)))
+    : events;
+  const pagedEventsData = paginate(filteredEvents, eventsPage, eventsPageSize);
+  eventsPage = pagedEventsData.currentPage;
+  return `
+    ${eventsFilterPanel()}
+    <table><thead><tr><th>\u0421\u043e\u0431\u044b\u0442\u0438\u0435</th><th>\u0414\u0435\u0442\u0430\u043b\u0438</th><th>\u0414\u0430\u0442\u0430 \u0438 \u0432\u0440\u0435\u043c\u044f</th></tr></thead><tbody>
+      ${rows(pagedEventsData.pageItems, "\u0421\u043e\u0431\u044b\u0442\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442", (item) => `
+        <tr>
+          <td>${eventNameCell(item)}</td>
+          <td>${eventDetailsHtml(item)}</td>
+          <td>${escapeHtml(formatDateTime(item.created_at))}</td>
+        </tr>
+      `)}
+    </tbody></table>
+    ${paginationControls(pagedEventsData.currentPage, pagedEventsData.totalPages, filteredEvents.length, {
+      pageAttr: "data-events-page",
+      pageSizeAttr: "data-events-page-size",
+      pageSize: eventsPageSize,
+      pageSizeLabel: "\u041e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0442\u044c \u0441\u043e\u0431\u044b\u0442\u0438\u0439",
+    })}
+  `;
+}
+
+function refreshEventsContent(root) {
+  const content = root.querySelector("[data-events-content]");
+  if (content) content.innerHTML = eventsContent();
 }
 
 function eventVisitPayload(item) {
@@ -1787,11 +1894,20 @@ function modalFields(type, item) {
     </select></label>
   `;
   if (type === "achievement") return `
+    ${achievementPhotoField(item)}
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
     <label><span>Клиент должен выполнить</span><select name="logic">
       ${ACHIEVEMENT_LOGIC_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.logic === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
     </select></label>
     ${achievementConditionsFields(item.conditions || [])}
+    <label class="checkbox modal-full"><input type="checkbox" name="notification_enabled" ${item.notification_enabled !== false ? "checked" : ""}> Уведомление при получении</label>
+    <label class="modal-full"><span>Канал уведомления</span><select name="notification_channel">
+      <option value="application" ${(item.notification_channel || "application") === "application" ? "selected" : ""}>Приложение</option>
+      <option value="telegram" disabled>Telegram</option>
+      <option value="max" disabled>Max</option>
+      <option value="vk" disabled>VK</option>
+      <option value="sms" disabled>SMS</option>
+    </select></label>
   `;
   if (type === "branch") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
@@ -2008,7 +2124,10 @@ async function saveEntity(type, id, data, form = null) {
   }
   if (type === "achievement") {
     if (!api.updateAchievement) throw new Error("API достижений не подключен.");
-    return api.updateAchievement(id, achievementPayload(data, form));
+    return api.updateAchievement(id, achievementPayload(data, form)).then(async (achievement) => {
+      const photo = form.elements.photo_file?.files?.[0];
+      return photo ? api.uploadAchievementPhoto(id, photo) : achievement;
+    });
   }
   if (type === "branch") return api.updateBranch(id, {
     name: data.name,
@@ -2135,10 +2254,8 @@ export async function settings(ctx, tabSlug = "") {
   const filteredUsers = users.filter((user) => userMatchesFilters(user, memberships, branchMemberships));
   const pagedUsersData = paginate(filteredUsers, userPage, USER_PAGE_SIZE);
   const pagedAuditData = paginate(auditLogs, auditPage, auditPageSize);
-  const pagedEventsData = paginate(events, eventsPage, eventsPageSize);
   userPage = pagedUsersData.currentPage;
   auditPage = pagedAuditData.currentPage;
-  eventsPage = pagedEventsData.currentPage;
 
   return `
     <section class="panel" data-settings data-settings-section="${escapeHtml(currentTab)}">
@@ -2309,26 +2426,12 @@ export async function settings(ctx, tabSlug = "") {
 
       ${currentTab === "logs" ? `
       <div id="events" data-permission="settings.events.view">
-        ${section("События", `
-          <table><thead><tr><th>Событие</th><th>Детали</th><th>Дата и время</th></tr></thead><tbody>
-            ${rows(pagedEventsData.pageItems, "Событий пока нет", (item) => `
-              <tr>
-                <td>${eventNameCell(item)}</td>
-                <td>${eventDetailsHtml(item)}</td>
-                <td>${escapeHtml(formatDateTime(item.created_at))}</td>
-              </tr>
-            `)}
-          </tbody></table>
-          ${paginationControls(pagedEventsData.currentPage, pagedEventsData.totalPages, events.length, {
-            pageAttr: "data-events-page",
-            pageSizeAttr: "data-events-page-size",
-            pageSize: eventsPageSize,
-            pageSizeLabel: "Отображать событий",
-          })}
-        `, "События — это системные записи о произошедших действиях.")}
+        ${section("\u0421\u043e\u0431\u044b\u0442\u0438\u044f", `
+          <div data-events-content>${eventsContent()}</div>
+        `, "\u0421\u043e\u0431\u044b\u0442\u0438\u044f \u2014 \u044d\u0442\u043e \u0441\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0435 \u0437\u0430\u043f\u0438\u0441\u0438 \u043e \u043f\u0440\u043e\u0438\u0437\u043e\u0448\u0435\u0434\u0448\u0438\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f\u0445.")}
       </div>
       ` : ""}
-      ${eventVisitModal()}
+            ${eventVisitModal()}
     </section>
   `;
 }
@@ -2337,6 +2440,20 @@ export function bindSettings(root, ctx) {
   syncRequiredPanelForms(root);
 
   root.addEventListener("input", (event) => {
+    if (event.target.matches('[data-entity-edit][data-type="achievement"] [name="photo_file"]')) {
+      const file = event.target.files?.[0];
+      const preview = event.target.closest(".achievement-photo-field")?.querySelector(".achievement-photo-preview");
+      if (!file) return;
+      const previewUrl = URL.createObjectURL(file);
+      if (preview) {
+        preview.src = previewUrl;
+      } else {
+        event.target.closest(".achievement-photo-field")?.insertAdjacentHTML("beforeend", `<img src="${escapeHtml(previewUrl)}" alt="Фото достижения" class="achievement-photo-preview">`);
+      }
+      const photoButton = event.target.closest(".photo-upload-control")?.querySelector(".photo-upload-button");
+      if (photoButton) photoButton.textContent = "Заменить фото";
+      return;
+    }
     if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
       syncRequiredPanelForms(root);
     }
@@ -2401,7 +2518,14 @@ export function bindSettings(root, ctx) {
       const value = Number(event.target.value);
       eventsPageSize = LOG_PAGE_SIZE_OPTIONS.includes(value) ? value : LOG_PAGE_SIZE_OPTIONS[0];
       eventsPage = 1;
-      ctx.reload();
+      refreshEventsContent(root);
+      return;
+    }
+    if (event.target.matches("[data-event-type-filter]")) {
+      if (event.target.checked) eventTypeFilters.add(event.target.value);
+      else eventTypeFilters.delete(event.target.value);
+      eventsPage = 1;
+      refreshEventsContent(root);
       return;
     }
     if (event.target.matches('[name="vat_enabled"]')) {
@@ -2623,7 +2747,7 @@ export function bindSettings(root, ctx) {
     const eventsPageButton = event.target.closest("[data-events-page]");
     if (eventsPageButton && !eventsPageButton.disabled) {
       eventsPage = Number(eventsPageButton.getAttribute("data-events-page")) || 1;
-      ctx.reload();
+      refreshEventsContent(root);
       return;
     }
 
