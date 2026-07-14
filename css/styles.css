@@ -810,6 +810,27 @@ button:active { transform: translateY(1px); }
   align-items: start;
 }
 
+.visit-form .visit-selected-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.visit-form .visit-selected-item span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.visit-form .visit-selected-item input {
+  width: 54px;
+}
+
+.visit-form .visit-selected-item button {
+  min-width: 28px;
+  padding: 2px 8px;
+}
+
 .visit-form .visit-item-picker input,
 .visit-form .visit-item-picker button,
 .visit-form textarea {
@@ -1010,6 +1031,10 @@ td small { display: block; color: #667085; margin-top: 4px; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+
+.client-level-field { display: grid; gap: 6px; }
+.client-level-label { display: flex; align-items: center; gap: 10px; }
+.client-level-label .checkbox { font-size: 11px; font-weight: 400; }
 
 .modal-full {
   grid-column: 1 / -1;

@@ -211,7 +211,7 @@ export const api = {
   startApplyRuleToAllJob: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all-jobs`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   workerJobs: (organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`),
   applyLevelTransitions: (clientId, organizationId) => request(`/loyalty-api/client-bonuses/clients/${clientId}/apply-level-transitions`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
-  setClientLevel: (clientId, organizationId, clientLevel) => request(`/loyalty-api/client-bonuses/clients/${clientId}/level`, { method: "PUT", body: JSON.stringify({ organization_id: organizationId, client_level: clientLevel || null }) }),
+  setClientLevel: (clientId, organizationId, clientLevel, autoLevelTransitionDisabled = false) => request(`/loyalty-api/client-bonuses/clients/${clientId}/level`, { method: "PUT", body: JSON.stringify({ organization_id: organizationId, client_level: clientLevel || null, auto_level_transition_disabled: autoLevelTransitionDisabled }) }),
   bonusLevels: (orgId) => request(`/loyalty-api/organizations/${orgId}/bonus-levels`),
   createBonusLevel: (body) => request("/loyalty-api/client-bonuses/levels", { method: "POST", body: JSON.stringify(body) }),
   updateBonusLevel: (id, body) => request(`/loyalty-api/client-bonuses/levels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),

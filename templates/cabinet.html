@@ -49,6 +49,14 @@
             <div class="cabinet-history-list" data-cabinet-history></div>
           </section>
         </div>
+        <div class="cabinet-panel" data-cabinet-view="achievements" hidden>
+          <div class="cabinet-heading"><p>Личный кабинет</p><h1>Мои достижения</h1></div>
+          <nav class="cabinet-achievement-tabs">
+            <button type="button" class="active" data-cabinet-achievement-tab="received">Получено</button>
+            <button type="button" data-cabinet-achievement-tab="all">Все достижения</button>
+          </nav>
+          <div class="cabinet-achievements-list" data-cabinet-achievements></div>
+        </div>
       </section>
     </main>
     <div class="modal-backdrop cabinet-menu-backdrop" data-cabinet-menu hidden>
@@ -59,6 +67,7 @@
         </div>
         <nav class="cabinet-drawer-nav">
           <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">Мои данные</a>
+          <a class="cabinet-nav-link" href="#achievements" data-cabinet-tab="achievements">Мои достижения</a>
           <button type="button" class="cabinet-logout" data-cabinet-logout>Выход</button>
         </nav>
       </aside>
@@ -93,6 +102,7 @@
       const pushToggle = document.querySelector("[data-cabinet-push-toggle]");
       const pushStatus = document.querySelector("[data-cabinet-push-status]");
       const notificationsList = document.querySelector("[data-cabinet-notifications-list]");
+      const achievementsList = document.querySelector("[data-cabinet-achievements]");
       const token = new URLSearchParams(window.location.search).get("token");
       const submitButton = form.querySelector("button");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
@@ -445,11 +455,26 @@
         historyList.insertAdjacentHTML("beforeend", visitModal());
       }
 
+      function renderAchievements(tab = "received") {
+        const all = cabinetData?.organization_achievements || [];
+        const received = cabinetData?.achievements || [];
+        const receivedIds = new Set(received.map((item) => String(item.achievement_id)));
+        const items = tab === "received" ? all.filter((item) => receivedIds.has(String(item.id))) : all;
+        document.querySelectorAll("[data-cabinet-achievement-tab]").forEach((button) => button.classList.toggle("active", button.dataset.cabinetAchievementTab === tab));
+        achievementsList.innerHTML = items.length ? items.map((item) => `
+          <article class="cabinet-achievement-card ${receivedIds.has(String(item.id)) ? "is-earned" : ""}">
+            <b>${escapeHtml(item.name)}</b>
+            <span>${receivedIds.has(String(item.id)) ? "Выполнено" : "Не выполнено"}</span>
+          </article>
+        `).join("") : `<p class="cabinet-history-empty">${tab === "received" ? "Полученных достижений пока нет." : "Достижений пока нет."}</p>`;
+      }
+
       function setCabinetTab(tab) {
         document.querySelectorAll("[data-cabinet-tab]").forEach((link) => link.classList.toggle("active", link.dataset.cabinetTab === tab));
         document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
           view.hidden = view.dataset.cabinetView !== tab;
         });
+        if (tab === "achievements") renderAchievements("received");
       }
 
       function openCabinetMenu() {
@@ -589,8 +614,12 @@
           event.preventDefault();
           setCabinetTab(link.dataset.cabinetTab);
           closeCabinetMenu();
-          history.replaceState(null, "", "#my-data");
+          history.replaceState(null, "", link.dataset.cabinetTab === "achievements" ? "#achievements" : "#my-data");
         });
+      });
+
+      document.querySelectorAll("[data-cabinet-achievement-tab]").forEach((button) => {
+        button.addEventListener("click", () => renderAchievements(button.dataset.cabinetAchievementTab));
       });
 
       document.addEventListener("click", async (event) => {
@@ -706,4 +735,3 @@
     </script>
   </body>
 </html>
-

@@ -625,10 +625,10 @@ function referralAmountTypeOptions(selected = "percent") {
 }
 
 function currentBonusTypeOptions(items, selected = "") {
-  const options = (items || []).map((item) => ({
+  const options = [{ value: "cashback", label: "\u041a\u044d\u0448\u0431\u044d\u043a" }, ...(items || []).map((item) => ({
     value: item.code,
     label: item.name,
-  }));
+  }))];
   if (selected && !options.some((item) => String(item.value) === String(selected))) {
     options.push({ value: selected, label: selected });
   }

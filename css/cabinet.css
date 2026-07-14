@@ -408,6 +408,14 @@
   gap: 12px;
 }
 
+.cabinet-achievement-tabs { display: flex; gap: 8px; border-bottom: 1px solid #dce3ee; }
+.cabinet-achievement-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: #667085; }
+.cabinet-achievement-tabs button.active { border-bottom-color: #2563eb; color: #1d4ed8; }
+.cabinet-achievements-list { display: grid; gap: 10px; }
+.cabinet-achievement-card { display: flex; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid #dce3ee; border-radius: 8px; background: #f8fafc; }
+.cabinet-achievement-card span { color: #667085; }
+.cabinet-achievement-card.is-earned { border-color: #86efac; background: #f0fdf4; }
+
 .cabinet-history-card {
   display: grid;
   gap: 6px;

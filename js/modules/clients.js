@@ -404,9 +404,13 @@ function bonusTypeName(items, code) {
 }
 
 function currentLoyaltyLevel(history, levels) {
-  const state = (history || []).find((item) => ["level_assignment", "level_transition"].includes(item.target_type));
+  const state = currentLoyaltyLevelState(history);
   const levelName = state ? state.client_level || "" : (history || []).find((item) => item.client_level)?.client_level || "";
   return (levels || []).some((level) => level.name === levelName) ? levelName : "";
+}
+
+function currentLoyaltyLevelState(history) {
+  return (history || []).find((item) => ["level_assignment", "level_transition"].includes(item.target_type));
 }
 
 function lastLoyaltyAction(history) {
@@ -621,11 +625,8 @@ function productCategoryType(categoryId) {
 }
 
 function branchProductItems(branchId = "", type = "") {
-  const branch = state.branches.find((item) => String(item.id) === String(branchId));
-  const availableIds = new Set((branch?.product_item_ids || []).map((id) => String(id)));
-  if (!branch || !availableIds.size) return [];
-  return state.productItems.filter((item) =>
-    availableIds.has(String(item.id)) && (!type || productCategoryType(item.category_id) === type));
+  if (!branchId) return [];
+  return state.productItems.filter((item) => !type || productCategoryType(item.category_id) === type);
 }
 
 function visitProductInputField(label, name, branchId, type, value = "", error = "", listKey = "") {
@@ -634,15 +635,41 @@ function visitProductInputField(label, name, branchId, type, value = "", error =
   const searchName = `${name}_search`;
   return `<label style="grid-column: 1 / -1;"><span>${escapeHtml(label)}</span>
     <div class="visit-item-picker">
-      <input name="${escapeHtml(searchName)}" list="${escapeHtml(listId)}" placeholder="${escapeHtml(branchId ? "\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0432\u0432\u043e\u0434\u0438\u0442\u044c \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435" : "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0438\u043b\u0438\u0430\u043b")}" ${branchId ? "" : "disabled"}>
-      <button type="button" class="ghost" data-visit-add-item="${escapeHtml(name)}">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>
+      <input name="${escapeHtml(searchName)}" data-visit-item-search data-visit-item-name="${escapeHtml(name)}" list="${escapeHtml(listId)}" placeholder="${escapeHtml(branchId ? "\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0432\u0432\u043e\u0434\u0438\u0442\u044c \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435" : "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0438\u043b\u0438\u0430\u043b")}" ${branchId ? "" : "disabled"}>
     </div>
     <datalist id="${escapeHtml(listId)}">
       ${options.map((item) => `<option value="${escapeHtml(item.title)}"></option>`).join("")}
     </datalist>
-    <textarea name="${escapeHtml(name)}" rows="3" placeholder="\u0412\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438">${escapeHtml(value ?? "")}</textarea>
+    <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value ?? "")}">
+    <div data-visit-selected-items="${escapeHtml(name)}">${visitSelectedItemsMarkup(name, branchId, type, value)}</div>
     ${error ? `<small class="field-error">${escapeHtml(error)}</small>` : ""}
   </label>`;
+}
+
+function visitSelectedItems(value = "") {
+  return String(value || "").split(/[,;\n]/).map((value) => {
+    const match = value.trim().match(/^(.*?)(?:\s*×\s*(\d+))?$/);
+    return { name: match?.[1]?.trim() || "", quantity: Math.max(Number(match?.[2] || 1), 1) };
+  }).filter((item) => item.name);
+}
+
+function productStock(branchId, item) {
+  const warehouseId = state.branches.find((branch) => String(branch.id) === String(branchId))?.warehouse_id;
+  const amounts = Array.isArray(item?.actual_amounts) ? item.actual_amounts : [];
+  if (!amounts.length) return null;
+  return amounts
+    .filter((entry) => !warehouseId || String(entry.storage_id) === String(warehouseId))
+    .reduce((total, entry) => total + Number(entry.amount || 0), 0);
+}
+
+function visitSelectedItemsMarkup(name, branchId, type, value = "") {
+  const items = branchProductItems(branchId, type);
+  return visitSelectedItems(value).map((selected) => {
+    const item = items.find((candidate) => String(candidate.title || "").trim().toLowerCase() === selected.name.toLowerCase());
+    const stock = type === "product" ? productStock(branchId, item) : null;
+    const max = stock === null ? "" : ` max="${escapeHtml(stock)}"`;
+    return `<div class="visit-selected-item"><span>${escapeHtml(selected.name)}</span>${type === "product" ? `<input type="number" min="1"${max} value="${escapeHtml(selected.quantity)}" data-visit-item-quantity data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Количество">` : ""}<button type="button" class="ghost" data-visit-remove-item data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Удалить">×</button></div>`;
+  }).join("");
 }
 
 function visitItemPrice(item) {
@@ -650,14 +677,14 @@ function visitItemPrice(item) {
 }
 
 function visitSelectedItemsTotal(branchId, type, value = "") {
-  const names = String(value || "").split(/[,;\n]/).map((name) => name.trim()).filter(Boolean);
-  if (!names.length) return null;
+  const selected = visitSelectedItems(value);
+  if (!selected.length) return null;
   const items = branchProductItems(branchId, type);
   let total = 0;
-  for (const name of names) {
+  for (const { name, quantity } of selected) {
     const item = items.find((candidate) => String(candidate.title || "").trim().toLowerCase() === name.toLowerCase());
     if (!item) return null;
-    total += visitItemPrice(item);
+    total += visitItemPrice(item) * quantity;
   }
   return total;
 }
@@ -751,6 +778,11 @@ function syncVisitAmounts(form) {
   );
 }
 
+function syncVisitSubmitButton(form) {
+  const submit = form.querySelector('button[type="submit"], button.primary');
+  if (submit) submit.disabled = !(String(form.elements.service_names?.value || "").trim() || String(form.elements.product_names?.value || "").trim());
+}
+
 function syncVisitItemCost(form, name) {
   const config = {
     service_names: { type: "service", costName: "service_cost" },
@@ -773,14 +805,28 @@ function addVisitSelectedItem(form, name) {
   const selected = form.elements[name];
   if (!search || !selected) return false;
   const value = String(search.value || "").trim();
-  const exists = branchProductItems(form.elements.branch_id?.value, config.type)
-    .some((item) => String(item.title || "").trim().toLowerCase() === value.toLowerCase());
-  if (!value || !exists) return false;
-  const names = String(selected.value || "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
-  if (!names.some((item) => item.toLowerCase() === value.toLowerCase())) names.push(value);
-  selected.value = names.join(", ");
+  const item = branchProductItems(form.elements.branch_id?.value, config.type)
+    .find((candidate) => String(candidate.title || "").trim().toLowerCase() === value.toLowerCase());
+  if (!value || !item) return false;
+  const quantity = 1;
+  const stock = productStock(form.elements.branch_id?.value, item);
+  const selectedItems = visitSelectedItems(selected.value);
+  const alreadySelected = selectedItems.find((entry) => entry.name.toLowerCase() === value.toLowerCase())?.quantity || 0;
+  if (config.type === "product" && stock !== null && alreadySelected + quantity > stock) {
+    search.setCustomValidity(`Доступно на складе: ${stock}`);
+    search.reportValidity();
+    return false;
+  }
+  search.setCustomValidity("");
+  const names = selectedItems.filter((entry) => entry.name);
+  const existing = names.find((entry) => entry.name.toLowerCase() === value.toLowerCase());
+  if (existing) existing.quantity += quantity;
+  else names.push({ name: value, quantity });
+  selected.value = names.map((entry) => config.type === "product" ? `${entry.name} × ${entry.quantity}` : entry.name).join(", ");
   search.value = "";
+  form.querySelector(`[data-visit-selected-items="${name}"]`).innerHTML = visitSelectedItemsMarkup(name, form.elements.branch_id?.value, config.type, selected.value);
   syncVisitItemCost(form, name);
+  syncVisitSubmitButton(form);
   return true;
 }
 
@@ -857,6 +903,7 @@ function visitCreateFormMarkup() {
   const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
   const masters = masterOptions(visitDraft.branch_id, visitDraft.department_id, visitDraft.workplace_id);
   const errors = state.visitErrors || {};
+  const hasVisitItems = Boolean(String(visitDraft.service_names || "").trim() || String(visitDraft.product_names || "").trim());
 
   return `
     ${visitInputField("Дата и время", "visit_at", visitDraft.visit_at, 'type="datetime-local"', errors.visit_at)}
@@ -879,7 +926,7 @@ function visitCreateFormMarkup() {
     ${visitProductInputField("Товары", "product_names", visitDraft.branch_id, "product", visitDraft.product_names, errors.product_names, "visit-create-products")}
     ${visitInputField("Источник", "source", visitDraft.source)}
     ${visitInputField("Комментарий", "comment", visitDraft.comment)}
-    <button class="primary">Добавить визит</button>
+    <button class="primary" ${hasVisitItems ? "" : "disabled"}>Добавить визит</button>
     <p data-message></p>
   `;
 }
@@ -982,7 +1029,9 @@ function modal(client) {
   const accounts = client.accounts;
   const branches = state.branches;
   const card = client.card;
+  const loyaltyLevelState = currentLoyaltyLevelState(client.bonusHistory);
   const loyaltyLevel = currentLoyaltyLevel(client.bonusHistory, client.bonusLevels);
+  const autoLevelTransitionDisabled = [true, "true"].includes(loyaltyLevelState?.usage_restrictions?.auto_level_transition_disabled);
   const loyaltyBonusType = client.bonusBalance?.bonus_type || client.bonusTypes?.[0]?.code || "";
 
   return `
@@ -1051,6 +1100,7 @@ function modal(client) {
               </tr>`;
             })}
           </tbody></table>
+          <p>Всего визитов: <b>${(client.visits || []).length}</b></p>
         </div>
         <div class="subpanel">
           <h3>Счета клиента</h3>
@@ -1067,7 +1117,7 @@ function modal(client) {
             ${readonly("Баланс бонусов", client.bonusBalance ? money(client.bonusBalance.balance) : "")}
           </div>
           <div class="modal-grid">
-            <label><span>Уровень клиента</span><select data-client-level-select>${[{ value: "", label: "Без уровня" }, ...(client.bonusLevels || []).map((level) => ({ value: level.name, label: level.name }))].map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === loyaltyLevel ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>
+            <div class="client-level-field"><div class="client-level-label"><span>Уровень клиента</span><label class="checkbox"><input type="checkbox" data-client-auto-level-transition-disabled ${autoLevelTransitionDisabled ? "checked" : ""}> Запрет автоперевода</label></div><select data-client-level-select>${[{ value: "", label: "Без уровня" }, ...(client.bonusLevels || []).map((level) => ({ value: level.name, label: level.name }))].map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === loyaltyLevel ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></div>
             ${readonly("Тип бонусов", bonusTypeName(client.bonusTypes, loyaltyBonusType))}
             ${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}
             ${readonly("Достижения", (client.achievements || []).map((item) => item.name).join(", "))}
@@ -1378,12 +1428,49 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
-    if (event.target.matches("[data-client-level-select]") && state.selectedClient) {
-      const select = event.target;
+    if (event.target.matches("[data-visit-item-search]")) {
+      const form = event.target.closest("[data-visit-create], [data-visit-edit]");
+      if (form && addVisitSelectedItem(form, event.target.dataset.visitItemName)) {
+        const data = visitFormData(form);
+        if (form.matches("[data-visit-create]")) state.visitDraft = { ...state.visitDraft, ...data };
+        else state.selectedVisitDraft = { ...state.selectedVisitDraft, ...data };
+      }
+      return;
+    }
+    if (event.target.matches("[data-visit-item-quantity]")) {
+      const input = event.target;
+      const form = input.closest("[data-visit-create], [data-visit-edit]");
+      const name = input.dataset.visitItemName;
+      const hidden = form?.elements[name];
+      if (!form || !hidden) return;
+      const selected = visitSelectedItems(hidden.value);
+      const item = branchProductItems(form.elements.branch_id?.value, "product")
+        .find((candidate) => String(candidate.title || "").trim().toLowerCase() === String(input.dataset.visitItemTitle || "").trim().toLowerCase());
+      const stock = productStock(form.elements.branch_id?.value, item);
+      const quantity = Math.max(1, Math.min(Number(input.value || 1), stock === null ? Number.MAX_SAFE_INTEGER : stock));
+      const entry = selected.find((candidate) => candidate.name.toLowerCase() === String(input.dataset.visitItemTitle || "").trim().toLowerCase());
+      if (!entry) return;
+      entry.quantity = quantity;
+      hidden.value = selected.map((candidate) => `${candidate.name} \u00d7 ${candidate.quantity}`).join(", ");
+      input.value = String(quantity);
+      form.querySelector(`[data-visit-selected-items="${name}"]`).innerHTML = visitSelectedItemsMarkup(name, form.elements.branch_id?.value, "product", hidden.value);
+      syncVisitItemCost(form, name);
+      const data = visitFormData(form);
+      if (form.matches("[data-visit-create]")) state.visitDraft = { ...state.visitDraft, ...data };
+      else state.selectedVisitDraft = { ...state.selectedVisitDraft, ...data };
+      return;
+    }
+    if (event.target.matches("[data-client-level-select], [data-client-auto-level-transition-disabled]") && state.selectedClient) {
+      const select = root.querySelector("[data-client-level-select]");
+      const autoTransitionCheckbox = root.querySelector("[data-client-auto-level-transition-disabled]");
       select.disabled = true;
-      void api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value)
-        .then(() => ctx.reload())
-        .catch(() => { select.disabled = false; });
+      autoTransitionCheckbox.disabled = true;
+      void api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value, autoTransitionCheckbox.checked)
+        .then(async () => {
+          state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
+          ctx.reload();
+        })
+        .catch(() => { select.disabled = false; autoTransitionCheckbox.disabled = false; });
       return;
     }
     if (event.target.matches("[data-client-page-size]")) {
@@ -1584,6 +1671,27 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const removeVisitItemButton = event.target.closest("[data-visit-remove-item]");
+    if (removeVisitItemButton) {
+      event.preventDefault();
+      const form = removeVisitItemButton.closest("[data-visit-create], [data-visit-edit]");
+      const name = removeVisitItemButton.dataset.visitItemName;
+      const selected = form?.elements[name];
+      if (!form || !selected) return;
+      const title = String(removeVisitItemButton.dataset.visitItemTitle || "").trim().toLowerCase();
+      const type = name === "product_names" ? "product" : "service";
+      selected.value = visitSelectedItems(selected.value)
+        .filter((item) => item.name.toLowerCase() !== title)
+        .map((item) => type === "product" ? `${item.name} × ${item.quantity}` : item.name)
+        .join(", ");
+      form.querySelector(`[data-visit-selected-items="${name}"]`).innerHTML = visitSelectedItemsMarkup(name, form.elements.branch_id?.value, type, selected.value);
+      syncVisitItemCost(form, name);
+      syncVisitSubmitButton(form);
+      const data = visitFormData(form);
+      if (form.matches("[data-visit-create]")) state.visitDraft = { ...state.visitDraft, ...data };
+      else state.selectedVisitDraft = { ...state.selectedVisitDraft, ...data };
+      return;
+    }
     const addVisitItemButton = event.target.closest("[data-visit-add-item]");
     if (addVisitItemButton) {
       event.preventDefault();

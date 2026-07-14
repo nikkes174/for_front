@@ -316,7 +316,7 @@ function achievementPayload(data, form) {
     name: data.name,
     logic: data.logic || "and",
     conditions,
-    notification_enabled: formObject?.get("notification_enabled") === "on",
+    notification_enabled: formObject?.has("notification_enabled") ? formObject.get("notification_enabled") === "on" : true,
     notification_channel: formObject?.get("notification_channel") || "application",
   };
 }
@@ -2439,21 +2439,21 @@ export async function settings(ctx, tabSlug = "") {
 export function bindSettings(root, ctx) {
   syncRequiredPanelForms(root);
 
-  root.addEventListener("input", (event) => {
-    if (event.target.matches('[data-entity-edit][data-type="achievement"] [name="photo_file"]')) {
-      const file = event.target.files?.[0];
-      const preview = event.target.closest(".achievement-photo-field")?.querySelector(".achievement-photo-preview");
-      if (!file) return;
-      const previewUrl = URL.createObjectURL(file);
-      if (preview) {
-        preview.src = previewUrl;
-      } else {
-        event.target.closest(".achievement-photo-field")?.insertAdjacentHTML("beforeend", `<img src="${escapeHtml(previewUrl)}" alt="Фото достижения" class="achievement-photo-preview">`);
-      }
-      const photoButton = event.target.closest(".photo-upload-control")?.querySelector(".photo-upload-button");
-      if (photoButton) photoButton.textContent = "Заменить фото";
-      return;
+  const previewAchievementPhoto = (input) => {
+    const file = input.files?.[0];
+    const preview = input.closest(".achievement-photo-field")?.querySelector(".achievement-photo-preview");
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    if (preview) {
+      preview.src = previewUrl;
+    } else {
+      input.closest(".achievement-photo-field")?.insertAdjacentHTML("beforeend", `<img src="${escapeHtml(previewUrl)}" alt="Фото достижения" class="achievement-photo-preview">`);
     }
+    const photoButton = input.closest(".photo-upload-control")?.querySelector(".photo-upload-button");
+    if (photoButton) photoButton.textContent = "Заменить фото";
+  };
+
+  root.addEventListener("input", (event) => {
     if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
       syncRequiredPanelForms(root);
     }
@@ -2850,6 +2850,10 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target.matches('[data-entity-edit][data-type="achievement"] [name="photo_file"]')) {
+      previewAchievementPhoto(event.target);
+      return;
+    }
     if (event.target.matches('[name="user_branch_ids"]')) {
       syncUserBranchEditForm(event.target);
     }
