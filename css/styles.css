@@ -58,29 +58,30 @@ button, input, select { font: inherit; }
 
 .ajax-indicator {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
   z-index: 50;
-  height: 3px;
-  overflow: hidden;
+  display: grid;
+  place-items: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .18s ease;
+  transition: opacity .18s ease, background-color .18s ease;
 }
 
 .ajax-indicator span {
   display: block;
-  width: 38%;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e, #2563eb, #f59e0b);
-  box-shadow: 0 0 18px rgb(37 99 235 / 45%);
-  animation: ajax-slide .9s ease-in-out infinite;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgb(37 99 235 / 90%), rgb(34 197 94 / 90%)),
+    #fff;
+  box-shadow: 0 18px 44px rgb(37 99 235 / 22%);
+  animation: live-splash 1s ease-in-out infinite alternate;
 }
 
 .ajax-active .ajax-indicator {
   opacity: 1;
+  background: rgb(255 255 255 / 30%);
 }
 
 [data-page-content].is-live-refreshing {
@@ -106,11 +107,6 @@ button, input, select { font: inherit; }
     #fff;
   box-shadow: 0 18px 44px rgb(37 99 235 / 22%);
   animation: live-splash 1s ease-in-out infinite alternate;
-}
-
-@keyframes ajax-slide {
-  from { transform: translateX(-110%); }
-  to { transform: translateX(280%); }
 }
 
 @keyframes live-pop {
@@ -1035,6 +1031,9 @@ td small { display: block; color: #667085; margin-top: 4px; }
 .client-level-field { display: grid; gap: 6px; }
 .client-level-label { display: flex; align-items: center; gap: 10px; }
 .client-level-label .checkbox { font-size: 11px; font-weight: 400; }
+.client-level-save-field { display: grid; gap: 8px; align-content: start; }
+.client-level-save-field .primary { justify-self: start; }
+.visit-pagination { display: flex; align-items: center; gap: 8px; }
 
 .modal-full {
   grid-column: 1 / -1;

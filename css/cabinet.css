@@ -531,3 +531,389 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Mobile cabinet visual system, aligned with exemple.html. */
+.cabinet-shell {
+  min-height: 100dvh;
+  background: #f3f2ea;
+  color: #111827;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.cabinet-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  gap: 16px;
+}
+
+.cabinet-topbar,
+.cabinet-panel {
+  max-width: none;
+}
+
+.cabinet-menu-button,
+.cabinet-notifications-button {
+  border-color: #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 2px 8px rgb(17 24 39 / 6%);
+  transition: transform .18s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.cabinet-menu-button:hover,
+.cabinet-notifications-button:hover {
+  border-color: #111827;
+  background: #fff;
+  box-shadow: 0 6px 16px rgb(17 24 39 / 12%);
+  transform: translateY(-1px);
+}
+
+.cabinet-panel {
+  gap: 20px;
+  padding: 20px;
+  border-color: rgb(17 24 39 / 10%);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(17 24 39 / 8%);
+  animation: cabinet-panel-enter .32s ease both;
+}
+
+.cabinet-heading p,
+.profile-form .field,
+.cabinet-heading h1 + p,
+.cabinet-message,
+.cabinet-history-empty,
+.cabinet-achievement-card span,
+.cabinet-history-card span,
+.cabinet-history-body > span,
+.cabinet-visit-button span,
+.cabinet-detail-grid span {
+  color: #6b7280;
+}
+
+.cabinet-heading h1,
+.cabinet-subtitle,
+.cabinet-history-card b,
+.cabinet-history-body,
+.cabinet-visit-button,
+.cabinet-notification-item,
+.cabinet-notifications-toggle {
+  color: #111827;
+}
+
+.cabinet-heading h1 {
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -.045em;
+}
+
+.cabinet-subtitle {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -.025em;
+}
+
+.profile-form .field input,
+.profile-form .field select {
+  min-height: 46px;
+  border-color: #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.profile-form .field input:focus,
+.profile-form .field select:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgb(17 24 39 / 10%);
+}
+
+.form-actions button {
+  min-height: 46px;
+  border-radius: 8px;
+  background: #111827;
+  color: #fff;
+  box-shadow: none;
+  transition: transform .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+
+.form-actions button:hover {
+  background: #374151;
+  box-shadow: 0 6px 14px rgb(17 24 39 / 18%);
+  transform: translateY(-1px);
+}
+
+.cabinet-achievement-tabs {
+  gap: 18px;
+  border-bottom-color: #e5e7eb;
+}
+
+.cabinet-achievement-tabs button {
+  padding: 9px 0;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.cabinet-achievement-tabs button.active {
+  border-bottom-color: #111827;
+  color: #111827;
+}
+
+.cabinet-achievement-card,
+.cabinet-history-card,
+.cabinet-detail-grid > div,
+.cabinet-notifications-empty {
+  border-color: #e5e7eb;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.cabinet-achievement-card.is-earned {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.cabinet-visit-button {
+  border-color: #e5e7eb;
+  border-radius: 10px;
+  transition: transform .18s ease, border-color .18s ease, background-color .18s ease;
+}
+
+.cabinet-visit-button:hover {
+  border-color: #111827;
+  background: #fafafa;
+  transform: translateY(-1px);
+}
+
+.cabinet-drawer {
+  background: #111827;
+  box-shadow: 18px 0 50px rgb(17 24 39 / 28%);
+}
+
+.cabinet-drawer-close {
+  border-color: #4b5563;
+  border-radius: 8px;
+  background: #1f2937;
+}
+
+.cabinet-nav-link,
+.cabinet-logout {
+  border-radius: 8px;
+  color: #d1d5db;
+  transition: background-color .18s ease, color .18s ease, transform .18s ease;
+}
+
+.cabinet-nav-link:hover,
+.cabinet-nav-link.active,
+.cabinet-logout:hover {
+  background: #374151;
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.cabinet-switch input:checked + .cabinet-switch-track {
+  background: #111827;
+  box-shadow: inset 0 0 0 1px #111827;
+}
+
+.cabinet-switch input:focus-visible + .cabinet-switch-track {
+  outline-color: rgb(17 24 39 / 25%);
+}
+
+@keyframes cabinet-panel-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabinet-panel,
+  .cabinet-menu-button,
+  .cabinet-notifications-button,
+  .form-actions button,
+  .cabinet-visit-button,
+  .cabinet-nav-link,
+  .cabinet-logout {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Drawer follows the same light mobile visual language as the cabinet. */
+.cabinet-menu-backdrop {
+  background: rgb(17 24 39 / 32%);
+  backdrop-filter: blur(3px);
+}
+
+.cabinet-drawer {
+  width: min(340px, 88vw);
+  padding: 22px 16px;
+  gap: 22px;
+  background: #f3f2ea;
+  color: #111827;
+  box-shadow: 16px 0 48px rgb(17 24 39 / 20%);
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1);
+}
+
+.cabinet-drawer-head {
+  padding: 0 4px 14px;
+  border-bottom: 1px solid rgb(17 24 39 / 12%);
+}
+
+.cabinet-drawer-head strong {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -.035em;
+}
+
+.cabinet-drawer-close {
+  border-color: #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  transition: transform .18s ease, background-color .18s ease, border-color .18s ease;
+}
+
+.cabinet-drawer-close:hover {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+.cabinet-drawer-nav {
+  gap: 6px;
+}
+
+.cabinet-nav-link,
+.cabinet-logout {
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.cabinet-nav-link:hover,
+.cabinet-nav-link.active {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.cabinet-logout {
+  margin-top: 10px;
+  color: #991b1b;
+}
+
+.cabinet-logout:hover {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  transform: translateX(2px);
+}
+
+.cabinet-achievements-list {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px;
+  align-items: start;
+}
+
+.cabinet-achievement-column {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.cabinet-achievement-column h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.cabinet-achievement-column-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cabinet-achievement-card {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-color: #e5e7eb;
+  background: #fff;
+}
+
+.cabinet-achievement-button {
+  width: 100%;
+  min-height: 116px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  text-align: center;
+  transition: background-color .18s ease, transform .18s ease;
+}
+
+.cabinet-achievement-button:hover {
+  background: #fafafa;
+  transform: translateY(-1px);
+}
+
+.cabinet-achievement-button b {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.cabinet-achievement-modal {
+  width: min(420px, calc(100vw - 32px));
+  max-width: 420px;
+}
+
+.cabinet-achievement-modal [data-cabinet-achievement-content] {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+
+.cabinet-achievement-modal-photo {
+  width: 100%;
+  max-height: min(54vh, 380px);
+  display: block;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.cabinet-achievement-modal-title {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 500;
+  text-align: center;
+}
+
+[data-cabinet-notifications-modal] {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+[data-cabinet-notifications-modal] .cabinet-notifications-modal {
+  margin: 0;
+  justify-self: center;
+  align-self: center;
+}

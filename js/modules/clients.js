@@ -31,6 +31,7 @@ let state = {
   productItems: [],
   selectedClient: null,
   selectedVisit: null,
+  visitPage: 1,
   visitDraft: {},
   visitErrors: {},
   bonusTransactionType: "accrual",
@@ -1090,8 +1091,13 @@ function modal(client) {
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
             ${visitCreateFormMarkup()}
           </form>
-          <table><tbody>
-            ${rows(client.visits || [], "Истории визитов пока нет.", (item) => {
+          ${(() => {
+            const visits = client.visits || [];
+            const pages = Math.max(Math.ceil(visits.length / 5), 1);
+            const page = Math.min(state.visitPage, pages);
+            const pageVisits = visits.slice((page - 1) * 5, page * 5);
+            return `<table><tbody>
+            ${rows(pageVisits, "Истории визитов пока нет.", (item) => {
               const visit = item.visit || item;
               return `<tr>
                 <td><button type="button" class="ghost" data-open-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at) || "Дата не указана")}</b><small>${escapeHtml(visitStatusLabel(visit.visit_status))}</small></button></td>
@@ -1100,7 +1106,9 @@ function modal(client) {
               </tr>`;
             })}
           </tbody></table>
-          <p>Всего визитов: <b>${(client.visits || []).length}</b></p>
+          <p>Всего визитов: <b>${visits.length}</b></p>
+          ${visits.length > 5 ? `<div class="visit-pagination"><button type="button" class="ghost" data-client-visits-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>←</button><span>${page} / ${pages}</span><button type="button" class="ghost" data-client-visits-page="${page + 1}" ${page >= pages ? "disabled" : ""}>→</button></div>` : ""}`;
+          })()}
         </div>
         <div class="subpanel">
           <h3>Счета клиента</h3>
@@ -1119,7 +1127,7 @@ function modal(client) {
           <div class="modal-grid">
             <div class="client-level-field"><div class="client-level-label"><span>Уровень клиента</span><label class="checkbox"><input type="checkbox" data-client-auto-level-transition-disabled ${autoLevelTransitionDisabled ? "checked" : ""}> Запрет автоперевода</label></div><select data-client-level-select>${[{ value: "", label: "Без уровня" }, ...(client.bonusLevels || []).map((level) => ({ value: level.name, label: level.name }))].map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === loyaltyLevel ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></div>
             ${readonly("Тип бонусов", bonusTypeName(client.bonusTypes, loyaltyBonusType))}
-            ${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}
+            <div class="client-level-save-field">${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}<button type="button" class="primary" data-client-level-save disabled>Сохранить</button></div>
             ${readonly("Достижения", (client.achievements || []).map((item) => item.name).join(", "))}
           </div>
           <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
@@ -1461,16 +1469,7 @@ export function bindClients(root, ctx) {
       return;
     }
     if (event.target.matches("[data-client-level-select], [data-client-auto-level-transition-disabled]") && state.selectedClient) {
-      const select = root.querySelector("[data-client-level-select]");
-      const autoTransitionCheckbox = root.querySelector("[data-client-auto-level-transition-disabled]");
-      select.disabled = true;
-      autoTransitionCheckbox.disabled = true;
-      void api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value, autoTransitionCheckbox.checked)
-        .then(async () => {
-          state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
-          ctx.reload();
-        })
-        .catch(() => { select.disabled = false; autoTransitionCheckbox.disabled = false; });
+      root.querySelector("[data-client-level-save]").disabled = false;
       return;
     }
     if (event.target.matches("[data-client-page-size]")) {
@@ -1529,6 +1528,12 @@ export function bindClients(root, ctx) {
       state.visitDraft.employee_id = "";
       syncVisitCreateForm(root);
     }
+  });
+
+  root.addEventListener("input", (event) => {
+    if (!event.target.matches("[data-visit-item-quantity]")) return;
+    const max = Number(event.target.max);
+    if (Number.isFinite(max) && max >= 0 && Number(event.target.value) > max) event.target.value = String(max);
   });
 
   root.addEventListener("submit", async (event) => {
@@ -1671,6 +1676,25 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const visitPageButton = event.target.closest("[data-client-visits-page]");
+    if (visitPageButton) {
+      state.visitPage = Number(visitPageButton.dataset.clientVisitsPage) || 1;
+      ctx.reload();
+      return;
+    }
+    const saveLevelButton = event.target.closest("[data-client-level-save]");
+    if (saveLevelButton && state.selectedClient) {
+      const select = root.querySelector("[data-client-level-select]");
+      const autoTransitionCheckbox = root.querySelector("[data-client-auto-level-transition-disabled]");
+      saveLevelButton.disabled = true;
+      try {
+        await api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value, autoTransitionCheckbox.checked);
+        saveLevelButton.textContent = "Сохранено";
+      } catch {
+        saveLevelButton.disabled = false;
+      }
+      return;
+    }
     const removeVisitItemButton = event.target.closest("[data-visit-remove-item]");
     if (removeVisitItemButton) {
       event.preventDefault();
@@ -1756,6 +1780,7 @@ export function bindClients(root, ctx) {
         clearPhotoPreview();
         state.selectedClient = null;
         state.selectedVisit = null;
+        state.visitPage = 1;
         state.visitDraft = {};
         state.visitErrors = {};
         state.selectedVisitDraft = {};
@@ -1771,6 +1796,7 @@ export function bindClients(root, ctx) {
       if (client) {
         clearPhotoPreview();
         state.selectedVisit = null;
+        state.visitPage = 1;
         state.selectedVisitDraft = {};
         state.visitDraft = {};
         state.visitErrors = {};

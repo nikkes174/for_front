@@ -51,10 +51,6 @@
         </div>
         <div class="cabinet-panel" data-cabinet-view="achievements" hidden>
           <div class="cabinet-heading"><p>Личный кабинет</p><h1>Мои достижения</h1></div>
-          <nav class="cabinet-achievement-tabs">
-            <button type="button" class="active" data-cabinet-achievement-tab="received">Получено</button>
-            <button type="button" data-cabinet-achievement-tab="all">Все достижения</button>
-          </nav>
           <div class="cabinet-achievements-list" data-cabinet-achievements></div>
         </div>
       </section>
@@ -89,6 +85,15 @@
         <div class="cabinet-notifications-empty" data-cabinet-notifications-list>Уведомлений пока нет.</div>
       </div>
     </div>
+    <div class="modal-backdrop" data-cabinet-achievement-modal hidden>
+      <div class="modal-card cabinet-achievement-modal">
+        <div class="modal-head">
+          <h3>Достижение</h3>
+          <button type="button" class="ghost" data-cabinet-achievement-close>Закрыть</button>
+        </div>
+        <div data-cabinet-achievement-content></div>
+      </div>
+    </div>
 
     <script type="module" src="/js/dom.js"></script>
     <script>
@@ -103,6 +108,8 @@
       const pushStatus = document.querySelector("[data-cabinet-push-status]");
       const notificationsList = document.querySelector("[data-cabinet-notifications-list]");
       const achievementsList = document.querySelector("[data-cabinet-achievements]");
+      const achievementModal = document.querySelector("[data-cabinet-achievement-modal]");
+      const achievementContent = document.querySelector("[data-cabinet-achievement-content]");
       const token = new URLSearchParams(window.location.search).get("token");
       const submitButton = form.querySelector("button");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
@@ -455,18 +462,43 @@
         historyList.insertAdjacentHTML("beforeend", visitModal());
       }
 
-      function renderAchievements(tab = "received") {
+      function achievementPhotoUrl(item) {
+        if (!item?.id || !item.photo_file_id) return "";
+        const version = encodeURIComponent(item.updated_at || item.photo_file_id);
+        return `/organizations/achievements/${item.id}/photo?v=${version}`;
+      }
+
+      function renderAchievements() {
         const all = cabinetData?.organization_achievements || [];
         const received = cabinetData?.achievements || [];
         const receivedIds = new Set(received.map((item) => String(item.achievement_id)));
-        const items = tab === "received" ? all.filter((item) => receivedIds.has(String(item.id))) : all;
-        document.querySelectorAll("[data-cabinet-achievement-tab]").forEach((button) => button.classList.toggle("active", button.dataset.cabinetAchievementTab === tab));
-        achievementsList.innerHTML = items.length ? items.map((item) => `
+        const cards = (items) => items.length ? items.map((item) => `
           <article class="cabinet-achievement-card ${receivedIds.has(String(item.id)) ? "is-earned" : ""}">
-            <b>${escapeHtml(item.name)}</b>
-            <span>${receivedIds.has(String(item.id)) ? "Выполнено" : "Не выполнено"}</span>
+            <button type="button" class="cabinet-achievement-button" data-cabinet-achievement="${item.id}">
+              <b>${escapeHtml(item.name)}</b>
+            </button>
           </article>
-        `).join("") : `<p class="cabinet-history-empty">${tab === "received" ? "Полученных достижений пока нет." : "Достижений пока нет."}</p>`;
+        `).join("") : '<p class="cabinet-history-empty">Нет достижений.</p>';
+        const completed = all.filter((item) => receivedIds.has(String(item.id)));
+        achievementsList.innerHTML = `
+          <section class="cabinet-achievement-column">
+            <h2>Все</h2>
+            <div class="cabinet-achievement-column-list">${cards(all)}</div>
+          </section>
+          <section class="cabinet-achievement-column">
+            <h2>Выполненные</h2>
+            <div class="cabinet-achievement-column-list">${cards(completed)}</div>
+          </section>
+        `;
+      }
+
+      function openAchievementModal(item) {
+        const photoUrl = achievementPhotoUrl(item);
+        achievementContent.innerHTML = `
+          ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="${escapeHtml(item.name)}" class="cabinet-achievement-modal-photo">` : ""}
+          <h4 class="cabinet-achievement-modal-title">${escapeHtml(item.name)}</h4>
+        `;
+        achievementModal.hidden = false;
       }
 
       function setCabinetTab(tab) {
@@ -474,7 +506,7 @@
         document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
           view.hidden = view.dataset.cabinetView !== tab;
         });
-        if (tab === "achievements") renderAchievements("received");
+        if (tab === "achievements") renderAchievements();
       }
 
       function openCabinetMenu() {
@@ -618,10 +650,6 @@
         });
       });
 
-      document.querySelectorAll("[data-cabinet-achievement-tab]").forEach((button) => {
-        button.addEventListener("click", () => renderAchievements(button.dataset.cabinetAchievementTab));
-      });
-
       document.addEventListener("click", async (event) => {
         if (event.target.closest("[data-cabinet-menu-open]")) {
           openCabinetMenu();
@@ -642,6 +670,18 @@
 
         if (event.target.closest("[data-cabinet-notifications-close]") || event.target.matches("[data-cabinet-notifications-modal]")) {
           notificationsModal.hidden = true;
+          return;
+        }
+
+        const achievementButton = event.target.closest("[data-cabinet-achievement]");
+        if (achievementButton) {
+          const achievement = (cabinetData?.organization_achievements || []).find((item) => String(item.id) === achievementButton.dataset.cabinetAchievement);
+          if (achievement) openAchievementModal(achievement);
+          return;
+        }
+
+        if (event.target.closest("[data-cabinet-achievement-close]") || event.target.matches("[data-cabinet-achievement-modal]")) {
+          achievementModal.hidden = true;
           return;
         }
 
