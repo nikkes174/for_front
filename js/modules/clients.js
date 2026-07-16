@@ -422,14 +422,38 @@ function lastLoyaltyAction(history) {
 
 function bonusOperationDetails(item, visits) {
   const reason = item.reason || `${item.bonus_type || "bonus"} #${item.id}`;
-  if (item.target_type !== "client_history_visit") return reason;
+  const manualOperation = item.usage_restrictions?.manual_operation;
+  if (manualOperation?.actor_id != null) {
+    const actor = state.users.find((user) => String(user.id) === String(manualOperation.actor_id));
+    const eventNames = {
+      accrual: "\u041d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u0435 \u0431\u0430\u043b\u043b\u043e\u0432",
+      write_off: "\u0421\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0431\u0430\u043b\u043b\u043e\u0432",
+      expiration: "\u0421\u0433\u043e\u0440\u0430\u043d\u0438\u0435 \u0431\u0430\u043b\u043b\u043e\u0432",
+    };
+    return [
+      `\u0421\u043e\u0431\u044b\u0442\u0438\u0435: ${eventNames[item.transaction_type] || item.transaction_type || ""}`,
+      `\u041f\u0440\u0438\u0447\u0438\u043d\u0430: ${reason}`,
+      `\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c: ${manualOperation.actor_name || (actor ? displayUser(actor) : "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d")}`,
+    ].join(" \u00b7 ");
+  }
+  const accrualDetails = item.usage_restrictions?.accrual_details;
+  const details = accrualDetails ? [
+    accrualDetails.level || item.client_level ? `\u0423\u0440\u043e\u0432\u0435\u043d\u044c: ${accrualDetails.level || item.client_level}` : "",
+    Array.isArray(accrualDetails.rules) && accrualDetails.rules.length ? `\u041f\u0440\u0430\u0432\u0438\u043b\u0430: ${accrualDetails.rules.join(", ")}` : "",
+    `\u0422\u043e\u0432\u0430\u0440\u044b: ${money(accrualDetails.product_bonus || 0)}`,
+    `\u0423\u0441\u043b\u0443\u0433\u0438: ${money(accrualDetails.service_bonus || 0)}`,
+  ].filter(Boolean) : [];
+  const levelDetails = ["level_assignment", "level_transition"].includes(item.target_type) && item.client_level
+    ? [`\u0423\u0440\u043e\u0432\u0435\u043d\u044c: ${item.client_level}`]
+    : [];
+  if (item.target_type !== "client_history_visit") return [reason, ...levelDetails, ...details].join(" \u00b7 ");
   const visit = (visits || []).map((entry) => entry.visit || entry)
     .find((entry) => String(entry.id) === String(item.target_id));
-  if (!visit) return `${reason} · Визит #${item.target_id}`;
+  if (!visit) return [reason, `\u0412\u0438\u0437\u0438\u0442 #${item.target_id}`, ...details].join(" \u00b7 ");
   const master = state.users.find((user) => String(user.id) === String(visit.employee_id));
-  return [reason, dateTime(visit.visit_at), master ? `Мастер: ${displayUser(master)}` : `Мастер #${visit.employee_id || "-"}`]
+  return [reason, dateTime(visit.visit_at), master ? `\u041c\u0430\u0441\u0442\u0435\u0440: ${displayUser(master)}` : `\u041c\u0430\u0441\u0442\u0435\u0440 #${visit.employee_id || "-"}`, ...details]
     .filter(Boolean)
-    .join(" · ");
+    .join(" \u00b7 ");
 }
 
 function readonly(label, value) {
@@ -668,8 +692,7 @@ function visitSelectedItemsMarkup(name, branchId, type, value = "") {
   return visitSelectedItems(value).map((selected) => {
     const item = items.find((candidate) => String(candidate.title || "").trim().toLowerCase() === selected.name.toLowerCase());
     const stock = type === "product" ? productStock(branchId, item) : null;
-    const max = stock === null ? "" : ` max="${escapeHtml(stock)}"`;
-    return `<div class="visit-selected-item"><span>${escapeHtml(selected.name)}</span>${type === "product" ? `<input type="number" min="1"${max} value="${escapeHtml(selected.quantity)}" data-visit-item-quantity data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Количество">` : ""}<button type="button" class="ghost" data-visit-remove-item data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Удалить">×</button></div>`;
+    return `<div class="visit-selected-item"><span>${escapeHtml(selected.name)}</span>${type === "product" ? `<input type="number" min="1" value="${escapeHtml(selected.quantity)}" data-visit-item-quantity data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Количество">` : ""}<button type="button" class="ghost" data-visit-remove-item data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Удалить">×</button></div>`;
   }).join("");
 }
 
@@ -679,7 +702,7 @@ function visitItemPrice(item) {
 
 function visitSelectedItemsTotal(branchId, type, value = "") {
   const selected = visitSelectedItems(value);
-  if (!selected.length) return null;
+  if (!selected.length) return 0;
   const items = branchProductItems(branchId, type);
   let total = 0;
   for (const { name, quantity } of selected) {
@@ -810,14 +833,7 @@ function addVisitSelectedItem(form, name) {
     .find((candidate) => String(candidate.title || "").trim().toLowerCase() === value.toLowerCase());
   if (!value || !item) return false;
   const quantity = 1;
-  const stock = productStock(form.elements.branch_id?.value, item);
   const selectedItems = visitSelectedItems(selected.value);
-  const alreadySelected = selectedItems.find((entry) => entry.name.toLowerCase() === value.toLowerCase())?.quantity || 0;
-  if (config.type === "product" && stock !== null && alreadySelected + quantity > stock) {
-    search.setCustomValidity(`Доступно на складе: ${stock}`);
-    search.reportValidity();
-    return false;
-  }
   search.setCustomValidity("");
   const names = selectedItems.filter((entry) => entry.name);
   const existing = names.find((entry) => entry.name.toLowerCase() === value.toLowerCase());
@@ -1001,6 +1017,19 @@ async function loadClientDetails(client, orgId) {
     api.bonusHistory(client.id).catch(() => []),
     api.pushStatus(orgId, client.id).catch(() => ({ enabled: false })),
   ]);
+  const manualActorIds = [...new Set((bonusHistory || [])
+    .map((item) => item.usage_restrictions?.manual_operation?.actor_id)
+    .filter((actorId) => actorId != null && !state.users.some((user) => String(user.id) === String(actorId))))];
+  if (manualActorIds.length) {
+    const missingActors = await Promise.all(manualActorIds.map((actorId) => api.user(actorId).catch(() => null)));
+    state.users = [...state.users, ...missingActors.filter(Boolean)];
+  }
+  const balancesByType = await Promise.all((bonusTypes || []).map((bonusType) => (
+    api.bonusBalance(client.id, bonusType.code).catch(() => null)
+  )));
+  const selectedBonusBalance = balancesByType
+    .filter(Boolean)
+    .sort((left, right) => Number(right.balance || 0) - Number(left.balance || 0))[0] || bonusBalance;
   const clientWithPushState = {
     ...client,
     push_notifications_enabled: !!pushStatus?.enabled,
@@ -1019,7 +1048,7 @@ async function loadClientDetails(client, orgId) {
     clientBranches: clientBranches?.length ? clientBranches : branchesFromVisits(visits),
     bonusTypes,
     bonusLevels,
-    bonusBalance,
+    bonusBalance: selectedBonusBalance,
     bonusHistory,
   };
 }
@@ -1132,7 +1161,7 @@ function modal(client) {
           </div>
           <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
             ${selectField("Операция", "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), state.bonusTransactionType)}
-            ${selectField("Тип бонусов", "bonus_type", bonusTypeOptions(client.bonusTypes), "")}
+            ${selectField("Тип бонусов", "bonus_type", bonusTypeOptions(client.bonusTypes, loyaltyBonusType), loyaltyBonusType)}
             <label><span>Сумма</span><input name="amount" type="number" min="1" value="1"></label>
             <label><span>Причина</span><input name="reason"></label>
             <button class="primary">Выполнить</button>
@@ -1452,10 +1481,7 @@ export function bindClients(root, ctx) {
       const hidden = form?.elements[name];
       if (!form || !hidden) return;
       const selected = visitSelectedItems(hidden.value);
-      const item = branchProductItems(form.elements.branch_id?.value, "product")
-        .find((candidate) => String(candidate.title || "").trim().toLowerCase() === String(input.dataset.visitItemTitle || "").trim().toLowerCase());
-      const stock = productStock(form.elements.branch_id?.value, item);
-      const quantity = Math.max(1, Math.min(Number(input.value || 1), stock === null ? Number.MAX_SAFE_INTEGER : stock));
+      const quantity = Math.max(1, Number(input.value || 1));
       const entry = selected.find((candidate) => candidate.name.toLowerCase() === String(input.dataset.visitItemTitle || "").trim().toLowerCase());
       if (!entry) return;
       entry.quantity = quantity;
@@ -1528,12 +1554,6 @@ export function bindClients(root, ctx) {
       state.visitDraft.employee_id = "";
       syncVisitCreateForm(root);
     }
-  });
-
-  root.addEventListener("input", (event) => {
-    if (!event.target.matches("[data-visit-item-quantity]")) return;
-    const max = Number(event.target.max);
-    if (Number.isFinite(max) && max >= 0 && Number(event.target.value) > max) event.target.value = String(max);
   });
 
   root.addEventListener("submit", async (event) => {
@@ -1615,7 +1635,7 @@ export function bindClients(root, ctx) {
         const body = {
           client_id: state.selectedClient.id,
           organization_id: ctx.org.id,
-          bonus_type: data.bonus_type,
+          bonus_type: data.bonus_type || state.selectedClient.bonusBalance?.bonus_type || state.selectedClient.bonusTypes?.[0]?.code || "",
           amount: Number(data.amount || 0),
           reason: data.reason,
         };

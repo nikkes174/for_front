@@ -394,6 +394,10 @@
   justify-content: flex-end;
 }
 
+[data-cabinet-actions][hidden] {
+  display: none !important;
+}
+
 .form-actions button {
   background: #2563eb;
   color: #fff;
@@ -630,6 +634,32 @@
 .profile-form .field select:focus {
   border-color: #111827;
   box-shadow: 0 0 0 3px rgb(17 24 39 / 10%);
+}
+
+.cabinet-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cabinet-edit-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cabinet-edit-button:hover {
+  border-color: #111827;
+  background: #f3f4f6;
 }
 
 .form-actions button {

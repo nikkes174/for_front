@@ -834,7 +834,10 @@ function rulesSection(ctx, rules, selectedClient, bonusTypes, levels) {
   return `
     <div class="subpanel">${titleWithHint(L.rulesTitle, L.rulesHint)}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${accrualRuleTypeField()}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${accrualUnitField("amount", "0", loyaltyState.ruleExtras.level_params)}${field(L.termDays, "expires_in_days", "", 'type="number"')}${select(L.clientLevel, "client_level", levelOptions(levels, loyaltyState.ruleExtras.client_level), loyaltyState.ruleExtras.client_level).replace('name="client_level"', 'name="client_level" data-optional="true"')}<button class="primary" disabled>${L.createRule}</button><p data-message></p></form>` : ""}
-      <table><tbody>${rows(bonusRules, L.rulesEmpty, (item) => `<tr><td>${editButton("rule", item, item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`)}</tbody></table>
+      <table><tbody>${rows(bonusRules, L.rulesEmpty, (item) => {
+        const label = item.client_level ? `${item.name} (${L.clientLevel}: ${item.client_level})` : item.name;
+        return `<tr><td>${editButton("rule", item, label)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
+      })}</tbody></table>
     </div>
     ${transitionRulesSection(ctx, rules, levels, selectedClient)}`;
 }

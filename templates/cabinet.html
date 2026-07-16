@@ -28,21 +28,21 @@
         <div class="cabinet-panel" data-cabinet-view="profile">
           <div class="cabinet-heading">
             <p>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</p>
-            <h1 data-cabinet-title>&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</h1>
+            <div class="cabinet-title-row"><h1 data-cabinet-title>&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</h1><button type="button" class="cabinet-edit-button" data-cabinet-edit aria-label="&#1048;&#1079;&#1084;&#1077;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;" title="&#1048;&#1079;&#1084;&#1077;&#1085;&#1080;&#1090;&#1100;">&#9998;</button></div>
           </div>
 
           <form class="profile-form" data-cabinet-form>
-            <label class="field" data-cabinet-field="last_name"><span>&#1060;&#1072;&#1084;&#1080;&#1083;&#1080;&#1103; *</span><input name="last_name" type="text" required autocomplete="family-name" /></label>
-            <label class="field" data-cabinet-field="first_name"><span>&#1048;&#1084;&#1103; *</span><input name="first_name" type="text" required autocomplete="given-name" /></label>
-            <label class="field" data-cabinet-field="middle_name"><span>&#1054;&#1090;&#1095;&#1077;&#1089;&#1090;&#1074;&#1086;</span><input name="middle_name" type="text" autocomplete="additional-name" /></label>
-            <label class="field" data-cabinet-field="phone"><span>&#1053;&#1086;&#1084;&#1077;&#1088; &#1090;&#1077;&#1083;&#1077;&#1092;&#1086;&#1085;&#1072; *</span><input name="phone" type="tel" required autocomplete="tel" /></label>
-            <label class="field" data-cabinet-field="gender"><span>&#1055;&#1086;&#1083; *</span><select name="gender" required><option value="">&#1042;&#1099;&#1073;&#1077;&#1088;&#1080;&#1090;&#1077; &#1087;&#1086;&#1083;</option><option value="male">&#1052;&#1091;&#1078;&#1089;&#1082;&#1086;&#1081;</option><option value="female">&#1046;&#1077;&#1085;&#1089;&#1082;&#1080;&#1081;</option></select></label>
+            <label class="field" data-cabinet-field="last_name"><span>&#1060;&#1072;&#1084;&#1080;&#1083;&#1080;&#1103; *</span><input name="last_name" type="text" required autocomplete="family-name" disabled /></label>
+            <label class="field" data-cabinet-field="first_name"><span>&#1048;&#1084;&#1103; *</span><input name="first_name" type="text" required autocomplete="given-name" disabled /></label>
+            <label class="field" data-cabinet-field="middle_name"><span>&#1054;&#1090;&#1095;&#1077;&#1089;&#1090;&#1074;&#1086;</span><input name="middle_name" type="text" autocomplete="additional-name" disabled /></label>
+            <label class="field" data-cabinet-field="phone"><span>&#1053;&#1086;&#1084;&#1077;&#1088; &#1090;&#1077;&#1083;&#1077;&#1092;&#1086;&#1085;&#1072; *</span><input name="phone" type="tel" required autocomplete="tel" disabled /></label>
+            <label class="field" data-cabinet-field="gender"><span>&#1055;&#1086;&#1083; *</span><select name="gender" required disabled><option value="">&#1042;&#1099;&#1073;&#1077;&#1080;&#1090;&#1077; &#1087;&#1086;&#1083;</option><option value="male">&#1052;&#1091;&#1078;&#1089;&#1082;&#1086;&#1081;</option><option value="female">&#1046;&#1077;&#1085;&#1089;&#1082;&#1080;&#1081;</option></select></label>
             <label class="field" data-cabinet-field="telegram_id" hidden><span>Telegram ID</span><input name="telegram_id" type="text" inputmode="numeric" disabled /></label>
             <label class="field" data-cabinet-field="max_id" hidden><span>Max ID</span><input name="max_id" type="text" inputmode="numeric" disabled /></label>
             <label class="field" data-cabinet-field="vk_id" hidden><span>VK ID</span><input name="vk_id" type="text" inputmode="numeric" disabled /></label>
-            <label class="field wide" data-cabinet-field="email"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
+            <label class="field wide" data-cabinet-field="email"><span>Email</span><input name="email" type="email" autocomplete="email" disabled /></label>
             <p class="cabinet-message" data-cabinet-message></p>
-            <div class="form-actions"><button type="submit" data-cabinet-submit>&#1057;&#1086;&#1093;&#1088;&#1072;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</button></div>
+            <div class="form-actions" data-cabinet-actions hidden><button type="submit" data-cabinet-submit>&#1057;&#1086;&#1093;&#1088;&#1072;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</button></div>
           </form>
           <section data-cabinet-history-section>
             <h2 class="cabinet-subtitle">&#1048;&#1089;&#1090;&#1086;&#1088;&#1080;&#1103;</h2>
@@ -527,6 +527,21 @@
         if (cabinetTitle) cabinetTitle.textContent = enabled ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u0430" : "\u041c\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435";
         if (historySection) historySection.hidden = enabled;
         submitButton.textContent = enabled ? "\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u0441\u044f" : "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435";
+        form.dataset.cabinetRegistration = enabled ? "true" : "false";
+        setCabinetEditMode(enabled);
+      }
+
+      function setCabinetEditMode(enabled) {
+        const registration = form.dataset.cabinetRegistration === "true";
+        const editing = registration || enabled;
+        const lockedFields = new Set(["telegram_id", "max_id", "vk_id"]);
+        form.querySelectorAll("[data-cabinet-field]").forEach((field) => {
+          field.querySelectorAll("input, select, textarea").forEach((control) => {
+            control.disabled = field.hidden || lockedFields.has(field.dataset.cabinetField) || !editing;
+          });
+        });
+        document.querySelector("[data-cabinet-actions]").hidden = !editing;
+        document.querySelector("[data-cabinet-edit]").hidden = registration || editing;
       }
 
       function applyRegistrationFields(fields) {
@@ -546,6 +561,7 @@
             if (!isVisible) control.required = false;
           });
         });
+        setCabinetEditMode(form.dataset.cabinetRegistration === "true");
       }
 
       function textValue(data, name) {
@@ -653,6 +669,11 @@
       document.addEventListener("click", async (event) => {
         if (event.target.closest("[data-cabinet-menu-open]")) {
           openCabinetMenu();
+          return;
+        }
+
+        if (event.target.closest("[data-cabinet-edit]")) {
+          setCabinetEditMode(true);
           return;
         }
 
@@ -766,6 +787,7 @@
           if (!currentClient && !token) currentClient = result || null;
           renderHistorySections(currentCardSections);
           setMessage("\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.", "success");
+          if (!token) setCabinetEditMode(false);
           submitButton.disabled = false;
         } catch (error) {
           setMessage(error.message, "error");
