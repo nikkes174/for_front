@@ -207,7 +207,7 @@ function cabinetPage() {
 }
 
 const DEFAULT_CABINET_FIELDS = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
-const DEFAULT_CABINET_CARD_SECTIONS = ["client_name", "bonus_cashback", "client_level", "client_visits", "client_chat"];
+const DEFAULT_CABINET_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
 let cabinetCardSections = DEFAULT_CABINET_CARD_SECTIONS;
 let cabinetClient = null;
 let cabinetData = null;
@@ -224,8 +224,9 @@ function cabinetSectionTitle(section) {
   if (section === "client_name") return "\u0424\u0418\u041e";
   if (section === "client_level") return "\u0423\u0440\u043e\u0432\u0435\u043d\u044c";
   if (section === "client_visits") return "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0438\u0437\u0438\u0442\u043e\u0432";
+  if (section === "client_personal_link") return "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u0430";
   if (section === "client_chat") return "\u0427\u0430\u0442";
-  if (section.startsWith("bonus_")) return cabinetBonusName(section);
+  if (section.startsWith("bonus_")) return "\u0411\u043e\u043d\u0443\u0441\u044b";
   return section;
 }
 
@@ -255,10 +256,19 @@ function cabinetVisitStatus(status) {
 }
 
 function cabinetBonusName(section) {
-  const code = section.replace(/^bonus_/, "") || "cashback";
-  if (code === "cashback") return "\u041a\u0435\u0448\u0431\u044d\u043a";
+  const code = cabinetBonusBalance(section)?.bonus_type || section.replace(/^bonus_/, "") || "cashback";
   const type = (cabinetData?.bonus_types || []).find((item) => item.code === code);
-  return type?.name || code;
+  return type?.name || (code === "cashback" ? "\u041a\u0435\u0448\u0431\u044d\u043a" : code);
+}
+
+function cabinetBonusBalance(section) {
+  const code = section.replace(/^bonus_/, "") || "cashback";
+  const balances = cabinetData?.bonus_balances || [];
+  const exact = balances.find((item) => (item.bonus_type || "cashback") === code);
+  if (code !== "cashback") return exact;
+  return balances
+    .filter((item) => item.bonus_type && item.bonus_type !== "cashback")
+    .sort((left, right) => Number(right.balance || 0) - Number(left.balance || 0))[0] || exact;
 }
 
 function cabinetVisitItemName(item, kind) {
@@ -326,7 +336,7 @@ function cabinetSectionBody(section) {
   const client = cabinetData?.client || cabinetClient;
   if (section === "client_name") return `<b>${escapeHtml(cabinetName(client))}</b>`;
   if (section === "client_level") {
-    const level = client?.client_level || cabinetData?.metric?.client_level || cabinetData?.metric?.loyalty_level || "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
+    const level = cabinetData?.client_level || client?.client_level || cabinetData?.metric?.client_level || cabinetData?.metric?.loyalty_level || "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
     return `<b>${escapeHtml(level)}</b>`;
   }
   if (section === "client_visits") {
@@ -341,11 +351,20 @@ function cabinetSectionBody(section) {
       </div>
     `;
   }
+  if (section === "client_personal_link") {
+    const referralLink = cabinetData?.referral_link || "";
+    const invitesCount = Number(cabinetData?.referral_invites_count || 0);
+    return `
+      ${referralLink
+        ? `<div class="inline-form compact"><a href="${escapeHtml(referralLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(referralLink)}</a><button type="button" class="ghost" data-cabinet-copy-referral>\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button></div>`
+        : `<p class="cabinet-history-empty">\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430 \u043f\u043e\u043a\u0430 \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d\u0430.</p>`}
+      <p>\u041f\u0440\u0438\u0433\u043b\u0430\u0448\u0451\u043d\u043d\u044b\u0445: <b>${escapeHtml(Number.isFinite(invitesCount) ? invitesCount : 0)}</b></p>
+    `;
+  }
   if (section === "client_chat") return `<p class="cabinet-history-empty">\u0427\u0430\u0442 \u043f\u043e\u043a\u0430 \u043d\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d.</p>`;
   if (section.startsWith("bonus_")) {
-    const code = section.replace(/^bonus_/, "") || "cashback";
-    const balance = (cabinetData?.bonus_balances || []).find((item) => (item.bonus_type || "cashback") === code);
-    return `<b>${escapeHtml(cabinetMoney(balance?.balance || 0))}</b><span>\u0431\u0430\u043b\u043b\u043e\u0432</span>`;
+    const balance = cabinetBonusBalance(section);
+    return `<b>${escapeHtml(cabinetMoney(balance?.balance || 0))}</b><span>${escapeHtml(cabinetBonusName(section))}</span>`;
   }
   return "";
 }
@@ -1132,6 +1151,7 @@ root.addEventListener("submit", async (event) => {
       max_id: profile.max_id,
       vk_id: profile.vk_id,
       email: profile.email,
+      referral_code: new URLSearchParams(window.location.search).get("referral_code") || null,
     } : profile;
     const response = await fetch(endpoint, {
       method: token ? "POST" : "PATCH",
@@ -1244,6 +1264,16 @@ root.addEventListener("click", async (event) => {
       if (status) status.textContent = error.message || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f.";
     } finally {
       pushToggle.disabled = false;
+    }
+    return;
+  }
+
+  const referralCopy = event.target.closest("[data-cabinet-copy-referral]");
+  if (referralCopy) {
+    const referralLink = cabinetData?.referral_link || "";
+    if (referralLink) {
+      await navigator.clipboard.writeText(referralLink);
+      referralCopy.textContent = "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e";
     }
     return;
   }

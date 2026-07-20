@@ -765,6 +765,7 @@ function humanizeCode(value) {
     "visit.completed": "Завершение визита",
     "visit.complete": "Завершение визита",
     "visit.cancelled": "Отмена визита",
+    "referral.visit": "Визит реферала",
     "visit.cancel": "Отмена визита",
     visit_completed: "Завершение визита",
     visit_complete: "Завершение визита",
@@ -1013,6 +1014,10 @@ function eventVisitDetailsHtml(item) {
   }
   if (payload.paid_amount !== undefined && payload.paid_amount !== null) {
     fields.push(`Оплачено: ${escapeHtml(payload.paid_amount)}`);
+  }
+  if (payload.program_name) fields.push(`Реферальная программа: ${escapeHtml(payload.program_name)}`);
+  if (payload.bonus_amount !== undefined && payload.bonus_amount !== null) {
+    fields.push(`Начислено: ${escapeHtml(payload.bonus_amount)} баллов`);
   }
   return fields.filter(Boolean).join(" · ") || no;
 }

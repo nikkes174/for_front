@@ -315,6 +315,20 @@ function selectedClientAuthLinkForm() {
   `;
 }
 
+function selectedClientReferralLinkBlock(source) {
+  const registrationToken = state.registrationLink?.token || "";
+  const registrationAddress = state.registrationLink?.url || state.registrationLink?.path || window.location.origin;
+  if (!source?.referral_code || !registrationToken) return "";
+  const registrationOrigin = new URL(registrationAddress, window.location.origin).origin;
+  const url = new URL(
+    `/auth/client-auth-links/${encodeURIComponent(registrationToken)}/open`,
+    registrationOrigin,
+  );
+  url.searchParams.set("referral_code", source.referral_code);
+  const referralLink = url.toString();
+  return `<div class="subpanel"><h3>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</h3><div class="inline-form compact"><label><span>\u0421\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost" data-copy-auth-link="${escapeHtml(referralLink)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button><label class="checkbox"><input type="checkbox" data-client-referral-active="${escapeHtml(source.id)}" ${source.is_active ? "checked" : ""}> \u0410\u043a\u0442\u0438\u0432\u043d\u0430</label><label class="checkbox"><input type="checkbox" data-client-referral-one-time="${escapeHtml(source.id)}" ${source.one_time_accrual !== false ? "checked" : ""}> \u0420\u0430\u0437\u043e\u0432\u043e\u0435 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u0435</label></div></div>`;
+}
+
 function enabledRegistrationFields(orgId) {
   try {
     const saved = JSON.parse(localStorage.getItem(`${REGISTRATION_FIELDS_STORAGE_PREFIX}${orgId || "default"}`) || "null");
@@ -1002,7 +1016,7 @@ function clientCardData(client) {
 }
 
 async function loadClientDetails(client, orgId) {
-  const [profile, metric, visits, accounts, categories, achievements, additionalFields, clientBranches, bonusTypes, bonusLevels, bonusBalance, bonusHistory, pushStatus] = await Promise.all([
+  const [profile, metric, visits, accounts, categories, achievements, additionalFields, clientBranches, bonusTypes, bonusLevels, bonusBalance, bonusHistory, pushStatus, referralSources, referralStats] = await Promise.all([
     api.clientProfile(client.id, orgId).catch(() => null),
     api.clientProfileMetric(client.id).catch(() => null),
     api.clientHistoryVisits(client.id).catch(() => []),
@@ -1016,7 +1030,24 @@ async function loadClientDetails(client, orgId) {
     api.bonusBalance(client.id).catch(() => null),
     api.bonusHistory(client.id).catch(() => []),
     api.pushStatus(orgId, client.id).catch(() => ({ enabled: false })),
+    api.referralSources().catch(() => []),
+    api.referralStats(client.id).catch(() => ({ invites_count: 0 })),
   ]);
+  const referralProgram = (referralSources || []).find((item) => !item.referrer_client_id && item.is_active) || null;
+  let personalReferralSource = (referralSources || []).find((item) => String(item.referrer_client_id) === String(client.id)) || null;
+  if (!personalReferralSource && referralProgram) {
+    personalReferralSource = await api.createReferralSource({
+      referrer_client_id: client.id,
+      program_source_id: referralProgram.id,
+      program_name: referralProgram.program_name,
+      is_active: true,
+    }).catch(() => null);
+  } else if (personalReferralSource && referralProgram && String(personalReferralSource.program_source_id || "") !== String(referralProgram.id)) {
+    personalReferralSource = await api.updateReferralSource(personalReferralSource.id, {
+      program_source_id: referralProgram.id,
+      program_name: referralProgram.program_name,
+    }).catch(() => personalReferralSource);
+  }
   const manualActorIds = [...new Set((bonusHistory || [])
     .map((item) => item.usage_restrictions?.manual_operation?.actor_id)
     .filter((actorId) => actorId != null && !state.users.some((user) => String(user.id) === String(actorId))))];
@@ -1050,6 +1081,8 @@ async function loadClientDetails(client, orgId) {
     bonusLevels,
     bonusBalance: selectedBonusBalance,
     bonusHistory,
+    personalReferralSource,
+    referralStats,
   };
 }
 
@@ -1115,6 +1148,7 @@ function modal(client) {
           <h3>\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u0441\u0441\u044b\u043b\u043a\u0438</h3>
           ${selectedClientAuthLinkForm()}
         </div>
+        ${selectedClientReferralLinkBlock(state.selectedClient.personalReferralSource)}
         <div class="subpanel">
           <h3>Сервис истории</h3>
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
@@ -1146,6 +1180,7 @@ function modal(client) {
             ${readonly("Сертификаты", accounts ? money(accounts.totals?.certificate_balance) : "")}
             ${readonly("Визитов по абонементам", accounts?.totals?.subscription_visits_left)}
             ${readonly("Бонусы", accounts ? money(accounts.totals?.bonus_balance) : "")}
+            ${readonly("Приглашённых клиентов", client.referralStats?.invites_count ?? 0)}
           </div>
         </div>
         <div class="subpanel">
@@ -1773,6 +1808,22 @@ export function bindClients(root, ctx) {
         await navigator.clipboard.writeText(link);
         copyAuthLinkButton.textContent = "Скопировано";
       }
+      return;
+    }
+
+    const referralActiveToggle = event.target.closest("[data-client-referral-active]");
+    if (referralActiveToggle && state.selectedClient?.personalReferralSource) {
+      const source = await api.updateReferralSource(referralActiveToggle.dataset.clientReferralActive, { is_active: referralActiveToggle.checked });
+      state.selectedClient.personalReferralSource = source;
+      ctx.reload();
+      return;
+    }
+
+    const referralOneTimeToggle = event.target.closest("[data-client-referral-one-time]");
+    if (referralOneTimeToggle && state.selectedClient?.personalReferralSource) {
+      const source = await api.updateReferralSource(referralOneTimeToggle.dataset.clientReferralOneTime, { one_time_accrual: referralOneTimeToggle.checked });
+      state.selectedClient.personalReferralSource = source;
+      ctx.reload();
       return;
     }
 
