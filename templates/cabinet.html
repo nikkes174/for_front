@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Личный кабинет" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/auth/pwa-manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</title>
     <link rel="stylesheet" href="/css/styles.css" />
@@ -35,7 +35,7 @@
             <label class="field" data-cabinet-field="last_name"><span>&#1060;&#1072;&#1084;&#1080;&#1083;&#1080;&#1103; *</span><input name="last_name" type="text" required autocomplete="family-name" disabled /></label>
             <label class="field" data-cabinet-field="first_name"><span>&#1048;&#1084;&#1103; *</span><input name="first_name" type="text" required autocomplete="given-name" disabled /></label>
             <label class="field" data-cabinet-field="middle_name"><span>&#1054;&#1090;&#1095;&#1077;&#1089;&#1090;&#1074;&#1086;</span><input name="middle_name" type="text" autocomplete="additional-name" disabled /></label>
-            <label class="field" data-cabinet-field="phone"><span>&#1053;&#1086;&#1084;&#1077;&#1088; &#1090;&#1077;&#1083;&#1077;&#1092;&#1086;&#1085;&#1072; *</span><input name="phone" type="tel" required autocomplete="tel" disabled /></label>
+            <label class="field" data-cabinet-field="phone"><span>&#1053;&#1086;&#1084;&#1077;&#1088; &#1090;&#1077;&#1083;&#1077;&#1092;&#1086;&#1085;&#1072; *</span><input name="phone" type="tel" required autocomplete="tel" data-phone-input oninput="let d=this.value.replace(/\D/g,'');if(d.length===10)d='7'+d;if(d[0]==='8')d='7'+d.slice(1);this.value=d?'+'+d:''" disabled /></label>
             <label class="field" data-cabinet-field="gender"><span>&#1055;&#1086;&#1083; *</span><select name="gender" required disabled><option value="">&#1042;&#1099;&#1073;&#1077;&#1080;&#1090;&#1077; &#1087;&#1086;&#1083;</option><option value="male">&#1052;&#1091;&#1078;&#1089;&#1082;&#1086;&#1081;</option><option value="female">&#1046;&#1077;&#1085;&#1089;&#1082;&#1080;&#1081;</option></select></label>
             <label class="field" data-cabinet-field="telegram_id" hidden><span>Telegram ID</span><input name="telegram_id" type="text" inputmode="numeric" disabled /></label>
             <label class="field" data-cabinet-field="max_id" hidden><span>Max ID</span><input name="max_id" type="text" inputmode="numeric" disabled /></label>
@@ -120,6 +120,12 @@
       let selectedVisit = null;
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
+
+      if (window.location.hash.startsWith("#pwa_session=")) {
+        const pwaSessionToken = decodeURIComponent(window.location.hash.slice("#pwa_session=".length));
+        if (pwaSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, pwaSessionToken);
+        history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      }
 
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

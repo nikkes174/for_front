@@ -326,7 +326,7 @@ function selectedClientReferralLinkBlock(source) {
   );
   url.searchParams.set("referral_code", source.referral_code);
   const referralLink = url.toString();
-  return `<div class="subpanel"><h3>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</h3><div class="inline-form compact"><label><span>\u0421\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost" data-copy-auth-link="${escapeHtml(referralLink)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button><label class="checkbox"><input type="checkbox" data-client-referral-active="${escapeHtml(source.id)}" ${source.is_active ? "checked" : ""}> \u0410\u043a\u0442\u0438\u0432\u043d\u0430</label><label class="checkbox"><input type="checkbox" data-client-referral-one-time="${escapeHtml(source.id)}" ${source.one_time_accrual !== false ? "checked" : ""}> \u0420\u0430\u0437\u043e\u0432\u043e\u0435 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u0435</label></div></div>`;
+  return `<div class="client-referral-link-block"><h4>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</h4><div class="inline-form compact"><label><span>\u0421\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost" data-copy-auth-link="${escapeHtml(referralLink)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button><label class="checkbox"><input type="checkbox" data-client-referral-active="${escapeHtml(source.id)}" ${source.is_active ? "checked" : ""}> \u0410\u043a\u0442\u0438\u0432\u043d\u0430</label><label class="checkbox"><input type="checkbox" data-client-referral-one-time="${escapeHtml(source.id)}" ${source.one_time_accrual !== false ? "checked" : ""}> \u0420\u0430\u0437\u043e\u0432\u043e\u0435 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u0435</label></div></div>`;
 }
 
 function enabledRegistrationFields(orgId) {
@@ -1148,7 +1148,6 @@ function modal(client) {
           <h3>\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u0441\u0441\u044b\u043b\u043a\u0438</h3>
           ${selectedClientAuthLinkForm()}
         </div>
-        ${selectedClientReferralLinkBlock(state.selectedClient.personalReferralSource)}
         <div class="subpanel">
           <h3>Сервис истории</h3>
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
@@ -1186,14 +1185,13 @@ function modal(client) {
         <div class="subpanel">
           <h3>Бонусные операции</h3>
           <div class="modal-grid">
-            ${readonly("Баланс бонусов", client.bonusBalance ? money(client.bonusBalance.balance) : "")}
-          </div>
-          <div class="modal-grid">
             <div class="client-level-field"><div class="client-level-label"><span>Уровень клиента</span><label class="checkbox"><input type="checkbox" data-client-auto-level-transition-disabled ${autoLevelTransitionDisabled ? "checked" : ""}> Запрет автоперевода</label></div><select data-client-level-select>${[{ value: "", label: "Без уровня" }, ...(client.bonusLevels || []).map((level) => ({ value: level.name, label: level.name }))].map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === loyaltyLevel ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></div>
             ${readonly("Тип бонусов", bonusTypeName(client.bonusTypes, loyaltyBonusType))}
-            <div class="client-level-save-field">${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}<button type="button" class="primary" data-client-level-save disabled>Сохранить</button></div>
+            ${readonly("Последнее действие", lastLoyaltyAction(client.bonusHistory))}
             ${readonly("Достижения", (client.achievements || []).map((item) => item.name).join(", "))}
           </div>
+          ${selectedClientReferralLinkBlock(state.selectedClient.personalReferralSource)}
+          <div class="client-level-save-field"><button type="button" class="primary" data-client-level-save disabled>Сохранить</button></div>
           <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
             ${selectField("Операция", "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), state.bonusTransactionType)}
             ${selectField("Тип бонусов", "bonus_type", bonusTypeOptions(client.bonusTypes, loyaltyBonusType), loyaltyBonusType)}
@@ -1530,7 +1528,15 @@ export function bindClients(root, ctx) {
       return;
     }
     if (event.target.matches("[data-client-level-select], [data-client-auto-level-transition-disabled]") && state.selectedClient) {
-      root.querySelector("[data-client-level-save]").disabled = false;
+      const saveButton = root.querySelector("[data-client-level-save]");
+      saveButton.disabled = false;
+      saveButton.dataset.levelDirty = "true";
+      return;
+    }
+    if (event.target.matches("[data-client-referral-active], [data-client-referral-one-time]") && state.selectedClient) {
+      const saveButton = root.querySelector("[data-client-level-save]");
+      saveButton.disabled = false;
+      saveButton.dataset.referralDirty = "true";
       return;
     }
     if (event.target.matches("[data-client-page-size]")) {
@@ -1741,10 +1747,27 @@ export function bindClients(root, ctx) {
     if (saveLevelButton && state.selectedClient) {
       const select = root.querySelector("[data-client-level-select]");
       const autoTransitionCheckbox = root.querySelector("[data-client-auto-level-transition-disabled]");
+      const referralActive = root.querySelector("[data-client-referral-active]");
+      const referralOneTime = root.querySelector("[data-client-referral-one-time]");
+      const requests = [];
+      if (saveLevelButton.dataset.levelDirty === "true") {
+        requests.push(api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value, autoTransitionCheckbox.checked));
+      }
+      if (saveLevelButton.dataset.referralDirty === "true" && state.selectedClient.personalReferralSource && referralActive && referralOneTime) {
+        requests.push(api.updateReferralSource(state.selectedClient.personalReferralSource.id, {
+          is_active: referralActive.checked,
+          one_time_accrual: referralOneTime.checked,
+        }).then((source) => {
+          state.selectedClient.personalReferralSource = source;
+        }));
+      }
+      if (!requests.length) return;
       saveLevelButton.disabled = true;
       try {
-        await api.setClientLevel(state.selectedClient.id, ctx.org.id, select.value, autoTransitionCheckbox.checked);
-        saveLevelButton.textContent = "Сохранено";
+        await Promise.all(requests);
+        delete saveLevelButton.dataset.levelDirty;
+        delete saveLevelButton.dataset.referralDirty;
+        saveLevelButton.textContent = "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e";
       } catch {
         saveLevelButton.disabled = false;
       }
@@ -1808,22 +1831,6 @@ export function bindClients(root, ctx) {
         await navigator.clipboard.writeText(link);
         copyAuthLinkButton.textContent = "Скопировано";
       }
-      return;
-    }
-
-    const referralActiveToggle = event.target.closest("[data-client-referral-active]");
-    if (referralActiveToggle && state.selectedClient?.personalReferralSource) {
-      const source = await api.updateReferralSource(referralActiveToggle.dataset.clientReferralActive, { is_active: referralActiveToggle.checked });
-      state.selectedClient.personalReferralSource = source;
-      ctx.reload();
-      return;
-    }
-
-    const referralOneTimeToggle = event.target.closest("[data-client-referral-one-time]");
-    if (referralOneTimeToggle && state.selectedClient?.personalReferralSource) {
-      const source = await api.updateReferralSource(referralOneTimeToggle.dataset.clientReferralOneTime, { one_time_accrual: referralOneTimeToggle.checked });
-      state.selectedClient.personalReferralSource = source;
-      ctx.reload();
       return;
     }
 

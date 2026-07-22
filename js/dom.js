@@ -1,5 +1,36 @@
 export const root = document.querySelector("#root");
 
+export function normalizePhone(value) {
+  let digits = String(value ?? "").replace(/\D/g, "");
+  if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) digits = `7${digits.slice(1)}`;
+  else if (digits.length === 10) digits = `7${digits}`;
+  return digits;
+}
+
+export function formatPhone(value) {
+  let digits = String(value ?? "").replace(/\D/g, "");
+  if (digits.startsWith("7") || digits.startsWith("8")) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (!digits) return "";
+  const chunks = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean);
+  return `+7${chunks[0] ? ` (${chunks[0]}` : ""}${chunks[0]?.length === 3 ? ")" : ""}${chunks[1] ? ` ${chunks[1]}` : ""}${chunks[2] ? `-${chunks[2]}` : ""}${chunks[3] ? `-${chunks[3]}` : ""}`;
+}
+
+function isPhoneInput(element) {
+  return element instanceof HTMLInputElement
+    && (element.type === "tel" || element.dataset.phoneInput !== undefined || /(^|_)(phone|tel)(_|$)/i.test(element.name));
+}
+
+document.addEventListener("input", (event) => {
+  if (!isPhoneInput(event.target)) return;
+  event.target.value = formatPhone(event.target.value);
+});
+
+document.addEventListener("blur", (event) => {
+  if (!isPhoneInput(event.target)) return;
+  event.target.value = formatPhone(event.target.value);
+}, true);
+
 let bodyScrollY = 0;
 let bodyScrollLocked = false;
 

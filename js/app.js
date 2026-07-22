@@ -64,7 +64,8 @@ const LOYALTY_MENU_SECTIONS = [
   { slug: "achievements", label: "Достижения", permissions: ["settings.achievements.view"] },
   { slug: "notifications", label: "Рассылки", permissions: ["notifications.notifications.view"] },
 ];
-let sidebarOpen = true;
+const SIDEBAR_COMPACT_BREAKPOINT = 1180;
+let sidebarOpen = window.innerWidth > SIDEBAR_COMPACT_BREAKPOINT;
 
 function can(permission) {
   if (state.org?.owner_user_id === state.me?.id) return true;
@@ -929,6 +930,10 @@ function closeSidebar({ restoreFocus = false } = {}) {
     root.querySelector("[data-sidebar-toggle]")?.focus();
   }
 }
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth <= SIDEBAR_COMPACT_BREAKPOINT && sidebarOpen) closeSidebar();
+});
 
 function toggleSettingsSidebarMenu() {
   const toggle = root.querySelector("[data-settings-menu-toggle]");
