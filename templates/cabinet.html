@@ -120,6 +120,7 @@
       let selectedVisit = null;
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
+      const PWA_PUSH_PERMISSION_REQUESTED_KEY = "loyalty.pwaPushPermissionRequested";
       const PWA_SESSION_HASH_PREFIX = "#pwa_session=";
       const isStandalonePwa = window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
 
@@ -312,6 +313,31 @@
           pushStatus.textContent = error.message || "Состояние сохранено, push-подписка не создана.";
         }
         pushToggle.checked = true;
+      }
+
+      async function requestPushOnFirstPwaLaunch(state) {
+        if (!isStandalonePwa || localStorage.getItem(PWA_PUSH_PERMISSION_REQUESTED_KEY)) return;
+        if (!state?.configured) return;
+        if (pushToggle.checked) {
+          localStorage.setItem(PWA_PUSH_PERMISSION_REQUESTED_KEY, "1");
+          return;
+        }
+        if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+          localStorage.setItem(PWA_PUSH_PERMISSION_REQUESTED_KEY, "1");
+          return;
+        }
+        localStorage.setItem(PWA_PUSH_PERMISSION_REQUESTED_KEY, "1");
+        try {
+          await enablePushNotifications();
+        } catch (error) {
+          pushStatus.textContent = error.message || "Не удалось включить уведомления.";
+        }
+        if (Notification.permission !== "granted") {
+          notificationsModal.hidden = false;
+          pushStatus.textContent = Notification.permission === "denied"
+            ? "Уведомления запрещены в настройках приложения."
+            : "Нажмите переключатель, чтобы разрешить уведомления.";
+        }
       }
 
       async function disablePushNotifications() {
@@ -660,8 +686,9 @@
             applyRegistrationFields(cabinetData?.registration_fields);
             fillCurrentUserCabinet(currentClient || result);
             renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
-            await refreshPushState().catch(() => null);
+            const pushState = await refreshPushState().catch(() => null);
             await refreshNotificationsList().catch(() => null);
+            await requestPushOnFirstPwaLaunch(pushState);
             exposeSessionForPwaInstall();
             setMessage("", "");
             submitButton.disabled = false;
@@ -683,8 +710,9 @@
           applyRegistrationFields(link.registration_fields);
           fillCurrentUserCabinet(currentClient || {});
           renderHistorySections(link.card_sections);
-          await refreshPushState().catch(() => null);
+          const pushState = await refreshPushState().catch(() => null);
           await refreshNotificationsList().catch(() => null);
+          await requestPushOnFirstPwaLaunch(pushState);
           exposeSessionForPwaInstall();
           submitButton.disabled = false;
         } catch {
