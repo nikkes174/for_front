@@ -120,7 +120,7 @@
       let selectedVisit = null;
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
-      const PWA_PUSH_PERMISSION_REQUESTED_KEY = "loyalty.pwaPushPermissionRequested";
+      const PWA_PUSH_PERMISSION_REQUESTED_KEY = "loyalty.pwaPushPermissionRequested.v2";
       const PWA_SESSION_HASH_PREFIX = "#pwa_session=";
       const isStandalonePwa = window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
 
@@ -204,7 +204,8 @@
         const subscription = await registration?.pushManager?.getSubscription?.();
         const endpoint = subscription?.endpoint ? `&endpoint=${encodeURIComponent(subscription.endpoint)}` : "";
         const state = await requestJson(`/crm-api/client-communications/push/status?organization_id=${organizationId}&client_id=${clientId}${endpoint}`, { cache: "no-store" });
-        pushToggle.checked = !!state.enabled;
+        const supportsPush = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
+        pushToggle.checked = !!state.enabled && (!supportsPush || (Notification.permission === "granted" && !!subscription));
         pushToggle.disabled = !state.configured;
         pushStatus.textContent = state.configured ? "" : "Push-ключи VAPID не настроены на сервере.";
         return state;
@@ -275,18 +276,23 @@
 
       async function enablePushNotifications() {
         const { organizationId, clientId } = pushContext();
-        await requestJson("/crm-api/client-communications/push/preference", {
-          method: "POST",
-          body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: true }),
-        });
         if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+          await requestJson("/crm-api/client-communications/push/preference", {
+            method: "POST",
+            body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: true }),
+          });
           pushStatus.textContent = "Уведомления включены.";
           pushToggle.checked = true;
           return;
         }
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
+          await requestJson("/crm-api/client-communications/push/preference", {
+            method: "POST",
+            body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: false }),
+          }).catch(() => null);
           pushStatus.textContent = `Разрешение на уведомления не выдано: ${permission}.`;
+          pushToggle.checked = false;
           return;
         }
         try {
@@ -308,17 +314,26 @@
               user_agent: navigator.userAgent || "",
             }),
           });
+          await requestJson("/crm-api/client-communications/push/preference", {
+            method: "POST",
+            body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: true }),
+          });
           pushStatus.textContent = "Уведомления включены.";
+          pushToggle.checked = true;
         } catch (error) {
+          await requestJson("/crm-api/client-communications/push/preference", {
+            method: "POST",
+            body: JSON.stringify({ organization_id: organizationId, client_id: clientId, enabled: false }),
+          }).catch(() => null);
           pushStatus.textContent = error.message || "Состояние сохранено, push-подписка не создана.";
+          pushToggle.checked = false;
         }
-        pushToggle.checked = true;
       }
 
       async function requestPushOnFirstPwaLaunch(state) {
         if (!isStandalonePwa || localStorage.getItem(PWA_PUSH_PERMISSION_REQUESTED_KEY)) return;
         if (!state?.configured) return;
-        if (pushToggle.checked) {
+        if (pushToggle.checked && Notification.permission === "granted") {
           localStorage.setItem(PWA_PUSH_PERMISSION_REQUESTED_KEY, "1");
           return;
         }
@@ -686,8 +701,8 @@
             fillCurrentUserCabinet(currentClient || result);
             renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
             const pushState = await refreshPushState().catch(() => null);
-            await refreshNotificationsList().catch(() => null);
             await requestPushOnFirstPwaLaunch(pushState);
+            await refreshNotificationsList().catch(() => null);
             exposeSessionForPwaInstall();
             setMessage("", "");
             submitButton.disabled = false;
@@ -710,8 +725,8 @@
           fillCurrentUserCabinet(currentClient || {});
           renderHistorySections(link.card_sections);
           const pushState = await refreshPushState().catch(() => null);
-          await refreshNotificationsList().catch(() => null);
           await requestPushOnFirstPwaLaunch(pushState);
+          await refreshNotificationsList().catch(() => null);
           exposeSessionForPwaInstall();
           submitButton.disabled = false;
         } catch {
