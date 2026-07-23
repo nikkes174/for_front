@@ -348,9 +348,10 @@
           pushStatus.textContent = error.message || "Не удалось включить уведомления.";
         }
         if (Notification.permission !== "granted") {
+          notificationsModal.hidden = false;
           pushStatus.textContent = Notification.permission === "denied"
             ? "Уведомления запрещены в настройках приложения."
-            : "Разрешение на уведомления не выдано.";
+            : "Включите уведомления тумблером, чтобы iPhone показал системный запрос.";
         }
       }
 
