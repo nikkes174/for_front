@@ -120,11 +120,13 @@
       let selectedVisit = null;
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
+      const PWA_SESSION_HASH_PREFIX = "#pwa_session=";
+      const isStandalonePwa = window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
 
-      if (window.location.hash.startsWith("#pwa_session=")) {
-        const pwaSessionToken = decodeURIComponent(window.location.hash.slice("#pwa_session=".length));
+      if (window.location.hash.startsWith(PWA_SESSION_HASH_PREFIX)) {
+        const pwaSessionToken = decodeURIComponent(window.location.hash.slice(PWA_SESSION_HASH_PREFIX.length));
         if (pwaSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, pwaSessionToken);
-        history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+        if (isStandalonePwa) history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
       }
 
       if ("serviceWorker" in navigator) {
@@ -179,6 +181,13 @@
         const response = await fetch("/auth/me");
         if (response.ok) return response.json();
         return restoreStoredSession();
+      }
+
+      function exposeSessionForPwaInstall() {
+        if (isStandalonePwa || token || window.location.hash) return;
+        const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
+        if (!sessionToken) return;
+        history.replaceState(null, "", `${window.location.pathname}${window.location.search}${PWA_SESSION_HASH_PREFIX}${encodeURIComponent(sessionToken)}`);
       }
 
       async function refreshPushState() {
@@ -651,6 +660,7 @@
             renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
             await refreshPushState().catch(() => null);
             await refreshNotificationsList().catch(() => null);
+            exposeSessionForPwaInstall();
             setMessage("", "");
             submitButton.disabled = false;
           } catch {
