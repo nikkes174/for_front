@@ -184,10 +184,12 @@
       }
 
       function exposeSessionForPwaInstall() {
-        if (isStandalonePwa || token || window.location.hash) return;
+        if (isStandalonePwa) return;
         const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
         if (!sessionToken) return;
-        history.replaceState(null, "", `${window.location.pathname}${window.location.search}${PWA_SESSION_HASH_PREFIX}${encodeURIComponent(sessionToken)}`);
+        history.replaceState(null, "", `${window.location.pathname}${PWA_SESSION_HASH_PREFIX}${encodeURIComponent(sessionToken)}`);
+        const manifestLink = document.querySelector('link[rel="manifest"]');
+        if (manifestLink) manifestLink.href = `/auth/pwa-manifest.webmanifest?session=${Date.now()}`;
       }
 
       async function refreshPushState() {
@@ -674,6 +676,7 @@
           const response = await fetch(`/auth/client-auth-links/${encodeURIComponent(token)}/consume`, { method: "POST" });
           if (!response.ok) throw new Error();
           const link = await response.json();
+          if (link.session_token) localStorage.setItem(SESSION_TOKEN_KEY, link.session_token);
           cabinetData = link;
           currentClient = link.client || link.profile || null;
           setRegistrationMode(!link.client_id);
@@ -682,6 +685,7 @@
           renderHistorySections(link.card_sections);
           await refreshPushState().catch(() => null);
           await refreshNotificationsList().catch(() => null);
+          exposeSessionForPwaInstall();
           submitButton.disabled = false;
         } catch {
           const text = "\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0430.";
