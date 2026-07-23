@@ -1,5 +1,5 @@
 import { api } from "../api.js";
-import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
+import { escapeHtml, formData, normalizePhone, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
 
 const CLIENTS_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_CLIENTS_PAGE_SIZE = 10;
@@ -146,6 +146,7 @@ function saveClientListFilters(orgId, filters) {
 function filterClientsBySearch(items, search) {
   const query = String(search || "").trim().toLowerCase();
   if (!query) return items;
+  const phoneQuery = normalizePhone(query);
   return items.filter((client) => [
     client.full_name,
     client.last_name,
@@ -156,7 +157,12 @@ function filterClientsBySearch(items, search) {
     client.phone,
     client.email,
     client.telegram_id,
-  ].some((value) => String(value || "").toLowerCase().includes(query)));
+    client.max_id,
+    client.vk_id,
+  ].some((value) => String(value || "").toLowerCase().includes(query)) || (
+    phoneQuery.length === 11 && [client.primary_phone, client.secondary_phone, client.phone]
+      .some((value) => normalizePhone(value) === phoneQuery)
+  ));
 }
 
 function clientListUrl(ctx, filters = {}) {
