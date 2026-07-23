@@ -333,10 +333,9 @@
           pushStatus.textContent = error.message || "Не удалось включить уведомления.";
         }
         if (Notification.permission !== "granted") {
-          notificationsModal.hidden = false;
           pushStatus.textContent = Notification.permission === "denied"
             ? "Уведомления запрещены в настройках приложения."
-            : "Нажмите переключатель, чтобы разрешить уведомления.";
+            : "Разрешение на уведомления не выдано.";
         }
       }
 
