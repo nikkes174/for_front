@@ -8,6 +8,7 @@ import { loyalty, bindLoyalty } from "./modules/loyalty.js";
 import { bindNotifications } from "./modules/notifications.js";
 import { settings, bindSettings } from "./modules/settings.js";
 import { tasks, bindTasks } from "./modules/tasks.js";
+import { booking, bindBooking } from "./modules/booking.js";
 
 const LAST_ORG_KEY = "loyalty.lastOrganizationId";
 const SESSION_TOKEN_KEY = "loyalty.sessionToken";
@@ -875,6 +876,7 @@ function shell(content, title) {
           ${catalogSidebarMenu(org.id)}
           ${settingsSidebarMenu(org.id)}
           ${navLink(`/organizations/${org.id}/tasks`, "Задачи")}
+          ${navLink(`/organizations/${org.id}/booking`, "Записи")}
         </nav>
       </aside>
       <main class="content">
@@ -1034,6 +1036,7 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
   if (routeInfo.page === "notifications") return ["Лояльность", await loyalty(ctx, "notifications")];
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
+  if (routeInfo.page === "booking") return ["Записи", await booking(ctx)];
   if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx, routeInfo.extra || "")];
   return ["Главная", await dashboard(ctx)];
 }
@@ -1343,6 +1346,7 @@ bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
 bindNotifications(root, { get org() { return state.org; }, navigate, reload });
 bindSettings(root, { get org() { return state.org; }, navigate, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
+bindBooking(root, { get org() { return state.org; }, reload });
 
 redirectClientDomainFromAdminPath().then((redirected) => {
   if (!redirected) draw();

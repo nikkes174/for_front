@@ -419,21 +419,6 @@ function syncBranchAchievementSummary(control) {
     : "Не выбрано";
 }
 
-function syncServiceStaffSummary(control) {
-  const root = control.closest("[data-service-staff-select]");
-  if (!root) return;
-  const checked = [...root.querySelectorAll('input[name="staff_user_ids"]:checked')]
-    .map((input) => input.closest("label")?.textContent?.trim())
-    .filter(Boolean);
-  const summary = root.querySelector("[data-service-staff-summary]");
-  if (!summary) return;
-  summary.textContent = checked.length
-    ? checked.length > 2
-      ? `Выбрано: ${checked.length}`
-      : checked.join(", ")
-    : "Не выбрано";
-}
-
 function syncBranchProductItemSummary(control) {
   const root = control.closest("[data-branch-product-item-select]");
   if (!root) return;
@@ -483,40 +468,76 @@ function categoryTypeById(categoryId) {
   return (cache.categories || []).find((category) => String(category.id) === String(categoryId))?.type;
 }
 
+function branchWorkScheduleFields(schedule = {}) {
+  return `
+    <label><span>Работа с</span><input name="work_schedule_from" type="time" value="${escapeHtml(schedule?.from || "")}"></label>
+    <label><span>Работа до</span><input name="work_schedule_to" type="time" value="${escapeHtml(schedule?.to || "")}"></label>
+  `;
+}
+
+function branchWorkSchedulePayload(data) {
+  const from = optional(data.work_schedule_from);
+  const to = optional(data.work_schedule_to);
+  return from || to ? { from, to } : null;
+}
+
 function productItemStaffFields(item) {
-  const selected = new Set((item.staff || []).map((staffItem) => String(staffItem.id)));
   const users = cache.users || [];
   if (!users.length) return "";
-  const selectedNames = users
-    .filter((user) => selected.has(String(user.id)))
-    .map((user) => userLabelById(user.id));
-  const summary = selectedNames.length
-    ? selectedNames.length > 2
-      ? `Выбрано: ${selectedNames.length}`
-      : selectedNames.join(", ")
-    : "Не выбрано";
+  const pairsByMaster = new Map((item.master_services || []).map((pair) => [String(pair.master_id), pair]));
+  const selectedUsers = users.filter((user) => pairsByMaster.has(String(user.id)) || (item.staff || []).some((staff) => String(staff.id) === String(user.id)));
   return `
-    <div class="branch-multiselect modal-full" data-service-staff-select>
-      <span>Сотрудники, оказывающие услугу</span>
-      <details class="branch-multiselect-dropdown">
-        <summary><span data-service-staff-summary>${escapeHtml(summary)}</span></summary>
-        <div class="branch-multiselect-options">
-          ${users.map((user) => `
-            <label class="checkbox">
-              <input type="checkbox" name="staff_user_ids" value="${escapeHtml(user.id)}" ${selected.has(String(user.id)) ? "checked" : ""}>
-              ${escapeHtml(userLabelById(user.id))}
-            </label>
-          `).join("")}
-        </div>
-      </details>
+    <div class="service-staff-editor modal-full" data-service-staff-editor>
+      <label><span>Сотрудники, оказывающие услугу</span><input type="search" list="service-staff-options-${escapeHtml(item.id)}" placeholder="Начните вводить имя сотрудника" autocomplete="off" data-service-staff-search></label>
+      <datalist id="service-staff-options-${escapeHtml(item.id)}">
+        ${users.map((user) => `<option value="${escapeHtml(userLabelById(user.id))}"></option>`).join("")}
+      </datalist>
+      <div class="service-staff-grid" data-service-staff-grid>
+        ${selectedUsers.map((user) => serviceStaffRow(user, pairsByMaster.get(String(user.id)), item)).join("")}
+      </div>
     </div>
   `;
 }
 
+function serviceStaffRow(user, pair = {}, item = {}) {
+  const durationSeconds = Number(pair?.service_duration ?? item.seance_length ?? 0);
+  const durationHours = Math.floor(durationSeconds / 3600);
+  const durationMinutes = Math.floor((durationSeconds % 3600) / 60);
+  const technicalBreakMinutes = Math.floor(Number(pair?.technical_break_duration ?? 0) / 60);
+  return `<div class="service-staff-row" data-master-service-row data-pair-id="${escapeHtml(pair?.id || "")}" data-master-id="${escapeHtml(user.id)}">
+    <strong>${escapeHtml(userLabelById(user.id))}</strong>
+    <label><span>Цена от</span><input name="master_price_min" type="number" step="0.01" min="0" placeholder="Цена услуги: ${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_min ?? "")}"></label>
+    <label><span>Цена до</span><input name="master_price_max" type="number" step="0.01" min="0" placeholder="Цена услуги: ${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_max ?? "")}"></label>
+    <label><span>Длительность</span><span class="service-duration-inputs"><input name="master_service_duration_hours" type="number" min="0" step="1" value="${escapeHtml(durationHours)}" required><i>ч</i><input name="master_service_duration_minutes" type="number" min="0" max="59" step="1" value="${escapeHtml(durationMinutes)}" required><i>мин</i></span></label>
+    <label><span>Тех. перерыв, мин</span><input name="master_technical_break_minutes" type="number" step="1" min="0" value="${escapeHtml(technicalBreakMinutes)}" required></label>
+    <button type="button" class="ghost" title="Удалить сотрудника" data-remove-service-staff>×</button>
+  </div>`;
+}
+
 function serviceStaffPayload(form) {
-  const formObject = form ? new FormData(form) : null;
-  return (formObject?.getAll("staff_user_ids") || []).map((userId) => ({
-    id: Number(userId),
+  return [...form.querySelectorAll("[data-master-service-row]")].map((row) => ({ id: Number(row.dataset.masterId) }));
+}
+
+function addServiceStaffFromSearch(search) {
+  const editor = search.closest("[data-service-staff-editor]");
+  const grid = editor?.querySelector("[data-service-staff-grid]");
+  const value = String(search.value || "").trim().toLocaleLowerCase();
+  const user = (cache.users || []).find((candidate) => userLabelById(candidate.id).trim().toLocaleLowerCase() === value);
+  if (!grid || !user) return false;
+  if (!grid.querySelector(`[data-master-id="${user.id}"]`)) grid.insertAdjacentHTML("beforeend", serviceStaffRow(user));
+  search.value = "";
+  return true;
+}
+
+function masterServicePayload(form) {
+  return [...form.querySelectorAll("[data-master-service-row]")].map((row) => ({
+    pairId: Number(row.dataset.pairId) || null,
+    master_id: Number(row.dataset.masterId),
+    price_min: numberOrNull(row.querySelector('[name="master_price_min"]')?.value),
+    price_max: numberOrNull(row.querySelector('[name="master_price_max"]')?.value),
+    service_duration: (Number(row.querySelector('[name="master_service_duration_hours"]')?.value || 0) * 3600)
+      + (Number(row.querySelector('[name="master_service_duration_minutes"]')?.value || 0) * 60),
+    technical_break_duration: Number(row.querySelector('[name="master_technical_break_minutes"]')?.value || 0) * 60,
   }));
 }
 
@@ -706,11 +727,7 @@ function branchAchievementFields(branch) {
 function productItemExtraFields(item) {
   const category = productItemCategory(item);
   if (category?.type === "service") return `
-    <label><span>Мин. цена</span><input name="price_min" type="number" step="0.01" min="0" value="${escapeHtml(item.price_min ?? "")}"></label>
-    <label><span>Макс. цена</span><input name="price_max" type="number" step="0.01" min="0" value="${escapeHtml(item.price_max ?? "")}"></label>
     <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
-    <label><span>Длительность, сек</span><input name="seance_length" type="number" step="1" min="0" value="${escapeHtml(item.seance_length ?? "")}"></label>
-    <label><span>Вес сортировки</span><input name="weight" type="number" step="1" value="${escapeHtml(item.weight ?? "")}"></label>
     <label><span>Внешний ID</span><input name="api_id" value="${escapeHtml(item.api_id || "")}"></label>
     <label class="modal-full"><span>URL изображения</span><input name="image_path" type="url" value="${escapeHtml(serviceImagePath(item))}"></label>
     ${productItemStaffFields(item)}
@@ -1919,6 +1936,7 @@ function modalFields(type, item) {
     <label><span>Адрес</span><input name="address" value="${escapeHtml(item.address || "")}"></label>
     <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
     ${timezoneOptions(item.timezone || DEFAULT_TIMEZONE)}
+    ${branchWorkScheduleFields(item.work_schedule)}
     ${selectField("Юридическое лицо", "legal_entity_id", cache.legalEntities, item.legal_entity_id)}
         <label class="checkbox modal-full"><input type="checkbox" name="online_booking_enabled" ${item.online_booking_enabled ? "checked" : ""}> Онлайн-запись</label>
   `;
@@ -1987,7 +2005,11 @@ function modalFields(type, item) {
   return "";
 }
 
-function openEntityModal(type, item) {
+async function openEntityModal(type, item) {
+  let modalItem = item;
+  if (type === "productItem" && productItemCategory(item)?.type === "service") {
+    modalItem = { ...item, master_services: await api.masterServices(cache.organizationId, item.id) };
+  }
   const titles = {
     brand: "Бренд",
     legal: "Юридическое лицо",
@@ -2003,13 +2025,13 @@ function openEntityModal(type, item) {
     permission: "Право",
     branchMembership: "Доступ к филиалу",
   };
-  const modalBaseTitle = item.name
-    || item.title
-    || item.module_name
-    || [item.last_name, item.first_name, item.middle_name].filter(Boolean).join(" ")
-    || item.email
-    || item.phone
-    || `${titles[type] || "Сущность"} #${item.id}`;
+  const modalBaseTitle = modalItem.name
+    || modalItem.title
+    || modalItem.module_name
+    || [modalItem.last_name, modalItem.first_name, modalItem.middle_name].filter(Boolean).join(" ")
+    || modalItem.email
+    || modalItem.phone
+    || `${titles[type] || "Сущность"} #${modalItem.id}`;
   const userAccessTitle = type === "user"
     ? userMemberships(item, cache.branchMemberships || [])
       .map((membership) => {
@@ -2033,7 +2055,7 @@ function openEntityModal(type, item) {
           <button type="button" class="ghost" data-close-modal>Закрыть</button>
         </div>
         <form class="modal-grid" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
-          ${modalFields(type, item)}
+          ${modalFields(type, modalItem)}
           <p data-message></p>
           <button class="primary">Сохранить</button>
         </form>
@@ -2102,8 +2124,8 @@ async function saveEntity(type, id, data, form = null) {
       title: data.title,
       price: numberOrNull(data.price),
       salon_service_id: categoryType === "service" ? numberOrNull(currentItem.salon_service_id) : null,
-      price_min: categoryType === "service" ? numberOrNull(data.price_min) : null,
-      price_max: categoryType === "service" ? numberOrNull(data.price_max) : null,
+      price_min: null,
+      price_max: null,
       discount: categoryType === "service" ? numberOrNull(data.discount) : null,
       comment: optional(data.comment),
       weight: categoryType === "service" ? numberOrNull(data.weight) : null,
@@ -2118,11 +2140,20 @@ async function saveEntity(type, id, data, form = null) {
       unit_actual_cost: categoryType === "product" ? numberOrNull(data.unit_actual_cost) : null,
       unit_equals: categoryType === "product" ? numberOrNull(data.unit_equals) : null,
       actual_amounts: categoryType === "product" ? parseActualAmounts(form) : null,
-      seance_length: categoryType === "service" ? numberOrNull(data.seance_length) : null,
+      seance_length: categoryType === "service" ? null : null,
       staff: categoryType === "service" ? serviceStaffPayload(form) : null,
       image_group: categoryType === "service" ? serviceImageGroupPayload(data) : null,
       active: data.active === "true",
     }).then(async (updated) => {
+      if (categoryType === "service") {
+        const existing = await api.masterServices(cache.organizationId, id);
+        const pairs = masterServicePayload(form);
+        const selected = new Set(pairs.map((pair) => pair.master_id));
+        await Promise.all(existing.filter((pair) => !selected.has(pair.master_id)).map((pair) => api.deleteMasterService(pair.id)));
+        await Promise.all(pairs.map((pair) => pair.pairId
+          ? api.updateMasterService(pair.pairId, pair)
+          : api.createMasterService({ organization_id: cache.organizationId, service_id: Number(id), ...pair })));
+      }
       await syncProductItemBranchAvailability(id, data.product_branch_ids || []);
       return updated;
     });
@@ -2139,6 +2170,7 @@ async function saveEntity(type, id, data, form = null) {
     address: optional(data.address),
     phone: optional(data.phone),
     timezone: optional(data.timezone),
+    work_schedule: branchWorkSchedulePayload(data),
     brand_id: numberOrNull(data.brand_id),
     legal_entity_id: numberOrNull(data.legal_entity_id),
   });
@@ -2307,6 +2339,7 @@ export async function settings(ctx, tabSlug = "") {
             <label><span>Адрес</span><input name="address"></label>
             <label><span>Телефон</span><input name="phone"></label>
             ${timezoneOptions()}
+            ${branchWorkScheduleFields()}
             ${selectField("Юридическое лицо", "legal_entity_id", legalEntities)}
             <label class="checkbox"><input type="checkbox" name="online_booking_enabled" checked> Онлайн-запись</label>
             <button class="primary" disabled>Добавить филиал</button>
@@ -2641,6 +2674,7 @@ export function bindSettings(root, ctx) {
           address: optional(data.address),
           phone: optional(data.phone),
           timezone: optional(data.timezone) || "Europe/Moscow",
+          work_schedule: branchWorkSchedulePayload(data),
           brand_id: numberOrNull(data.brand_id),
           legal_entity_id: numberOrNull(data.legal_entity_id),
           online_booking_enabled: data.online_booking_enabled === "on",
@@ -2759,7 +2793,7 @@ export function bindSettings(root, ctx) {
     const editButton = event.target.closest("[data-edit-entity]");
     if (editButton) {
       const item = findEntity(editButton.dataset.editEntity, editButton.dataset.id);
-      if (item) openEntityModal(editButton.dataset.editEntity, item);
+      if (item) await openEntityModal(editButton.dataset.editEntity, item);
       return;
     }
 
@@ -2791,6 +2825,12 @@ export function bindSettings(root, ctx) {
   document.addEventListener("click", (event) => {
     if (handleAchievementConditionClick(event)) return;
     if (handleProductAmountClick(event)) return;
+
+    const removeStaffButton = event.target.closest("[data-remove-service-staff]");
+    if (removeStaffButton) {
+      removeStaffButton.closest("[data-master-service-row]")?.remove();
+      return;
+    }
 
     const closeButton = event.target.closest("[data-close-modal]");
     if (closeButton) {
@@ -2840,7 +2880,6 @@ export function bindSettings(root, ctx) {
         payload.permission_codes = new FormData(form).getAll("permission_codes");
       }
       if (form.dataset.type === "productItem") {
-        payload.staff_user_ids = new FormData(form).getAll("staff_user_ids");
         payload.product_branch_ids = new FormData(form).getAll("product_branch_ids");
       }
       if (form.dataset.type === "user") {
@@ -2855,6 +2894,10 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target.matches("[data-service-staff-search]")) {
+      addServiceStaffFromSearch(event.target);
+      return;
+    }
     if (event.target.matches('[data-entity-edit][data-type="achievement"] [name="photo_file"]')) {
       previewAchievementPhoto(event.target);
       return;
@@ -2874,9 +2917,6 @@ export function bindSettings(root, ctx) {
     if (event.target.matches('[name="branch_achievement_ids"]')) {
       syncBranchAchievementSummary(event.target);
     }
-    if (event.target.matches('[name="staff_user_ids"]')) {
-      syncServiceStaffSummary(event.target);
-    }
     if (event.target.matches('[name="branch_service_item_ids"], [name="branch_product_item_ids"]')) {
       syncBranchProductItemSummary(event.target);
     }
@@ -2890,5 +2930,9 @@ export function bindSettings(root, ctx) {
     if (event.target.matches('[name="product_branch_ids"]')) {
       syncProductBranchSummary(event.target);
     }
+  });
+
+  document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-service-staff-search]")) addServiceStaffFromSearch(event.target);
   });
 }

@@ -206,6 +206,29 @@ button {
 
 button:disabled { opacity: .55; cursor: not-allowed; }
 button:active { transform: translateY(1px); }
+
+.booking-page { display: grid; gap: 14px; min-width: 980px; }
+.booking-toolbar { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
+.booking-nav, .booking-filters { display: flex; align-items: end; gap: 8px; }
+.booking-filters label { display: grid; gap: 4px; font-size: 12px; color: #667085; }
+.booking-calendar { display: grid; grid-template-columns: 58px repeat(7, minmax(125px, 1fr)); border: 1px solid #d9dee8; border-radius: 10px; overflow: hidden; background: #fff; }
+.booking-time-scale, .booking-day { min-width: 0; border-right: 1px solid #e2e6ee; }
+.booking-day:last-child { border-right: 0; }
+.booking-day header { height: 58px; display: grid; align-content: center; padding: 8px 10px; border-bottom: 1px solid #e2e6ee; }
+.booking-day header span { font-size: 12px; color: #667085; }
+.booking-day header strong { font-size: 18px; }
+.booking-time-spacer { height: 91px; border-bottom: 1px solid #e2e6ee; }
+.booking-day-hours { height: 33px; padding: 8px; overflow: hidden; border-bottom: 1px solid #e2e6ee; background: #eef1f5; color: #475467; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
+.booking-time-body, .booking-day-body { position: relative; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 33.5px, #e5e7eb 34.5px); }
+.booking-time-body span { position: absolute; right: 7px; transform: translateY(-7px); color: #667085; font-size: 11px; }
+.booking-event { position: absolute; z-index: 2; left: 4px; right: 4px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; padding: 5px; border-left: 4px solid #0f766e; border-radius: 5px; background: #99eadc; color: #18312d; font-size: 11px; box-shadow: 0 1px 2px rgba(16, 24, 40, .12); }
+.booking-event strong, .booking-event span, .booking-event small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.booking-event-completed { border-color: #475467; background: #d0d5dd; }
+.booking-event-cancelled { border-color: #b42318; background: #fecdca; }
+.booking-event-no_show { border-color: #7a5af8; background: #d9d6fe; }
+.booking-event-time { font-weight: 700; }
+.booking-status { width: 100%; min-height: 24px; margin-top: auto; padding: 2px 4px; border: 0; border-radius: 4px; font-size: 10px; }
+.content:has(.booking-page) { overflow-x: auto; }
 .primary { background: #2563eb; color: #fff; }
 .primary:hover { background: #1d4ed8; }
 .inline-action-link {
@@ -805,6 +828,21 @@ button:active { transform: translateY(1px); }
   gap: 8px;
   align-items: start;
 }
+
+.service-staff-editor { position: relative; }
+.service-staff-results { position: absolute; z-index: 25; top: 66px; left: 0; right: 0; display: grid; gap: 4px; max-height: 180px; overflow: auto; padding: 8px; border: 1px solid #cfd8e6; border-radius: 7px; background: #fff; box-shadow: 0 12px 30px rgba(15, 23, 42, .14); }
+.service-staff-results[hidden] { display: none; }
+.service-staff-results button { text-align: left; border: 0; border-radius: 5px; background: transparent; padding: 8px; cursor: pointer; }
+.service-staff-results button:hover { background: #f2f4f7; }
+.service-staff-grid { display: grid; gap: 8px; margin-top: 8px; }
+.service-staff-row { display: grid; grid-template-columns: minmax(150px, 1.3fr) repeat(4, minmax(100px, 1fr)) auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid #e4e7ec; border-radius: 8px; }
+.service-staff-row strong { padding-bottom: 10px; }
+.service-staff-row label { min-width: 0; }
+.service-staff-row label span { display: block; margin-bottom: 4px; font-size: 12px; color: #667085; }
+.service-duration-inputs { display: flex !important; align-items: center; gap: 5px; margin: 0 !important; }
+.service-duration-inputs input { width: 54px; min-width: 0; }
+.service-duration-inputs i { font-size: 12px; font-style: normal; color: #667085; }
+@media (max-width: 900px) { .service-staff-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .visit-form .visit-selected-item {
   display: flex;
