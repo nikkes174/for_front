@@ -2043,7 +2043,7 @@ async function openEntityModal(type, item) {
       .join("; ")
     : "";
   const modalTitle = userAccessTitle ? `${modalBaseTitle} - ${userAccessTitle}` : modalBaseTitle;
-  const modalTitleId = type === "productItem"
+  const modalTitleId = type === "productItem" || type === "branch"
     ? `<span class="modal-title-id">ID ${escapeHtml(item.id)}</span>`
     : "";
 
