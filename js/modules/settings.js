@@ -2173,6 +2173,7 @@ async function saveEntity(type, id, data, form = null) {
     work_schedule: branchWorkSchedulePayload(data),
     brand_id: numberOrNull(data.brand_id),
     legal_entity_id: numberOrNull(data.legal_entity_id),
+    online_booking_enabled: data.online_booking_enabled === "on",
   });
   if (type === "department") return api.updateDepartment(id, { name: data.name });
   if (type === "workplace") return api.updateWorkplace(id, {
