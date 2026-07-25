@@ -21,13 +21,19 @@ function isPhoneInput(element) {
     && (element.type === "tel" || element.dataset.phoneInput !== undefined || /(^|_)(phone|tel)(_|$)/i.test(element.name));
 }
 
+function isPhoneLikeLoginInput(element) {
+  return element instanceof HTMLInputElement
+    && element.dataset.loginPhoneInput !== undefined
+    && !String(element.value || "").includes("@");
+}
+
 document.addEventListener("input", (event) => {
-  if (!isPhoneInput(event.target)) return;
+  if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) return;
   event.target.value = formatPhone(event.target.value);
 });
 
 document.addEventListener("blur", (event) => {
-  if (!isPhoneInput(event.target)) return;
+  if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) return;
   event.target.value = formatPhone(event.target.value);
 }, true);
 

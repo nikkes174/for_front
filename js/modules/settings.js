@@ -1967,6 +1967,7 @@ function modalFields(type, item) {
     <label><span>Email</span><input name="email" value="${escapeHtml(item.email || "")}"></label>
     <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
     <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
+    <label><span>Новый пароль</span><input name="password" type="password" autocomplete="new-password"></label>
     ${userBranchAccessFields(item)}
     <label><span>Активен</span><select name="is_active">
       <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
@@ -2198,6 +2199,7 @@ async function saveEntity(type, id, data, form = null) {
     email: optional(data.email),
     telegram_id: bigintIdOrNull(data.telegram_id),
     max_id: bigintIdOrNull(data.max_id),
+    ...(data.password ? { password: data.password } : {}),
     is_active: data.is_active === "true",
     is_blocked: data.is_blocked === "true",
   }).then(async (updated) => {
@@ -2712,7 +2714,7 @@ export function bindSettings(root, ctx) {
           last_name: optional(data.last_name),
           phone: optional(data.phone),
           email: optional(data.email),
-          password_hash: data.password,
+          password: data.password,
         });
         if (data.role_id) {
           await api.assignUser({

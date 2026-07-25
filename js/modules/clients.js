@@ -867,7 +867,7 @@ function addVisitSelectedItem(form, name) {
   return true;
 }
 
-function masterOptions(branchId = "", departmentId = "", workplaceId = "") {
+function masterOptions(branchId = "", departmentId = "", workplaceId = "", activeOnly = false) {
   const masterRoleIds = new Set(
     state.roles
       .filter((item) => {
@@ -891,6 +891,7 @@ function masterOptions(branchId = "", departmentId = "", workplaceId = "") {
 
   return state.users
     .filter((item) => branchId ? branchUserIds.has(String(item.id)) : orgMasterUserIds.has(String(item.id)))
+    .filter((item) => !activeOnly || item.is_active !== false)
     .map((item) => ({ id: item.id, name: displayUser(item) }));
 }
 
@@ -938,7 +939,7 @@ function visitCreateFormMarkup() {
   const branches = state.branches;
   const departments = departmentOptions(visitDraft.branch_id);
   const workplaces = workplaceOptions(visitDraft.branch_id, visitDraft.department_id);
-  const masters = masterOptions(visitDraft.branch_id, visitDraft.department_id, visitDraft.workplace_id);
+  const masters = masterOptions(visitDraft.branch_id, visitDraft.department_id, visitDraft.workplace_id, true);
   const errors = state.visitErrors || {};
   const hasVisitItems = Boolean(String(visitDraft.service_names || "").trim() || String(visitDraft.product_names || "").trim());
 
