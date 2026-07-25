@@ -500,15 +500,18 @@ function productItemStaffFields(item) {
 }
 
 function serviceStaffRow(user, pair = {}, item = {}) {
-  const durationSeconds = Number(pair?.service_duration ?? item.seance_length ?? 0);
+  const durationSeconds = Number(pair?.service_duration || 0);
   const durationHours = Math.floor(durationSeconds / 3600);
   const durationMinutes = Math.floor((durationSeconds % 3600) / 60);
+  const defaultDurationSeconds = Number(item.seance_length || 0);
+  const defaultDurationHours = Math.floor(defaultDurationSeconds / 3600);
+  const defaultDurationMinutes = Math.floor((defaultDurationSeconds % 3600) / 60);
   const technicalBreakMinutes = Math.floor(Number(pair?.technical_break_duration ?? 0) / 60);
   return `<div class="service-staff-row" data-master-service-row data-pair-id="${escapeHtml(pair?.id || "")}" data-master-id="${escapeHtml(user.id)}">
     <strong>${escapeHtml(userLabelById(user.id))}</strong>
     <label><span>Цена от</span><input name="master_price_min" type="number" step="0.01" min="0" placeholder="Цена услуги: ${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_min ?? "")}"></label>
     <label><span>Цена до</span><input name="master_price_max" type="number" step="0.01" min="0" placeholder="Цена услуги: ${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_max ?? "")}"></label>
-    <label><span>Длительность</span><span class="service-duration-inputs"><input name="master_service_duration_hours" type="number" min="0" step="1" value="${escapeHtml(durationHours)}" required><i>ч</i><input name="master_service_duration_minutes" type="number" min="0" max="59" step="1" value="${escapeHtml(durationMinutes)}" required><i>мин</i></span></label>
+    <label><span>Длительность</span><span class="service-duration-inputs"><input name="master_service_duration_hours" type="number" min="0" step="1" placeholder="${escapeHtml(defaultDurationHours)}" value="${durationSeconds ? escapeHtml(durationHours) : ""}"><i>ч</i><input name="master_service_duration_minutes" type="number" min="0" max="59" step="1" placeholder="${escapeHtml(defaultDurationMinutes)}" value="${durationSeconds ? escapeHtml(durationMinutes) : ""}"><i>мин</i></span></label>
     <label><span>Тех. перерыв, мин</span><input name="master_technical_break_minutes" type="number" step="1" min="0" value="${escapeHtml(technicalBreakMinutes)}" required></label>
     <button type="button" class="ghost" title="Удалить сотрудника" data-remove-service-staff>×</button>
   </div>`;
@@ -726,8 +729,12 @@ function branchAchievementFields(branch) {
 
 function productItemExtraFields(item) {
   const category = productItemCategory(item);
+  const durationSeconds = Number(item.seance_length || 0);
+  const durationHours = Math.floor(durationSeconds / 3600);
+  const durationMinutes = Math.floor((durationSeconds % 3600) / 60);
   if (category?.type === "service") return `
     <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
+    <label><span>Длительность</span><span class="service-duration-inputs"><input name="service_duration_hours" type="number" min="0" step="1" value="${escapeHtml(durationHours)}"><i>ч</i><input name="service_duration_minutes" type="number" min="0" max="59" step="1" value="${escapeHtml(durationMinutes)}"><i>мин</i></span></label>
     <label><span>Внешний ID</span><input name="api_id" value="${escapeHtml(item.api_id || "")}"></label>
     <label class="modal-full"><span>URL изображения</span><input name="image_path" type="url" value="${escapeHtml(serviceImagePath(item))}"></label>
     ${productItemStaffFields(item)}
@@ -2140,7 +2147,9 @@ async function saveEntity(type, id, data, form = null) {
       unit_actual_cost: categoryType === "product" ? numberOrNull(data.unit_actual_cost) : null,
       unit_equals: categoryType === "product" ? numberOrNull(data.unit_equals) : null,
       actual_amounts: categoryType === "product" ? parseActualAmounts(form) : null,
-      seance_length: categoryType === "service" ? null : null,
+      seance_length: categoryType === "service"
+        ? (Number(data.service_duration_hours || 0) * 3600) + (Number(data.service_duration_minutes || 0) * 60)
+        : null,
       staff: categoryType === "service" ? serviceStaffPayload(form) : null,
       image_group: categoryType === "service" ? serviceImageGroupPayload(data) : null,
       active: data.active === "true",

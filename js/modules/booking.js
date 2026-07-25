@@ -55,15 +55,13 @@ function eventCard(event, minHour) {
   const startMinute = minutesOfDay(event.start);
   const endMinute = minutesOfDay(event.end);
   const top = Math.max((startMinute - minHour * 60) * 1.15, 0);
-  const height = Math.max((endMinute - startMinute) * 1.15, 46);
+  const height = Math.max((endMinute - startMinute) * 1.15, 78);
   const breakMinutes = Math.round(Number(event.technical_break_seconds || 0) / 60);
   return `<article class="booking-event booking-event-${escapeHtml(event.visit_status)}" style="top:${top}px;height:${height}px">
     <div class="booking-event-time">${clock(event.start)}–${clock(event.end)}</div>
     <strong>${escapeHtml(event.service_names?.join(", ") || "Визит")}</strong>
     <span>${escapeHtml(event.client_name)}</span>
-    <small>${escapeHtml(event.employee_name)} · ${escapeHtml(event.branch_name)}</small>
     ${event.client_phone ? `<small>${escapeHtml(event.client_phone)}</small>` : ""}
-    ${breakMinutes ? `<small>Техперерыв: ${breakMinutes} мин</small>` : ""}
     ${statusSelect(event)}
   </article>`;
 }
@@ -82,10 +80,17 @@ function dayColumn(day, data, minHour, maxHour) {
 }
 
 function timeScale(minHour, maxHour) {
+  const halfHourSlots = (maxHour - minHour) * 2 + 1;
   return `<div class="booking-time-scale">
     <div class="booking-time-spacer"></div>
     <div class="booking-time-body" style="height:${(maxHour - minHour) * 60 * 1.15}px">
-      ${Array.from({ length: maxHour - minHour + 1 }, (_, index) => `<span style="top:${index * 60 * 1.15}px">${String(minHour + index).padStart(2, "0")}:00</span>`).join("")}
+      ${Array.from({ length: halfHourSlots }, (_, index) => {
+        const isHalfHour = index % 2 === 1;
+        const label = isHalfHour
+          ? "30"
+          : `${String(minHour + index / 2).padStart(2, "0")}<sup>00</sup>`;
+        return `<span class="${isHalfHour ? "booking-time-half" : "booking-time-hour"}" style="top:${index * 30 * 1.15}px">${label}</span>`;
+      }).join("")}
     </div>
   </div>`;
 }

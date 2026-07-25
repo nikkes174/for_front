@@ -49,6 +49,79 @@
             <div class="cabinet-history-list" data-cabinet-history></div>
           </section>
         </div>
+        <div class="cabinet-panel" data-cabinet-view="client_booking" hidden>
+          <form class="cabinet-booking-form" data-client-booking-form>
+            <div class="cabinet-booking-brand">
+              <span class="cabinet-booking-logo" aria-hidden="true">L</span>
+              <label>
+                <span>Онлайн-запись</span>
+                <select name="branch_id" required><option value="">Выберите филиал</option></select>
+                <span class="cabinet-booking-branch-meta" data-client-booking-branch-meta hidden></span>
+              </label>
+            </div>
+            <h1 class="cabinet-booking-title">Записаться на услугу</h1>
+            <section class="cabinet-booking-step">
+              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="services" aria-expanded="false" disabled>
+                <span class="cabinet-booking-step-icon" aria-hidden="true"><img src="/fronted/icons/services.svg" alt="" /></span>
+                <span><small>Услуги</small><b data-booking-service-summary>Выбрать услуги</b></span>
+                <i aria-hidden="true">›</i>
+              </button>
+              <div class="cabinet-booking-step-panel" data-booking-step-panel="services" hidden>
+                <label class="cabinet-booking-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Найти услугу" autocomplete="off" data-client-booking-service-search></label>
+                <fieldset class="cabinet-booking-services" data-client-booking-services disabled>
+                  <legend>Услуги</legend>
+                  <p class="cabinet-history-empty">Сначала выберите филиал.</p>
+                </fieldset>
+              </div>
+            </section>
+            <section class="cabinet-booking-step">
+              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="master" aria-expanded="false" disabled>
+                <span class="cabinet-booking-step-icon" aria-hidden="true"><img src="/fronted/icons/personal.svg" alt="" /></span>
+                <span><small>Специалист</small><b data-booking-master-summary>Выбрать специалиста</b></span>
+                <i aria-hidden="true">›</i>
+              </button>
+              <div class="cabinet-booking-step-panel" data-booking-step-panel="master" hidden>
+                <input type="hidden" name="master_id" disabled />
+                <div class="cabinet-booking-master-list" data-client-booking-masters>
+                  <p class="cabinet-history-empty">Сначала выберите филиал.</p>
+                </div>
+              </div>
+            </section>
+            <section class="cabinet-booking-step">
+              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="datetime" aria-expanded="false" disabled>
+                <span class="cabinet-booking-step-icon" aria-hidden="true"><img src="/fronted/icons/calendar.svg" alt="" /></span>
+                <span><small>Дата и время</small><b data-booking-date-summary>Выбрать дату и время</b></span>
+                <i aria-hidden="true">›</i>
+              </button>
+              <div class="cabinet-booking-step-panel" data-booking-step-panel="datetime" hidden>
+                <input name="booking_date" type="hidden" disabled />
+                <div class="cabinet-booking-calendar">
+                  <div class="cabinet-booking-calendar-head">
+                    <b data-booking-calendar-title></b>
+                    <span>
+                      <button type="button" aria-label="Предыдущий месяц" data-booking-calendar-prev>‹</button>
+                      <button type="button" aria-label="Следующий месяц" data-booking-calendar-next>›</button>
+                    </span>
+                  </div>
+                  <div class="cabinet-booking-weekdays" aria-hidden="true">
+                    <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span>
+                  </div>
+                  <div class="cabinet-booking-calendar-days" data-booking-calendar-days></div>
+                </div>
+                <fieldset class="cabinet-booking-slots" data-client-booking-slots disabled>
+                  <legend>Свободное время</legend>
+                  <p class="cabinet-history-empty">Выберите услугу, специалиста и дату.</p>
+                </fieldset>
+                <p class="cabinet-message" data-client-booking-message></p>
+                <button type="submit" data-client-booking-submit disabled>Записаться</button>
+              </div>
+            </section>
+          </form>
+          <section class="cabinet-my-bookings">
+            <h2 class="cabinet-subtitle">Мои визиты</h2>
+            <div data-client-booking-list></div>
+          </section>
+        </div>
         <div class="cabinet-panel" data-cabinet-view="achievements" hidden>
           <div class="cabinet-heading"><p>Личный кабинет</p><h1>Мои достижения</h1></div>
           <div class="cabinet-achievements-list" data-cabinet-achievements></div>
@@ -63,6 +136,7 @@
         </div>
         <nav class="cabinet-drawer-nav">
           <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">Мои данные</a>
+          <a class="cabinet-nav-link active" href="#my-booking" data-cabinet-tab="client_booking">Мои записи</a>
           <a class="cabinet-nav-link" href="#achievements" data-cabinet-tab="achievements">Мои достижения</a>
           <button type="button" class="cabinet-logout" data-cabinet-logout>Выход</button>
         </nav>
@@ -110,6 +184,11 @@
       const achievementsList = document.querySelector("[data-cabinet-achievements]");
       const achievementModal = document.querySelector("[data-cabinet-achievement-modal]");
       const achievementContent = document.querySelector("[data-cabinet-achievement-content]");
+      const clientBookingForm = document.querySelector("[data-client-booking-form]");
+      const clientBookingServices = document.querySelector("[data-client-booking-services]");
+      const clientBookingSlots = document.querySelector("[data-client-booking-slots]");
+      const clientBookingMessage = document.querySelector("[data-client-booking-message]");
+      const clientBookingList = document.querySelector("[data-client-booking-list]");
       const token = new URLSearchParams(window.location.search).get("token");
       const submitButton = form.querySelector("button");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
@@ -118,6 +197,9 @@
       let currentClient = null;
       let cabinetData = null;
       let selectedVisit = null;
+      let clientBookingOptions = null;
+      let clientBookingMasterPreviews = null;
+      let clientBookingCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
       const PWA_PUSH_PERMISSION_REQUESTED_KEY = "loyalty.pwaPushPermissionRequested.v2";
@@ -545,6 +627,307 @@
         return `/organizations/achievements/${item.id}/photo?v=${version}`;
       }
 
+      function selectedBookingServiceIds() {
+        return [...clientBookingForm.querySelectorAll('[name="service_ids"]:checked')].map((input) => Number(input.value));
+      }
+
+      function bookingScheduleLabel(schedule) {
+        if (!schedule || typeof schedule !== "object") return "\u0413\u0440\u0430\u0444\u0438\u043a \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
+        if (schedule.from || schedule.to) return `${schedule.from || "09:00"}\u2013${schedule.to || "18:00"}`;
+        const days = { monday: "\u041f\u043d", tuesday: "\u0412\u0442", wednesday: "\u0421\u0440", thursday: "\u0427\u0442", friday: "\u041f\u0442", saturday: "\u0421\u0431", sunday: "\u0412\u0441" };
+        const entries = Object.entries(schedule)
+          .filter(([day, value]) => days[day] && value && typeof value === "object")
+          .map(([day, value]) => `${days[day]} ${value.closed ? "\u0432\u044b\u0445\u043e\u0434\u043d\u043e\u0439" : `${value.from || "09:00"}\u2013${value.to || "18:00"}`}`);
+        return entries.length ? entries.join(" \u00b7 ") : "\u0413\u0440\u0430\u0444\u0438\u043a \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
+      }
+
+      function renderClientBookingBranchMeta() {
+        const meta = clientBookingForm.querySelector("[data-client-booking-branch-meta]");
+        const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+        const branch = clientBookingOptions?.branches?.find((item) => Number(item.id) === branchId);
+        if (!branch) {
+          meta.hidden = true;
+          meta.innerHTML = "";
+          return;
+        }
+        meta.hidden = false;
+        meta.innerHTML = `<span>${escapeHtml(branch.address || "Адрес не указан")}</span><span>${escapeHtml(bookingScheduleLabel(branch.work_schedule))}</span>`;
+      }
+
+      function bookingDurationLabel(seconds) {
+        const minutes = Math.round(Number(seconds || 0) / 60);
+        if (!minutes) return "";
+        const hours = Math.floor(minutes / 60);
+        const rest = minutes % 60;
+        return [hours ? `${hours} ч` : "", rest ? `${rest} мин` : ""].filter(Boolean).join(" ");
+      }
+
+      function bookingDateIso(value) {
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, "0");
+        const day = String(value.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function renderClientBookingCalendar() {
+        const input = clientBookingForm.elements.booking_date;
+        const minDate = input.min ? new Date(`${input.min}T00:00:00`) : new Date();
+        const maxDate = input.max ? new Date(`${input.max}T00:00:00`) : new Date(Date.now() + 30 * 86400000);
+        const selectedDate = input.value ? new Date(`${input.value}T00:00:00`) : null;
+        const monthStart = new Date(clientBookingCalendarMonth.getFullYear(), clientBookingCalendarMonth.getMonth(), 1);
+        const gridStart = new Date(monthStart);
+        gridStart.setDate(gridStart.getDate() - ((monthStart.getDay() + 6) % 7));
+        clientBookingForm.querySelector("[data-booking-calendar-title]").textContent =
+          monthStart.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+        clientBookingForm.querySelector("[data-booking-calendar-days]").innerHTML = Array.from({ length: 42 }, (_, index) => {
+          const date = new Date(gridStart);
+          date.setDate(gridStart.getDate() + index);
+          const iso = bookingDateIso(date);
+          const outside = date.getMonth() !== monthStart.getMonth();
+          const disabled = date < minDate || date > maxDate;
+          const selected = selectedDate && iso === bookingDateIso(selectedDate);
+          const today = iso === bookingDateIso(new Date());
+          return `<button type="button" data-booking-date="${iso}" ${disabled ? "disabled" : ""} class="${outside ? "outside" : ""}${selected ? " selected" : ""}${today ? " today" : ""}">${date.getDate()}</button>`;
+        }).join("");
+        const previousMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
+        const nextMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+        clientBookingForm.querySelector("[data-booking-calendar-prev]").disabled =
+          previousMonth < new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        clientBookingForm.querySelector("[data-booking-calendar-next]").disabled =
+          nextMonth > new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+      }
+
+      function setClientBookingStep(step, forceOpen) {
+        const selectedPanel = clientBookingForm.querySelector(`[data-booking-step-panel="${step}"]`);
+        const selectedTrigger = clientBookingForm.querySelector(`[data-booking-step-toggle="${step}"]`);
+        if (!selectedPanel || selectedTrigger?.disabled) return;
+        const shouldOpen = forceOpen ?? selectedPanel.hidden;
+        clientBookingForm.querySelectorAll("[data-booking-step-panel]").forEach((panel) => {
+          panel.hidden = panel !== selectedPanel || !shouldOpen;
+        });
+        clientBookingForm.querySelectorAll("[data-booking-step-toggle]").forEach((trigger) => {
+          trigger.setAttribute("aria-expanded", String(trigger === selectedTrigger && shouldOpen));
+        });
+        if (shouldOpen && step === "services") {
+          clientBookingForm.querySelector("[data-client-booking-service-search]")?.focus();
+        }
+      }
+
+      function updateClientBookingSummaries() {
+        const serviceIds = new Set(selectedBookingServiceIds());
+        const selectedServices = (clientBookingOptions?.services || []).filter((item) => serviceIds.has(Number(item.id)));
+        const serviceSummary = clientBookingForm.querySelector("[data-booking-service-summary]");
+        serviceSummary.textContent = selectedServices.length
+          ? (selectedServices.length === 1 ? selectedServices[0].title : `Выбрано услуг: ${selectedServices.length}`)
+          : "Выбрать услуги";
+        const masterInput = clientBookingForm.elements.master_id;
+        const selectedMaster = (clientBookingOptions?.masters || []).find((item) => String(item.id) === masterInput.value);
+        clientBookingForm.querySelector("[data-booking-master-summary]").textContent =
+          selectedMaster?.name || "Выбрать специалиста";
+        const dateValue = clientBookingForm.elements.booking_date.value;
+        const selectedTime = clientBookingForm.querySelector('[name="starts_at"]:checked')?.value;
+        const dateLabel = dateValue
+          ? new Date(`${dateValue}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })
+          : "";
+        clientBookingForm.querySelector("[data-booking-date-summary]").textContent =
+          dateLabel ? `${dateLabel}${selectedTime ? `, ${new Date(selectedTime).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : ""}` : "Выбрать дату и время";
+      }
+
+      function visitServiceTitle(item) {
+        const visit = item?.visit || item || {};
+        const line = String(visit.comment || "").split("\n").find((value) => value.startsWith("__services:"));
+        return line?.slice("__services:".length).trim() || "Визит";
+      }
+
+      function renderClientBookingList() {
+        const visits = [...(cabinetData?.visits || [])].sort((left, right) => {
+          const leftVisit = left.visit || left;
+          const rightVisit = right.visit || right;
+          return new Date(rightVisit.visit_at) - new Date(leftVisit.visit_at);
+        });
+        clientBookingList.innerHTML = visits.length ? visits.map((item) => {
+          const visit = item.visit || item;
+          return `<article class="cabinet-booking-visit">
+            <b>${escapeHtml(visitServiceTitle(item))}</b>
+            <span>${escapeHtml(new Date(visit.visit_at).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" }))}</span>
+            <small>${escapeHtml(visitStatus(visit.visit_status))}</small>
+          </article>`;
+        }).join("") : '<p class="cabinet-history-empty">Записей пока нет.</p>';
+      }
+
+      function renderClientBookingServices() {
+        const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+        const selectedIds = new Set(selectedBookingServiceIds());
+        const query = String(clientBookingForm.querySelector("[data-client-booking-service-search]")?.value || "").trim().toLocaleLowerCase("ru");
+        const services = (clientBookingOptions?.services || []).filter((item) =>
+          item.branch_ids.includes(branchId) && (!query || String(item.title || "").toLocaleLowerCase("ru").includes(query))
+        );
+        const groups = new Map();
+        services.forEach((item) => {
+          const title = item.category_title || "Услуги";
+          if (!groups.has(title)) groups.set(title, []);
+          groups.get(title).push(item);
+        });
+        clientBookingServices.disabled = !branchId;
+        clientBookingServices.innerHTML = `<legend>Услуги</legend>${services.length ? [...groups.entries()].map(([title, items]) => `
+          <section class="cabinet-booking-service-group">
+            <h3>${escapeHtml(title)}</h3>
+            ${items.map((item) => {
+              const meta = [
+                bookingDurationLabel(item.duration),
+                item.price === null || item.price === undefined ? "" : `${item.price} ₽`,
+              ].filter(Boolean).join(" · ");
+              return `<label class="cabinet-booking-service">
+                <span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(meta)}</small></span>
+                <input type="checkbox" name="service_ids" value="${escapeHtml(item.id)}" ${selectedIds.has(Number(item.id)) ? "checked" : ""} />
+              </label>`;
+            }).join("")}
+          </section>
+        `).join("") : '<p class="cabinet-history-empty">Подходящих услуг не найдено.</p>'}`;
+        updateClientBookingSummaries();
+      }
+
+      function renderClientBookingMasters() {
+        const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+        const serviceIds = selectedBookingServiceIds();
+        const availableMasters = (clientBookingOptions?.masters || []).filter((item) =>
+          item.branch_ids.includes(branchId) && (!serviceIds.length || serviceIds.every((id) => item.service_ids.includes(id)))
+        );
+        const masterInput = clientBookingForm.elements.master_id;
+        if (!availableMasters.some((item) => String(item.id) === masterInput.value)) masterInput.value = "";
+        masterInput.disabled = !branchId;
+        clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = !branchId;
+        clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = !branchId;
+        clientBookingForm.elements.booking_date.disabled = !branchId;
+        const availableIds = new Set(availableMasters.map((item) => Number(item.id)));
+        const masters = clientBookingMasterPreviews === null
+          ? availableMasters.map((item) => ({ ...item, nearest_slots: null }))
+          : clientBookingMasterPreviews.filter((item) => availableIds.has(Number(item.id)));
+        const container = clientBookingForm.querySelector("[data-client-booking-masters]");
+        container.innerHTML = !branchId
+          ? '<p class="cabinet-history-empty">Сначала выберите филиал.</p>'
+          : masters.length ? masters.map((item) => {
+            const initials = String(item.name || "?").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+            const slots = item.nearest_slots;
+            const nearestDate = slots?.[0]?.date
+              ? new Date(`${slots[0].date}T00:00:00`).toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long" })
+              : "";
+            return `<article class="cabinet-booking-master${String(item.id) === masterInput.value ? " selected" : ""}">
+              <label>
+                <input type="radio" name="master_choice" value="${escapeHtml(item.id)}" ${String(item.id) === masterInput.value ? "checked" : ""} />
+                <span class="cabinet-booking-master-avatar">${escapeHtml(initials)}</span>
+                <span><b>${escapeHtml(item.name)}</b><small>Оказывает услуг: ${escapeHtml(item.service_ids?.length || 0)}</small></span>
+              </label>
+              <div class="cabinet-booking-master-nearest">
+                ${slots === null ? '<small>Ищем ближайшее время…</small>' : slots.length
+                  ? `<small>Ближайшее время для записи, ${escapeHtml(nearestDate)}:</small><span>${slots.map((slot) => `<button type="button" data-booking-nearest-slot data-master-id="${escapeHtml(item.id)}" data-start="${escapeHtml(slot.start)}">${escapeHtml(slot.time)}</button>`).join("")}</span>`
+                  : '<small>На ближайшие дни свободного времени нет.</small>'}
+              </div>
+            </article>`;
+          }).join("") : '<p class="cabinet-history-empty">В этом филиале нет подходящих специалистов.</p>';
+        updateClientBookingSummaries();
+      }
+
+      async function loadClientBookingMasters() {
+        const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+        if (!branchId) {
+          clientBookingMasterPreviews = [];
+          renderClientBookingMasters();
+          return;
+        }
+        clientBookingMasterPreviews = null;
+        renderClientBookingMasters();
+        const params = new URLSearchParams({
+          branch_id: String(branchId),
+          service_ids: selectedBookingServiceIds().join(","),
+          days: "14",
+        });
+        try {
+          const result = await requestJson(`/booking-api/client-booking/masters?${params}`, { cache: "no-store" });
+          clientBookingMasterPreviews = result.masters || [];
+          renderClientBookingMasters();
+        } catch (error) {
+          clientBookingMasterPreviews = [];
+          clientBookingForm.querySelector("[data-client-booking-masters]").innerHTML =
+            `<p class="cabinet-message error">${escapeHtml(error.message || "Не удалось загрузить специалистов.")}</p>`;
+        }
+      }
+
+      async function loadClientBookingSlots() {
+        const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+        const serviceIds = selectedBookingServiceIds();
+        const masterId = Number(clientBookingForm.elements.master_id.value || 0);
+        const bookingDate = clientBookingForm.elements.booking_date.value;
+        clientBookingForm.querySelector("[data-client-booking-submit]").disabled = true;
+        if (!branchId || !serviceIds.length || !masterId || !bookingDate) {
+          clientBookingSlots.disabled = true;
+          clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Выберите услугу, специалиста и дату.</p>';
+          return;
+        }
+        clientBookingSlots.disabled = false;
+        clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Загружаем свободное время…</p>';
+        const params = new URLSearchParams({
+          branch_id: String(branchId),
+          service_ids: serviceIds.join(","),
+          master_id: String(masterId),
+          date_from: bookingDate,
+          days: "1",
+        });
+        try {
+          const result = await requestJson(`/booking-api/client-booking/slots?${params}`);
+          const slotGroups = [
+            ["Утро", result.slots.filter((slot) => Number(slot.time.slice(0, 2)) < 12)],
+            ["День", result.slots.filter((slot) => {
+              const hour = Number(slot.time.slice(0, 2));
+              return hour >= 12 && hour < 18;
+            })],
+            ["Вечер", result.slots.filter((slot) => Number(slot.time.slice(0, 2)) >= 18)],
+          ].filter(([, slots]) => slots.length);
+          clientBookingSlots.innerHTML = `<legend>Свободное время</legend>${slotGroups.length ? slotGroups.map(([title, slots]) => `
+            <section class="cabinet-booking-slot-group">
+              <h3>${title}</h3>
+              <div class="cabinet-booking-slot-grid">${slots.map((slot) => `
+                <label class="cabinet-booking-slot"><input type="radio" name="starts_at" value="${escapeHtml(slot.start)}" /><span>${escapeHtml(slot.time)}</span></label>
+              `).join("")}</div>
+            </section>
+          `).join("") : `<div class="cabinet-booking-no-slots">
+            <span aria-hidden="true">□</span>
+            <b>В этот день нет свободного времени</b>
+            <small>Выберите другую доступную дату.</small>
+          </div>`}`;
+        } catch (error) {
+          clientBookingSlots.innerHTML = `<legend>Свободное время</legend><p class="cabinet-message error">${escapeHtml(error.message)}</p>`;
+        }
+      }
+
+      async function loadClientBookingOptions() {
+        renderClientBookingList();
+        clientBookingOptions = null;
+        clientBookingMessage.className = "cabinet-message";
+        clientBookingMessage.textContent = "Загружаем варианты записи…";
+        try {
+          clientBookingOptions = await requestJson("/booking-api/client-booking/options", { cache: "no-store" });
+          const branchSelect = clientBookingForm.elements.branch_id;
+          branchSelect.innerHTML = `<option value="">Выберите филиал</option>${clientBookingOptions.branches.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}`;
+          renderClientBookingBranchMeta();
+          clientBookingForm.querySelector('[data-booking-step-toggle="services"]').disabled = true;
+          clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = true;
+          clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = true;
+          const today = new Date();
+          const maxDate = new Date();
+          maxDate.setDate(maxDate.getDate() + 30);
+          clientBookingForm.elements.booking_date.min = today.toISOString().slice(0, 10);
+          clientBookingForm.elements.booking_date.max = maxDate.toISOString().slice(0, 10);
+          clientBookingForm.elements.booking_date.value = today.toISOString().slice(0, 10);
+          clientBookingCalendarMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          renderClientBookingCalendar();
+          clientBookingMessage.textContent = "";
+        } catch (error) {
+          clientBookingMessage.textContent = error.message || "Не удалось загрузить онлайн-запись.";
+          clientBookingMessage.className = "cabinet-message error";
+        }
+      }
+
       function renderAchievements() {
         const all = cabinetData?.organization_achievements || [];
         const received = cabinetData?.achievements || [];
@@ -584,6 +967,7 @@
           view.hidden = view.dataset.cabinetView !== tab;
         });
         if (tab === "achievements") renderAchievements();
+        if (tab === "client_booking") loadClientBookingOptions();
       }
 
       function openCabinetMenu() {
@@ -744,7 +1128,8 @@
           event.preventDefault();
           setCabinetTab(link.dataset.cabinetTab);
           closeCabinetMenu();
-          history.replaceState(null, "", link.dataset.cabinetTab === "achievements" ? "#achievements" : "#my-data");
+          const tabHashes = { achievements: "#achievements", client_booking: "#my-booking", profile: "#my-data" };
+          history.replaceState(null, "", tabHashes[link.dataset.cabinetTab] || "#my-data");
         });
       });
 
@@ -836,6 +1221,125 @@
           pushStatus.textContent = error.message || "Не удалось обновить уведомления.";
         } finally {
           pushToggle.disabled = false;
+        }
+      });
+
+      clientBookingForm.addEventListener("change", async (event) => {
+        clientBookingMessage.textContent = "";
+        if (event.target.name === "branch_id") {
+          renderClientBookingBranchMeta();
+          clientBookingForm.querySelectorAll('[name="service_ids"]').forEach((input) => { input.checked = false; });
+          clientBookingForm.querySelector("[data-client-booking-service-search]").value = "";
+          clientBookingForm.elements.master_id.value = "";
+          clientBookingForm.querySelector('[data-booking-step-toggle="services"]').disabled = !event.target.value;
+          clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = !event.target.value;
+          clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = !event.target.value;
+          renderClientBookingServices();
+          renderClientBookingMasters();
+          loadClientBookingMasters();
+          await loadClientBookingSlots();
+          return;
+        }
+        if (event.target.name === "service_ids") {
+          renderClientBookingMasters();
+          loadClientBookingMasters();
+          await loadClientBookingSlots();
+          updateClientBookingSummaries();
+          return;
+        }
+        if (event.target.name === "master_choice") {
+          clientBookingForm.elements.master_id.value = event.target.value;
+          renderClientBookingMasters();
+          await loadClientBookingSlots();
+          updateClientBookingSummaries();
+          return;
+        }
+        if (event.target.name === "booking_date") {
+          updateClientBookingSummaries();
+          await loadClientBookingSlots();
+          return;
+        }
+        if (event.target.name === "starts_at") {
+          clientBookingForm.querySelector("[data-client-booking-submit]").disabled = false;
+          updateClientBookingSummaries();
+        }
+      });
+
+      clientBookingForm.addEventListener("click", async (event) => {
+        const trigger = event.target.closest("[data-booking-step-toggle]");
+        if (trigger) {
+          setClientBookingStep(trigger.dataset.bookingStepToggle);
+          if (trigger.dataset.bookingStepToggle === "master" && clientBookingMasterPreviews === null) loadClientBookingMasters();
+          return;
+        }
+        const nearestSlot = event.target.closest("[data-booking-nearest-slot]");
+        if (nearestSlot) {
+          clientBookingForm.elements.master_id.value = nearestSlot.dataset.masterId;
+          clientBookingForm.elements.booking_date.value = nearestSlot.dataset.start.slice(0, 10);
+          clientBookingCalendarMonth = new Date(`${nearestSlot.dataset.start.slice(0, 7)}-01T00:00:00`);
+          renderClientBookingMasters();
+          renderClientBookingCalendar();
+          updateClientBookingSummaries();
+          setClientBookingStep("datetime", true);
+          await loadClientBookingSlots();
+          const matchingSlot = [...clientBookingForm.querySelectorAll('[name="starts_at"]')]
+            .find((input) => input.value === nearestSlot.dataset.start);
+          if (matchingSlot) {
+            matchingSlot.checked = true;
+            clientBookingForm.querySelector("[data-client-booking-submit]").disabled = false;
+            updateClientBookingSummaries();
+          }
+          return;
+        }
+        const dateButton = event.target.closest("[data-booking-date]");
+        if (dateButton && !dateButton.disabled) {
+          clientBookingForm.elements.booking_date.value = dateButton.dataset.bookingDate;
+          renderClientBookingCalendar();
+          updateClientBookingSummaries();
+          loadClientBookingSlots();
+          return;
+        }
+        if (event.target.closest("[data-booking-calendar-prev]")) {
+          clientBookingCalendarMonth = new Date(clientBookingCalendarMonth.getFullYear(), clientBookingCalendarMonth.getMonth() - 1, 1);
+          renderClientBookingCalendar();
+          return;
+        }
+        if (event.target.closest("[data-booking-calendar-next]")) {
+          clientBookingCalendarMonth = new Date(clientBookingCalendarMonth.getFullYear(), clientBookingCalendarMonth.getMonth() + 1, 1);
+          renderClientBookingCalendar();
+        }
+      });
+
+      clientBookingForm.querySelector("[data-client-booking-service-search]").addEventListener("input", () => {
+        renderClientBookingServices();
+      });
+
+      clientBookingForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const startsAt = clientBookingForm.querySelector('[name="starts_at"]:checked')?.value;
+        const submit = clientBookingForm.querySelector("[data-client-booking-submit]");
+        if (!startsAt) return;
+        submit.disabled = true;
+        clientBookingMessage.className = "cabinet-message";
+        clientBookingMessage.textContent = "Создаём запись…";
+        try {
+          await requestJson("/booking-api/client-booking", {
+            method: "POST",
+            body: JSON.stringify({
+              branch_id: Number(clientBookingForm.elements.branch_id.value),
+              service_ids: selectedBookingServiceIds(),
+              master_id: Number(clientBookingForm.elements.master_id.value),
+              starts_at: startsAt,
+            }),
+          });
+          cabinetData = await requestJson("/auth/cabinet", { cache: "no-store" });
+          renderClientBookingList();
+          clientBookingMessage.textContent = "Запись успешно создана.";
+          await loadClientBookingSlots();
+        } catch (error) {
+          clientBookingMessage.className = "cabinet-message error";
+          clientBookingMessage.textContent = error.message || "Не удалось создать запись.";
+          submit.disabled = false;
         }
       });
 

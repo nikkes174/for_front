@@ -701,16 +701,20 @@ async function initCabinetForm() {
   }
 }
 
-function navLink(href, label) {
+function sidebarIcon(icon) {
+  return icon ? `<img class="sidebar-nav-icon" src="/fronted/icons/${icon}" alt="" aria-hidden="true" />` : "";
+}
+
+function navLink(href, label, icon = "") {
   if (href.includes("/settings") && !canAny(SETTINGS_PERMISSIONS)) return "";
   if (href.includes("/catalog") && !canAny(["settings.categories.view", "settings.items.view"])) return "";
   if (href.includes("/settings")) {
     const active = location.pathname === href;
-    return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
+    return `<a class="${active ? "active" : ""}" href="${href}">${sidebarIcon(icon)}<span>${escapeHtml(label)}</span></a>`;
   }
   if (href.includes("/catalog")) {
     const active = location.pathname === href;
-    return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
+    return `<a class="${active ? "active" : ""}" href="${href}">${sidebarIcon(icon)}<span>${escapeHtml(label)}</span></a>`;
   }
   const permission = href.includes("/clients")
     ? "clients.clients.view"
@@ -725,7 +729,7 @@ function navLink(href, label) {
   if (href.includes("/tasks") && !canAny(TASK_PERMISSIONS)) return "";
   if (permission && !can(permission)) return "";
   const active = location.pathname === href || (href.includes("/loyalty") && location.pathname.includes("/loyalty"));
-  return `<a class="${active ? "active" : ""}" href="${href}">${escapeHtml(label)}</a>`;
+  return `<a class="${active ? "active" : ""}" href="${href}">${sidebarIcon(icon)}<span>${escapeHtml(label)}</span></a>`;
 }
 
 function activeSettingsSectionSlug() {
@@ -763,7 +767,7 @@ function loyaltySidebarMenu(orgId) {
         aria-expanded="${isLoyaltyPage ? "true" : "false"}"
         aria-controls="loyalty-submenu"
       >
-        <span>Лояльность</span>
+        <span class="sidebar-group-label">${sidebarIcon("loylty.svg")}<span>Лояльность</span></span>
         <span class="sidebar-group-chevron" aria-hidden="true"></span>
       </button>
       <div
@@ -798,7 +802,7 @@ function catalogSidebarMenu(orgId) {
         aria-expanded="${isCatalogPage ? "true" : "false"}"
         aria-controls="catalog-submenu"
       >
-        <span>Товары и услуги</span>
+        <span class="sidebar-group-label">${sidebarIcon("services_main.svg")}<span>Товары и услуги</span></span>
         <span class="sidebar-group-chevron" aria-hidden="true"></span>
       </button>
       <div
@@ -834,7 +838,7 @@ function settingsSidebarMenu(orgId) {
         aria-expanded="${isSettingsPage ? "true" : "false"}"
         aria-controls="settings-submenu"
       >
-        <span>Настройки организации</span>
+        <span class="sidebar-group-label">${sidebarIcon("settings_org.svg")}<span>Настройки организации</span></span>
         <span class="sidebar-group-chevron" aria-hidden="true"></span>
       </button>
       <div
@@ -870,13 +874,13 @@ function shell(content, title) {
         <select aria-label="Организация" data-org-switch>${orgOptions}</select>
         <button class="ghost" data-open-onboarding>Создать организацию</button>
         <nav>
-          ${navLink(`/organizations/${org.id}`, "Главная")}
-          ${navLink(`/organizations/${org.id}/clients`, "Клиенты")}
+          ${navLink(`/organizations/${org.id}`, "Главная", "main.svg")}
+          ${navLink(`/organizations/${org.id}/clients`, "Клиенты", "clients.svg")}
           ${loyaltySidebarMenu(org.id)}
           ${catalogSidebarMenu(org.id)}
           ${settingsSidebarMenu(org.id)}
-          ${navLink(`/organizations/${org.id}/tasks`, "Задачи")}
-          ${navLink(`/organizations/${org.id}/booking`, "Записи")}
+          ${navLink(`/organizations/${org.id}/tasks`, "Задачи", "tasks.svg")}
+          ${navLink(`/organizations/${org.id}/booking`, "Записи", "recorsd.svg")}
         </nav>
       </aside>
       <main class="content">
