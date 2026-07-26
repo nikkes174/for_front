@@ -12,7 +12,7 @@ const STATUS_OPTIONS = [
 const bookingState = {
   weekStart: null,
   viewBy: "masters",
-  period: "all",
+  period: "week",
   calendarData: null,
   dateFrom: "",
   dateTo: "",
@@ -320,7 +320,11 @@ function filterOptions(data) {
 export async function booking(ctx) {
   bookingState.weekStart ||= weekStart();
   const start = bookingState.weekStart;
-  const defaultRange = monthRange(start);
+  const defaultRange = bookingState.period === "day"
+    ? { start, end: start }
+    : bookingState.period === "week"
+      ? { start, end: addDays(start, 6) }
+      : monthRange(start);
   const rangeStart = bookingState.dateFrom ? new Date(`${bookingState.dateFrom}T00:00:00`) : defaultRange.start;
   const rangeEnd = bookingState.dateTo ? new Date(`${bookingState.dateTo}T00:00:00`) : defaultRange.end;
   bookingState.pickerMonth ||= new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
@@ -543,7 +547,9 @@ export function bindBooking(root, ctx) {
   root.addEventListener("change", async (event) => {
     if (event.target.matches("[data-booking-period]")) {
       bookingState.period = event.target.value;
-      renderCalendar(root);
+      bookingState.dateFrom = "";
+      bookingState.dateTo = "";
+      ctx.reload();
       return;
     }
     if (event.target.matches("[data-booking-view]")) {
