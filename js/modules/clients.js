@@ -5,6 +5,11 @@ const CLIENTS_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_CLIENTS_PAGE_SIZE = 10;
 const CLIENT_FILTER_STORAGE_PREFIX = "loyalty.clients.filters.";
 const REGISTRATION_FIELDS_STORAGE_PREFIX = "loyalty.registrationFields.";
+const CLIENT_DETAILS_CACHE_TTL_MS = 15_000;
+const CLIENT_DETAILS_SHARED_CACHE_TTL_MS = 60_000;
+const clientDetailsCache = new Map();
+const clientDetailsRequests = new Map();
+const clientDetailsSharedCache = new Map();
 const REGISTRATION_FIELD_NAMES = [
   "last_name",
   "first_name",
@@ -43,6 +48,21 @@ let state = {
   clientAuthLink: null,
   authLinks: [],
 };
+
+function showClientToast(message) {
+  document.querySelector("[data-client-toast]")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "booking-toast";
+  toast.dataset.clientToast = "";
+  toast.setAttribute("role", "status");
+  toast.innerHTML = '<span aria-hidden="true">\u2713</span><b>' + escapeHtml(message) + "</b>";
+  document.body.append(toast);
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+  window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+    window.setTimeout(() => toast.remove(), 200);
+  }, 2600);
+}
 
 const no = "Не указано";
 const notSpecified = "Не указано";
@@ -1022,75 +1042,130 @@ function clientCardData(client) {
   };
 }
 
-async function loadClientDetails(client, orgId) {
-  const [profile, metric, visits, accounts, categories, achievements, additionalFields, clientBranches, bonusTypes, bonusLevels, bonusBalance, bonusHistory, pushStatus, referralSources, referralStats] = await Promise.all([
-    api.clientProfile(client.id, orgId).catch(() => null),
-    api.clientProfileMetric(client.id).catch(() => null),
-    api.clientHistoryVisits(client.id).catch(() => []),
-    api.clientAccounts(client.id).catch(() => null),
-    api.clientCategories(client.id).catch(() => []),
-    api.clientAchievements(client.id).catch(() => []),
-    api.clientAdditionalFieldValues(client.id).catch(() => []),
-    api.clientBranches(client.id).catch(() => []),
+async function clientDetailsSharedResources(orgId) {
+  const key = String(orgId);
+  const cached = clientDetailsSharedCache.get(key);
+  if (cached?.expiresAt > Date.now()) return cached.value;
+  if (cached?.request) return cached.request;
+
+  const request = Promise.all([
     api.bonusTypes(orgId).catch(() => []),
     api.bonusLevels(orgId).catch(() => []),
-    api.bonusBalance(client.id).catch(() => null),
-    api.bonusHistory(client.id).catch(() => []),
-    api.pushStatus(orgId, client.id).catch(() => ({ enabled: false })),
     api.referralSources().catch(() => []),
-    api.referralStats(client.id).catch(() => ({ invites_count: 0 })),
-  ]);
-  const referralProgram = (referralSources || []).find((item) => !item.referrer_client_id && item.is_active) || null;
-  let personalReferralSource = (referralSources || []).find((item) => String(item.referrer_client_id) === String(client.id)) || null;
-  if (!personalReferralSource && referralProgram) {
-    personalReferralSource = await api.createReferralSource({
-      referrer_client_id: client.id,
-      program_source_id: referralProgram.id,
-      program_name: referralProgram.program_name,
-      is_active: true,
-    }).catch(() => null);
-  } else if (personalReferralSource && referralProgram && String(personalReferralSource.program_source_id || "") !== String(referralProgram.id)) {
-    personalReferralSource = await api.updateReferralSource(personalReferralSource.id, {
-      program_source_id: referralProgram.id,
-      program_name: referralProgram.program_name,
-    }).catch(() => personalReferralSource);
-  }
-  const manualActorIds = [...new Set((bonusHistory || [])
-    .map((item) => item.usage_restrictions?.manual_operation?.actor_id)
-    .filter((actorId) => actorId != null && !state.users.some((user) => String(user.id) === String(actorId))))];
-  if (manualActorIds.length) {
-    const missingActors = await Promise.all(manualActorIds.map((actorId) => api.user(actorId).catch(() => null)));
-    state.users = [...state.users, ...missingActors.filter(Boolean)];
-  }
-  const balancesByType = await Promise.all((bonusTypes || []).map((bonusType) => (
-    api.bonusBalance(client.id, bonusType.code).catch(() => null)
-  )));
-  const selectedBonusBalance = balancesByType
-    .filter(Boolean)
-    .sort((left, right) => Number(right.balance || 0) - Number(left.balance || 0))[0] || bonusBalance;
-  const clientWithPushState = {
-    ...client,
-    push_notifications_enabled: !!pushStatus?.enabled,
-  };
+  ]).then(([bonusTypes, bonusLevels, referralSources]) => {
+    const value = { bonusTypes, bonusLevels, referralSources };
+    clientDetailsSharedCache.set(key, {
+      value,
+      expiresAt: Date.now() + CLIENT_DETAILS_SHARED_CACHE_TTL_MS,
+    });
+    return value;
+  });
+  clientDetailsSharedCache.set(key, { request, expiresAt: 0 });
+  return request;
+}
 
-  return {
-    ...clientWithPushState,
-    card: clientCardData(clientWithPushState),
-    profile,
-    metric: mergeMetrics(metric || profile?.metrics, buildMetricsFromVisits(visits)),
-    visits,
-    accounts,
-    categories,
-    achievements,
-    additionalFields,
-    clientBranches: clientBranches?.length ? clientBranches : branchesFromVisits(visits),
-    bonusTypes,
-    bonusLevels,
-    bonusBalance: selectedBonusBalance,
-    bonusHistory,
-    personalReferralSource,
-    referralStats,
-  };
+async function loadClientDetails(client, orgId, { force = false } = {}) {
+  const cacheKey = String(orgId) + ":" + String(client.id);
+  const cached = clientDetailsCache.get(cacheKey);
+  if (!force && cached?.expiresAt > Date.now()) return cached.value;
+  if (!force && clientDetailsRequests.has(cacheKey)) return clientDetailsRequests.get(cacheKey);
+
+  const request = (async () => {
+    const [profile, visits, accounts, categories, achievements, additionalFields, clientBranches, shared, bonusHistory, pushStatus, referralStats] = await Promise.all([
+      api.clientProfile(client.id, orgId).catch(() => null),
+      api.clientHistoryVisits(client.id).catch(() => []),
+      api.clientAccounts(client.id).catch(() => null),
+      api.clientCategories(client.id).catch(() => []),
+      api.clientAchievements(client.id).catch(() => []),
+      api.clientAdditionalFieldValues(client.id).catch(() => []),
+      api.clientBranches(client.id).catch(() => []),
+      clientDetailsSharedResources(orgId),
+      api.bonusHistory(client.id).catch(() => []),
+      api.pushStatus(orgId, client.id).catch(() => ({ enabled: false })),
+      api.referralStats(client.id).catch(() => ({ invites_count: 0 })),
+    ]);
+    const { bonusTypes, bonusLevels, referralSources } = shared;
+    const referralProgram = (referralSources || []).find((item) => !item.referrer_client_id && item.is_active) || null;
+    let personalReferralSource = (referralSources || []).find((item) => String(item.referrer_client_id) === String(client.id)) || null;
+    if (!personalReferralSource && referralProgram) {
+      personalReferralSource = await api.createReferralSource({
+        referrer_client_id: client.id,
+        program_source_id: referralProgram.id,
+        program_name: referralProgram.program_name,
+        is_active: true,
+      }).catch(() => null);
+      if (personalReferralSource) referralSources.push(personalReferralSource);
+    } else if (personalReferralSource && referralProgram && String(personalReferralSource.program_source_id || "") !== String(referralProgram.id)) {
+      const previousSource = personalReferralSource;
+      personalReferralSource = await api.updateReferralSource(personalReferralSource.id, {
+        program_source_id: referralProgram.id,
+        program_name: referralProgram.program_name,
+      }).catch(() => previousSource);
+      const sourceIndex = referralSources.findIndex((item) => String(item.id) === String(personalReferralSource.id));
+      if (sourceIndex >= 0) referralSources[sourceIndex] = personalReferralSource;
+    }
+
+    const manualActorIds = [...new Set((bonusHistory || [])
+      .map((item) => item.usage_restrictions?.manual_operation?.actor_id)
+      .filter((actorId) => actorId != null && !state.users.some((user) => String(user.id) === String(actorId))))];
+    if (manualActorIds.length) {
+      const missingActors = await Promise.all(manualActorIds.map((actorId) => api.user(actorId).catch(() => null)));
+      state.users = [...state.users, ...missingActors.filter(Boolean)];
+    }
+
+    const bonusTypeCodes = [...new Set((bonusTypes || []).map((item) => item.code).filter(Boolean))];
+    const balancesByType = await Promise.all(
+      (bonusTypeCodes.length ? bonusTypeCodes : [""]).map((bonusType) => (
+        api.bonusBalance(client.id, bonusType).catch(() => null)
+      )),
+    );
+    const selectedBonusBalance = balancesByType
+      .filter(Boolean)
+      .sort((left, right) => Number(right.balance || 0) - Number(left.balance || 0))[0] || null;
+    const clientWithPushState = {
+      ...client,
+      push_notifications_enabled: !!pushStatus?.enabled,
+    };
+    const value = {
+      ...clientWithPushState,
+      card: clientCardData(clientWithPushState),
+      profile,
+      metric: mergeMetrics(profile?.metrics, buildMetricsFromVisits(visits)),
+      visits,
+      accounts,
+      categories,
+      achievements,
+      additionalFields,
+      clientBranches: clientBranches?.length ? clientBranches : branchesFromVisits(visits),
+      bonusTypes,
+      bonusLevels,
+      bonusBalance: selectedBonusBalance,
+      bonusHistory,
+      personalReferralSource,
+      referralStats,
+    };
+    clientDetailsCache.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + CLIENT_DETAILS_CACHE_TTL_MS,
+    });
+    return value;
+  })();
+
+  clientDetailsRequests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (clientDetailsRequests.get(cacheKey) === request) clientDetailsRequests.delete(cacheKey);
+  }
+}
+
+function refreshSelectedClientModal(root, ctx) {
+  const pageContent = root.querySelector("[data-page-content]") || root;
+  pageContent.querySelector("[data-client-modal]")?.remove();
+  pageContent.insertAdjacentHTML("beforeend", modal(state.selectedClient));
+  pageContent.querySelectorAll("[data-client-modal] [data-permission]").forEach((node) => {
+    if (!ctx.can(node.dataset.permission)) node.remove();
+  });
 }
 
 function modal(client) {
@@ -1103,15 +1178,21 @@ function modal(client) {
   const loyaltyLevel = currentLoyaltyLevel(client.bonusHistory, client.bonusLevels);
   const autoLevelTransitionDisabled = [true, "true"].includes(loyaltyLevelState?.usage_restrictions?.auto_level_transition_disabled);
   const loyaltyBonusType = client.bonusBalance?.bonus_type || client.bonusTypes?.[0]?.code || "";
+  const profilePhoto = state.photoPreviewUrl || clientPhotoUrl(client);
+  const initials = [client.first_name, client.last_name].filter(Boolean).map((part) => String(part).trim().charAt(0)).join("").slice(0, 2).toUpperCase() || "К";
 
   return `
     <div class="modal-backdrop" data-client-modal>
-      <div class="modal-card">
+      <div class="modal-card client-profile-modal">
         <div class="modal-head">
           <h3>${escapeHtml(name(client))}</h3>
           <button type="button" class="ghost" data-close-client>Закрыть</button>
         </div>
-      <form class="modal-grid" data-client-edit data-permission="clients.clients.edit">
+        <header class="client-profile-card-head">
+          <div class="client-profile-avatar">${profilePhoto ? `<img src="${escapeHtml(profilePhoto)}" alt="Фото клиента">` : `<span>${escapeHtml(initials)}</span>`}</div>
+          <div class="client-profile-summary"><span>Карточка клиента</span><h4>${escapeHtml(name(client))}</h4><p>ID ${escapeHtml(client.id)} · ${escapeHtml(statusLabel(card.status))}</p></div>
+        </header>
+      <form class="modal-grid client-profile-form" data-client-edit data-permission="clients.clients.edit">
           ${field("Имя", "first_name", card.first_name)}
           ${field("Фамилия", "last_name", card.last_name)}
           ${field("Отчество", "middle_name", card.middle_name)}
@@ -1622,6 +1703,7 @@ export function bindClients(root, ctx) {
     event.preventDefault();
     setMessage(form, "");
     const data = form.matches("[data-visit-create], [data-visit-edit]") ? visitFormData(form) : formData(form);
+    let successToastMessage = "";
 
     try {
       if (form.matches("[data-client-one-time-auth-link-create]") && state.selectedClient) {
@@ -1633,6 +1715,9 @@ export function bindClients(root, ctx) {
           one_time: false,
           registration_fields: Array.isArray(registrationSettings?.fields) ? registrationSettings.fields : enabledRegistrationFields(ctx.org.id),
         }));
+        form.outerHTML = selectedClientAuthLinkForm();
+        showClientToast("\u0421\u0441\u044b\u043b\u043a\u0430 \u0441\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u0430");
+        return;
       } else if (form.matches("[data-client-create]")) {
         const created = await api.createClient(clean({
           organization_id: ctx.org.id,
@@ -1676,8 +1761,9 @@ export function bindClients(root, ctx) {
           status: optional(data.status),
         }));
         upsertClient(updated);
-        state.selectedClient = await loadClientDetails(updated, ctx.org.id);
+        state.selectedClient = await loadClientDetails(updated, ctx.org.id, { force: true });
         clearPhotoPreview();
+        successToastMessage = "\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b";
       } else if (form.matches("[data-client-bonus-op]") && state.selectedClient) {
         state.bonusTransactionType = data.transaction_type || "accrual";
         const body = {
@@ -1690,7 +1776,8 @@ export function bindClients(root, ctx) {
         if (data.transaction_type === "write_off") await api.writeOffBonus(body);
         else if (data.transaction_type === "expiration") await api.expireBonus(body);
         else await api.accrueBonus(body);
-        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
+        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true });
+        successToastMessage = "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0430";
       } else if (form.matches("[data-visit-create]") && state.selectedClient) {
         data.total_cost = String(calculateVisitTotalCost(data));
         data.paid_amount = calculatePaidAmount(data.total_cost, data.discount_amount, data.discount_type);
@@ -1714,9 +1801,10 @@ export function bindClients(root, ctx) {
           comment: optional(buildVisitComment(data)),
         }));
 
-        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
+        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true });
         state.visitDraft = {};
         state.visitErrors = {};
+        successToastMessage = "\u0412\u0438\u0437\u0438\u0442 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d";
       } else if (form.matches("[data-visit-edit]") && state.selectedClient && state.selectedVisit) {
         data.total_cost = String(calculateVisitTotalCost(data));
         data.paid_amount = calculatePaidAmount(data.total_cost, data.discount_amount, data.discount_type);
@@ -1733,9 +1821,14 @@ export function bindClients(root, ctx) {
           comment: optional(buildVisitComment(data)),
         }));
 
-        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
+        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true });
         state.selectedVisit = (state.selectedClient.visits || []).find((item) => String((item.visit || item).id) === String(currentVisit.id)) || null;
         state.selectedVisitDraft = {};
+      }
+      if (successToastMessage) showClientToast(successToastMessage);
+      if (form.closest("[data-client-modal]")) {
+        refreshSelectedClientModal(root, ctx);
+        return;
       }
       ctx.reload();
     } catch (error) {
@@ -1775,6 +1868,7 @@ export function bindClients(root, ctx) {
         delete saveLevelButton.dataset.levelDirty;
         delete saveLevelButton.dataset.referralDirty;
         saveLevelButton.textContent = "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e";
+        showClientToast("\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b");
       } catch {
         saveLevelButton.disabled = false;
       }
@@ -1887,7 +1981,7 @@ export function bindClients(root, ctx) {
         state.visitErrors = {};
         state.clientAuthLink = null;
         state.selectedClient = await loadClientDetails(client, ctx.org.id);
-        ctx.reload();
+        refreshSelectedClientModal(root, ctx);
       }
       return;
     }
@@ -1904,7 +1998,7 @@ export function bindClients(root, ctx) {
     if (deleteVisitButton && state.selectedClient) {
       const visitId = deleteVisitButton.dataset.deleteVisit;
       await api.deleteClientVisit(visitId);
-      state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id);
+      state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true });
       if (state.selectedVisit && String((state.selectedVisit.visit || state.selectedVisit).id) === String(visitId)) {
         state.selectedVisit = null;
         state.selectedVisitDraft = {};

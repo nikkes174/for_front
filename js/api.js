@@ -96,6 +96,12 @@ export const api = {
   createProductItem: (body) => request("/organizations/product-items", { method: "POST", body: JSON.stringify(body) }),
   updateProductItem: (id, body) => request(`/organizations/product-items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteProductItem: (id) => request(`/organizations/product-items/${id}`, { method: "DELETE" }),
+  uploadProductItemImages: (id, files) => {
+    const data = new FormData();
+    [...files].forEach((file) => data.append("files", file));
+    return upload(`/organizations/product-items/${id}/images`, data);
+  },
+  deleteProductItemImage: (id, imageId) => request(`/organizations/product-items/${id}/images/${encodeURIComponent(imageId)}`, { method: "DELETE" }),
   masterServices: (orgId, serviceId = "") => request(`/master-services/organizations/${orgId}${serviceId ? `?service_id=${serviceId}` : ""}`),
   createMasterService: (body) => request("/master-services", { method: "POST", body: JSON.stringify(body) }),
   updateMasterService: (id, body) => request(`/master-services/pairs/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -129,6 +135,11 @@ export const api = {
   user: (id) => request(`/users-access/users/${id}`),
   createUser: (body) => request("/users-access/users", { method: "POST", body: JSON.stringify(body) }),
   updateUser: (id, body) => request(`/users-access/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  uploadUserPhoto: (id, file) => {
+    const data = new FormData();
+    data.append("file", file);
+    return upload(`/users-access/users/${id}/photo`, data);
+  },
   blockUser: (id) => request(`/users-access/users/${id}/block`, { method: "POST" }),
   unblockUser: (id) => request(`/users-access/users/${id}/unblock`, { method: "POST" }),
   roles: (orgId) => request(`/users-access/organizations/${orgId}/roles`),
@@ -191,6 +202,13 @@ export const api = {
   clientHistoryVisits: (id) => request(`/crm-api/client-history/visits?client_id=${id}&include_services=true&include_products=true`),
   createClientVisit: (body) => request("/crm-api/client-history/visits", { method: "POST", body: JSON.stringify(body) }),
   updateClientVisit: (id, body) => request(`/crm-api/client-history/visits/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  clientVisit: (id) => request(`/crm-api/client-history/visits/${id}`),
+  uploadVisitPhotos: (id, stage, files) => {
+    const data = new FormData();
+    [...files].forEach((file) => data.append("files", file));
+    return upload(`/crm-api/client-history/visits/${id}/photos/${stage}`, data);
+  },
+  deleteVisitPhoto: (id, stage, photoId) => request(`/crm-api/client-history/visits/${id}/photos/${stage}/${encodeURIComponent(photoId)}`, { method: "DELETE" }),
   deleteClientVisit: (id) => request(`/crm-api/client-history/visits/${id}`, { method: "DELETE" }),
   bookingCalendar: (orgId, dateFrom, dateTo, viewBy, branchId = "", employeeId = "") => request(`/booking-api/calendar?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}&view_by=${viewBy}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),
   updateBookingVisitStatus: (id, visitStatus) => request(`/booking-api/visits/${id}/status`, { method: "PATCH", body: JSON.stringify({ visit_status: visitStatus }) }),

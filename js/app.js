@@ -869,7 +869,6 @@ function shell(content, title) {
       <aside class="sidebar ${sidebarOpen ? "is-open" : ""}" data-sidebar aria-label="Основное меню" aria-hidden="${sidebarOpen ? "false" : "true"}">
         <div class="sidebar-head">
         <strong class="brand">Лояльность</strong>
-          <button type="button" class="sidebar-close" data-sidebar-close aria-label="Закрыть меню">×</button>
         </div>
         <select aria-label="Организация" data-org-switch>${orgOptions}</select>
         <button class="ghost" data-open-onboarding>Создать организацию</button>
@@ -893,9 +892,7 @@ function shell(content, title) {
               aria-label="${sidebarOpen ? "Меню открыто" : "Открыть меню"}"
               aria-expanded="${sidebarOpen ? "true" : "false"}"
             >
-              <span class="sidebar-toggle-box" aria-hidden="true">
-                <span></span><span></span><span></span>
-              </span>
+              <img src="/fronted/icons/slider_menu.svg" alt="" aria-hidden="true">
             </button>
             <div><span data-org-title>${escapeHtml(org.name)}</span><h1 data-page-title>${escapeHtml(title)}</h1></div>
           </div>
@@ -1196,12 +1193,8 @@ root.addEventListener("click", async (event) => {
     return;
   }
   if (event.target.closest("[data-sidebar-toggle]")) {
-    openSidebar();
-    return;
-  }
-
-  if (event.target.closest("[data-sidebar-close]")) {
-    closeSidebar({ restoreFocus: true });
+    if (sidebarOpen) closeSidebar();
+    else openSidebar();
     return;
   }
 

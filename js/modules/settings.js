@@ -13,6 +13,7 @@ let userFilterBranchId = "";
 let userFilterRoleId = "";
 let userFilterDepartmentId = "";
 let userFilterWorkplaceId = "";
+let userHideInactive = false;
 let userPage = 1;
 let auditPage = 1;
 let eventsPage = 1;
@@ -485,21 +486,46 @@ function productItemStaffFields(item) {
   const users = cache.users || [];
   if (!users.length) return "";
   const pairsByMaster = new Map((item.master_services || []).map((pair) => [String(pair.master_id), pair]));
-  const selectedUsers = users.filter((user) => pairsByMaster.has(String(user.id)) || (item.staff || []).some((staff) => String(staff.id) === String(user.id)));
+  const selectedMasterIds = new Set([
+    ...pairsByMaster.keys(),
+    ...(item.staff || []).map((staff) => String(staff.id)),
+  ]);
   return `
     <div class="service-staff-editor modal-full" data-service-staff-editor>
-      <label><span>Сотрудники, оказывающие услугу</span><input type="search" list="service-staff-options-${escapeHtml(item.id)}" placeholder="Начните вводить имя сотрудника" autocomplete="off" data-service-staff-search></label>
-      <datalist id="service-staff-options-${escapeHtml(item.id)}">
-        ${users.map((user) => `<option value="${escapeHtml(userLabelById(user.id))}"></option>`).join("")}
-      </datalist>
-      <div class="service-staff-grid" data-service-staff-grid>
-        ${selectedUsers.map((user) => serviceStaffRow(user, pairsByMaster.get(String(user.id)), item)).join("")}
+      <div class="service-staff-editor-head">
+        <strong>Сотрудники, оказывающие услугу</strong>
+        <div class="service-staff-editor-actions">
+          <label class="service-staff-filter"><input type="checkbox" data-select-all-service-staff ${users.length && users.every((user) => selectedMasterIds.has(String(user.id))) ? "checked" : ""}> <span>Выбрать всех</span></label>
+          <label class="service-staff-filter"><input type="checkbox" data-hide-inactive-service-staff> <span>Скрыть неактивных</span></label>
+        </div>
+      </div>
+      <div class="service-staff-table-wrap">
+        <table class="service-staff-table">
+          <thead><tr><th>Оказывает услугу</th><th>Сотрудник</th><th>Цена от</th><th>Цена до</th><th>Длительность</th><th>Тех. перерыв, мин</th></tr></thead>
+          <tbody data-service-staff-grid>
+            ${users.map((user) => serviceStaffRow(user, pairsByMaster.get(String(user.id)), item, selectedMasterIds.has(String(user.id)))).join("")}
+          </tbody>
+        </table>
       </div>
     </div>
   `;
 }
 
-function serviceStaffRow(user, pair = {}, item = {}) {
+function userPhotoField(item) {
+  const photoUrl = item?.id && item.photo_file_id ? `/users-access/users/${item.id}/photo?v=${encodeURIComponent(item.updated_at || item.photo_file_id)}` : "";
+  const initials = [item?.first_name, item?.last_name].filter(Boolean).map((part) => String(part).trim().charAt(0)).join("").slice(0, 2).toUpperCase() || "П";
+  return `
+    <div class="user-photo-field">
+      <div class="user-profile-avatar" data-user-photo-preview>${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Фото пользователя">` : `<span>${escapeHtml(initials)}</span>`}</div>
+      <label class="photo-upload-control">
+        <input name="user_photo_file" type="file" accept="image/*" hidden>
+        <span class="photo-upload-button">${photoUrl ? "Заменить фото" : "Добавить фото"}</span>
+      </label>
+    </div>
+  `;
+}
+
+function serviceStaffRow(user, pair = {}, item = {}, enabled = false) {
   const durationSeconds = Number(pair?.service_duration || 0);
   const durationHours = Math.floor(durationSeconds / 3600);
   const durationMinutes = Math.floor((durationSeconds % 3600) / 60);
@@ -507,33 +533,48 @@ function serviceStaffRow(user, pair = {}, item = {}) {
   const defaultDurationHours = Math.floor(defaultDurationSeconds / 3600);
   const defaultDurationMinutes = Math.floor((defaultDurationSeconds % 3600) / 60);
   const technicalBreakMinutes = Math.floor(Number(pair?.technical_break_duration ?? 0) / 60);
-  return `<div class="service-staff-row" data-master-service-row data-pair-id="${escapeHtml(pair?.id || "")}" data-master-id="${escapeHtml(user.id)}">
-    <strong>${escapeHtml(userLabelById(user.id))}</strong>
-    <label><span>Цена от</span><input name="master_price_min" type="number" step="0.01" min="0" placeholder="Цена услуги: ${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_min ?? "")}"></label>
-    <label><span>Цена до</span><input name="master_price_max" type="number" step="0.01" min="0" placeholder="Цена услуги: ${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_max ?? "")}"></label>
-    <label><span>Длительность</span><span class="service-duration-inputs"><input name="master_service_duration_hours" type="number" min="0" step="1" placeholder="${escapeHtml(defaultDurationHours)}" value="${durationSeconds ? escapeHtml(durationHours) : ""}"><i>ч</i><input name="master_service_duration_minutes" type="number" min="0" max="59" step="1" placeholder="${escapeHtml(defaultDurationMinutes)}" value="${durationSeconds ? escapeHtml(durationMinutes) : ""}"><i>мин</i></span></label>
-    <label><span>Тех. перерыв, мин</span><input name="master_technical_break_minutes" type="number" step="1" min="0" value="${escapeHtml(technicalBreakMinutes)}" required></label>
-    <button type="button" class="ghost" title="Удалить сотрудника" data-remove-service-staff>×</button>
-  </div>`;
+  const disabled = enabled ? "" : " disabled";
+  return `<tr class="service-staff-row${enabled ? "" : " is-disabled"}" data-master-service-row data-pair-id="${escapeHtml(pair?.id || "")}" data-master-id="${escapeHtml(user.id)}">
+    <td><label class="service-staff-enabled"><input type="checkbox" data-master-service-enabled ${enabled ? "checked" : ""}> <span>Активен</span></label></td>
+    <td><strong>${escapeHtml(userLabelById(user.id))}</strong></td>
+    <td><input name="master_price_min" aria-label="Цена от для ${escapeHtml(userLabelById(user.id))}" type="number" step="0.01" min="0" placeholder="${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_min ?? "")}"${disabled}></td>
+    <td><input name="master_price_max" aria-label="Цена до для ${escapeHtml(userLabelById(user.id))}" type="number" step="0.01" min="0" placeholder="${escapeHtml(item.price ?? "не указана")}" value="${escapeHtml(pair?.price_max ?? "")}"${disabled}></td>
+    <td><span class="service-duration-inputs"><input name="master_service_duration_hours" aria-label="Часы длительности для ${escapeHtml(userLabelById(user.id))}" type="number" min="0" step="1" placeholder="${escapeHtml(defaultDurationHours)}" value="${durationSeconds ? escapeHtml(durationHours) : ""}"${disabled}><i>ч</i><input name="master_service_duration_minutes" aria-label="Минуты длительности для ${escapeHtml(userLabelById(user.id))}" type="number" min="0" max="59" step="1" placeholder="${escapeHtml(defaultDurationMinutes)}" value="${durationSeconds ? escapeHtml(durationMinutes) : ""}"${disabled}><i>мин</i></span></td>
+    <td><input name="master_technical_break_minutes" aria-label="Технический перерыв для ${escapeHtml(userLabelById(user.id))}" type="number" step="1" min="0" value="${escapeHtml(technicalBreakMinutes)}" required${disabled}></td>
+  </tr>`;
 }
 
 function serviceStaffPayload(form) {
-  return [...form.querySelectorAll("[data-master-service-row]")].map((row) => ({ id: Number(row.dataset.masterId) }));
+  return [...form.querySelectorAll("[data-master-service-row]")]
+    .filter((row) => row.querySelector("[data-master-service-enabled]")?.checked)
+    .map((row) => ({ id: Number(row.dataset.masterId) }));
 }
 
-function addServiceStaffFromSearch(search) {
-  const editor = search.closest("[data-service-staff-editor]");
-  const grid = editor?.querySelector("[data-service-staff-grid]");
-  const value = String(search.value || "").trim().toLocaleLowerCase();
-  const user = (cache.users || []).find((candidate) => userLabelById(candidate.id).trim().toLocaleLowerCase() === value);
-  if (!grid || !user) return false;
-  if (!grid.querySelector(`[data-master-id="${user.id}"]`)) grid.insertAdjacentHTML("beforeend", serviceStaffRow(user));
-  search.value = "";
-  return true;
+function syncServiceStaffRow(row) {
+  if (!row) return;
+  const enabled = Boolean(row.querySelector("[data-master-service-enabled]")?.checked);
+  row.classList.toggle("is-disabled", !enabled);
+  row.querySelectorAll("input:not([data-master-service-enabled])").forEach((input) => {
+    input.disabled = !enabled;
+  });
+  const hideInactive = row.closest("[data-service-staff-editor]")?.querySelector("[data-hide-inactive-service-staff]")?.checked;
+  row.hidden = Boolean(hideInactive && !enabled);
+}
+
+function syncServiceStaffTable(editor) {
+  editor?.querySelectorAll("[data-master-service-row]").forEach(syncServiceStaffRow);
+  const selectAll = editor?.querySelector("[data-select-all-service-staff]");
+  const toggles = [...(editor?.querySelectorAll("[data-master-service-enabled]") || [])];
+  if (selectAll) {
+    selectAll.checked = Boolean(toggles.length && toggles.every((input) => input.checked));
+    selectAll.indeterminate = Boolean(toggles.some((input) => input.checked) && !selectAll.checked);
+  }
 }
 
 function masterServicePayload(form) {
-  return [...form.querySelectorAll("[data-master-service-row]")].map((row) => ({
+  return [...form.querySelectorAll("[data-master-service-row]")]
+    .filter((row) => row.querySelector("[data-master-service-enabled]")?.checked)
+    .map((row) => ({
     pairId: Number(row.dataset.pairId) || null,
     master_id: Number(row.dataset.masterId),
     price_min: numberOrNull(row.querySelector('[name="master_price_min"]')?.value),
@@ -544,22 +585,25 @@ function masterServicePayload(form) {
   }));
 }
 
-function serviceImagePath(item) {
-  return item.image_group?.images?.basic?.path || "";
+function serviceImageEntries(item) {
+  const images = item.image_group?.images || {};
+  const album = Array.isArray(images.album) ? images.album.filter((image) => image?.path) : [];
+  if (album.length) return album;
+  return images.basic?.path ? [{ path: images.basic.path }] : [];
 }
 
-function serviceImageGroupPayload(data) {
-  const path = optional(data.image_path);
-  if (!path) return null;
-  return {
-    entity: "settings_service",
-    images: {
-      basic: {
-        path,
-        version: "basic",
-      },
-    },
-  };
+function serviceImageAlbumField(item) {
+  const images = serviceImageEntries(item);
+  return `<div class="service-image-album modal-full" data-service-image-album data-existing-images-count="${images.length}">
+    <div class="service-image-album-head"><strong>Изображения услуги</strong><small>До 10 изображений</small></div>
+    <label class="photo-upload-control">
+      <input name="service_images" type="file" accept="image/*" multiple hidden>
+      <span class="photo-upload-button">Добавить изображения</span>
+    </label>
+    <div class="service-image-previews" data-service-image-previews>
+      ${images.map((image) => `<figure class="service-image-preview" data-service-image-id="${escapeHtml(image.id || "")}"><img src="${escapeHtml(image.path)}" alt="Изображение услуги">${image.id ? `<button type="button" class="ghost" data-remove-service-image data-image-id="${escapeHtml(image.id)}">Удалить</button>` : ""}</figure>`).join("")}
+    </div>
+  </div>`;
 }
 
 function productItemActualAmountRow(item = {}) {
@@ -736,7 +780,7 @@ function productItemExtraFields(item) {
     <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
     <label><span>Длительность</span><span class="service-duration-inputs"><input name="service_duration_hours" type="number" min="0" step="1" value="${escapeHtml(durationHours)}"><i>ч</i><input name="service_duration_minutes" type="number" min="0" max="59" step="1" value="${escapeHtml(durationMinutes)}"><i>мин</i></span></label>
     <label><span>Внешний ID</span><input name="api_id" value="${escapeHtml(item.api_id || "")}"></label>
-    <label class="modal-full"><span>URL изображения</span><input name="image_path" type="url" value="${escapeHtml(serviceImagePath(item))}"></label>
+    ${serviceImageAlbumField(item)}
     ${productItemStaffFields(item)}
     <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
   `;
@@ -1543,6 +1587,15 @@ function eventVisitId(item) {
   return item?.entity_id || payload.id || payload.visit_id;
 }
 
+function visitPhotoAlbumField(visit, visitId, stage, label) {
+  const photos = Array.isArray(visit?.[`photos_${stage}`]) ? visit[`photos_${stage}`] : [];
+  return `<div class="visit-photo-album modal-full" data-visit-photo-album data-visit-photo-stage="${stage}" data-existing-images-count="${photos.length}">
+    <div class="service-image-album-head"><strong>${escapeHtml(label)}</strong><small>До 10 изображений</small></div>
+    <label class="photo-upload-control"><input name="visit_${stage}_photos" type="file" accept="image/*" multiple hidden><span class="photo-upload-button">Добавить изображения</span></label>
+    <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview" data-visit-photo-id="${escapeHtml(photo.id)}"><img src="/crm-api/client-history/visits/${escapeHtml(visitId)}/photos/${stage}/${escapeHtml(photo.id)}" alt="${escapeHtml(label)}"><button type="button" class="ghost" data-remove-visit-photo data-photo-id="${escapeHtml(photo.id)}">Удалить</button></figure>`).join("")}</div>
+  </div>`;
+}
+
 function eventVisitModal() {
   if (!selectedEventVisit) return "";
   const visit = eventVisitPayload(selectedEventVisit);
@@ -1577,6 +1630,8 @@ function eventVisitModal() {
           ${readonly("Задолженность", visit.debt_amount)}
           <label><span>Источник</span><input name="source" value="${escapeHtml(visit.source || "")}"></label>
           <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visit.comment || "")}"></label>
+          ${visitPhotoAlbumField(visit, visitId, "before", "Фото до")}
+          ${visitPhotoAlbumField(visit, visitId, "after", "Фото после")}
           <p data-message></p>
           <button class="primary">Сохранить визит</button>
         </form>
@@ -1715,6 +1770,7 @@ function userRoleIds(user, memberships = [], branchMemberships = []) {
 function userMatchesFilters(user, memberships = [], branchMemberships = []) {
   const branches = userMemberships(user, branchMemberships);
   const roleIds = userRoleIds(user, memberships, branchMemberships).map((item) => String(item));
+  if (userHideInactive && !user.is_active) return false;
   if (userFilterBranchId && !branches.some((item) => String(item.branch_id) === String(userFilterBranchId))) return false;
   if (userFilterRoleId && !roleIds.includes(String(userFilterRoleId))) return false;
   if (userFilterDepartmentId && !branches.some((item) => String(item.department_id) === String(userFilterDepartmentId))) return false;
@@ -1747,7 +1803,26 @@ function userFilterOptions(branches, roles, departments, workplaces) {
         <option value="" ${!userFilterWorkplaceId ? "selected" : ""}>Все рабочие места</option>
         ${filteredWorkplaces.map((item) => `<option value="${escapeHtml(item.id)}" ${String(userFilterWorkplaceId) === String(item.id) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
       </select></label>
+      <label class="checkbox"><input type="checkbox" data-user-hide-inactive ${userHideInactive ? "checked" : ""}> Скрыть неактивных</label>
     </form>
+  `;
+}
+
+function userFilteredListMarkup() {
+  const users = cache.users || [];
+  const memberships = cache.memberships || [];
+  const branchMemberships = cache.branchMemberships || [];
+  const branches = cache.branches || [];
+  const departments = cache.departments || [];
+  const workplaces = cache.workplaces || [];
+  const roles = cache.roles || [];
+  const filteredUsers = users.filter((user) => userMatchesFilters(user, memberships, branchMemberships));
+  const pagedUsersData = paginate(filteredUsers, userPage, USER_PAGE_SIZE);
+  userPage = pagedUsersData.currentPage;
+  return `
+    ${userFilterOptions(branches, roles, departments, workplaces)}
+    ${userAccessTable(pagedUsersData.pageItems, users.length ? "Пользователи не найдены" : "Пользователей пока нет", memberships, branchMemberships, branches, departments, workplaces, roles)}
+    ${paginationControls(pagedUsersData.currentPage, pagedUsersData.totalPages, filteredUsers.length)}
   `;
 }
 
@@ -1958,21 +2033,39 @@ function modalFields(type, item) {
     <label><span>Название модуля</span><input name="module_name" value="${escapeHtml(item.module_name)}" required></label>
   `;
   if (type === "user") return `
-    <div class="readonly-field"><span>ID пользователя</span><b>${escapeHtml(item.id)}</b></div>
-    <div class="readonly-field"><span>Создан</span><b>${escapeHtml(item.created_at || no)}</b></div>
-    <label><span>Имя</span><input name="first_name" value="${escapeHtml(item.first_name || "")}"></label>
-    <label><span>Отчество</span><input name="middle_name" value="${escapeHtml(item.middle_name || "")}"></label>
-    <label><span>Фамилия</span><input name="last_name" value="${escapeHtml(item.last_name || "")}"></label>
-    <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
-    <label><span>Email</span><input name="email" value="${escapeHtml(item.email || "")}"></label>
-    <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
-    <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
-    <label><span>Новый пароль</span><input name="password" type="password" autocomplete="new-password"></label>
-    ${userBranchAccessFields(item)}
-    <label><span>Активен</span><select name="is_active">
-      <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
-      <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
-    </select></label>
+    <section class="user-profile-card modal-full">
+      <header class="user-profile-card-head">
+        ${userPhotoField(item)}
+        <div class="user-profile-summary">
+          <span>Карточка сотрудника</span>
+          <h4>${escapeHtml([item.last_name, item.first_name, item.middle_name].filter(Boolean).join(" ") || item.email || item.phone || "Пользователь")}</h4>
+          <p>ID ${escapeHtml(item.id)} · создан ${escapeHtml(item.created_at || no)}</p>
+        </div>
+      </header>
+      <div class="user-profile-section">
+        <h5>Личные данные</h5>
+        <div class="user-profile-fields">
+          <label><span>Имя</span><input name="first_name" value="${escapeHtml(item.first_name || "")}"></label>
+          <label><span>Фамилия</span><input name="last_name" value="${escapeHtml(item.last_name || "")}"></label>
+          <label><span>Отчество</span><input name="middle_name" value="${escapeHtml(item.middle_name || "")}"></label>
+          <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
+          <label><span>Email</span><input name="email" value="${escapeHtml(item.email || "")}"></label>
+          <label><span>Новый пароль</span><input name="password" type="password" autocomplete="new-password"></label>
+        </div>
+      </div>
+      <div class="user-profile-section">
+        <h5>Рабочий доступ</h5>
+        <div class="user-profile-fields">
+          <label><span>Telegram ID</span><input name="telegram_id" value="${escapeHtml(item.telegram_id || "")}" inputmode="numeric"></label>
+          <label><span>MAX ID</span><input name="max_id" value="${escapeHtml(item.max_id || "")}" inputmode="numeric"></label>
+          <label><span>Активен</span><select name="is_active">
+            <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
+            <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
+          </select></label>
+        </div>
+        <div class="user-profile-access">${userBranchAccessFields(item)}</div>
+      </div>
+    </section>
   `;
   if (type === "role") return `
     <label class="modal-full"><span>Название роли</span><input name="name" value="${escapeHtml(item.name)}" required></label>
@@ -2054,15 +2147,26 @@ async function openEntityModal(type, item) {
   const modalTitleId = type === "productItem" || type === "branch"
     ? `<span class="modal-title-id">ID ${escapeHtml(item.id)}</span>`
     : "";
+  const isServiceProfile = type === "productItem" && productItemCategory(modalItem)?.type === "service";
+  const serviceImage = isServiceProfile ? serviceImageEntries(modalItem)[0]?.path || "" : "";
+  const serviceCategory = isServiceProfile ? productItemCategory(modalItem)?.name || "Услуга" : "";
+  const serviceDurationMinutes = isServiceProfile ? Math.floor(Number(modalItem.seance_length || 0) / 60) : 0;
+  const serviceProfileHeader = isServiceProfile ? `
+    <header class="service-profile-card-head">
+      <div class="service-profile-avatar">${serviceImage ? `<img src="${escapeHtml(serviceImage)}" alt="Изображение услуги">` : "<span>У</span>"}</div>
+      <div class="service-profile-summary"><span>${escapeHtml(serviceCategory)}</span><h4>${escapeHtml(modalItem.title || "Услуга")}</h4><p>Цена: ${escapeHtml(modalItem.price ?? "не указана")} · Длительность: ${escapeHtml(serviceDurationMinutes ? `${serviceDurationMinutes} мин` : "не указана")}</p></div>
+    </header>
+  ` : "";
 
   document.body.insertAdjacentHTML("beforeend", `
     <div class="modal-backdrop" data-settings-modal>
-      <div class="modal-card">
+      <div class="modal-card${isServiceProfile ? " service-profile-modal" : ""}">
         <div class="modal-head">
           <h3>${escapeHtml(modalTitle)}${modalTitleId}</h3>
           <button type="button" class="ghost" data-close-modal>Закрыть</button>
         </div>
-        <form class="modal-grid" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
+        ${serviceProfileHeader}
+        <form class="modal-grid${type === "user" ? " user-profile-form" : ""}${isServiceProfile ? " service-profile-form" : ""}" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
           ${modalFields(type, modalItem)}
           <p data-message></p>
           <button class="primary">Сохранить</button>
@@ -2152,7 +2256,7 @@ async function saveEntity(type, id, data, form = null) {
         ? (Number(data.service_duration_hours || 0) * 3600) + (Number(data.service_duration_minutes || 0) * 60)
         : null,
       staff: categoryType === "service" ? serviceStaffPayload(form) : null,
-      image_group: categoryType === "service" ? serviceImageGroupPayload(data) : null,
+      image_group: categoryType === "service" ? undefined : null,
       active: data.active === "true",
     }).then(async (updated) => {
       if (categoryType === "service") {
@@ -2165,7 +2269,8 @@ async function saveEntity(type, id, data, form = null) {
           : api.createMasterService({ organization_id: cache.organizationId, service_id: Number(id), ...pair })));
       }
       await syncProductItemBranchAvailability(id, data.product_branch_ids || []);
-      return updated;
+      const images = form.elements.service_images?.files || [];
+      return images.length ? api.uploadProductItemImages(id, images) : updated;
     });
   }
   if (type === "achievement") {
@@ -2211,7 +2316,8 @@ async function saveEntity(type, id, data, form = null) {
       await api.assignUser({ user_id: Number(id), organization_id: cache.organizationId, role_id: roleId });
     }
     await syncUserBranchAccess(id, data.user_branch_ids || [], data.department_id, data.workplace_id);
-    return updated;
+    const photo = form.elements.user_photo_file?.files?.[0];
+    return photo ? api.uploadUserPhoto(id, photo) : updated;
   });
   if (type === "role") return api.updateRole(id, { name: data.name }).then(async (updated) => {
     const codes = Array.isArray(data.permission_codes)
@@ -2457,18 +2563,7 @@ export async function settings(ctx, tabSlug = "") {
             <p data-message></p>
           </form>
 
-          ${userFilterOptions(branches, roles, departments, workplaces)}
-          ${userAccessTable(
-            pagedUsersData.pageItems,
-            users.length ? "Пользователи не найдены" : "Пользователей пока нет",
-            memberships,
-            branchMemberships,
-            branches,
-            departments,
-            workplaces,
-            roles,
-          )}
-          ${paginationControls(pagedUsersData.currentPage, pagedUsersData.totalPages, filteredUsers.length)}
+          <div data-user-filtered-list>${userFilteredListMarkup()}</div>
         `, "Пользователи и доступ — это сотрудники и их роли в организации или филиалах.")}
       </div>
 
@@ -2489,8 +2584,20 @@ export async function settings(ctx, tabSlug = "") {
 export function bindSettings(root, ctx) {
   syncRequiredPanelForms(root);
 
+  const updateUserList = () => {
+    const list = root.querySelector("[data-user-filtered-list]");
+    if (list) list.innerHTML = userFilteredListMarkup();
+  };
+
   const previewAchievementPhoto = (input) => {
     const file = input.files?.[0];
+    const userPhotoPreview = input.closest(".user-photo-field")?.querySelector("[data-user-photo-preview]");
+    if (file && userPhotoPreview) {
+      userPhotoPreview.innerHTML = `<img src="${escapeHtml(URL.createObjectURL(file))}" alt="Фото пользователя">`;
+      const photoButton = input.closest(".photo-upload-control")?.querySelector(".photo-upload-button");
+      if (photoButton) photoButton.textContent = "Заменить фото";
+      return;
+    }
     const preview = input.closest(".achievement-photo-field")?.querySelector(".achievement-photo-preview");
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
@@ -2501,6 +2608,32 @@ export function bindSettings(root, ctx) {
     }
     const photoButton = input.closest(".photo-upload-control")?.querySelector(".photo-upload-button");
     if (photoButton) photoButton.textContent = "Заменить фото";
+  };
+
+  const previewVisitPhotos = (input) => {
+    const album = input.closest("[data-visit-photo-album]");
+    const previews = album?.querySelector("[data-visit-photo-previews]");
+    const files = [...(input.files || [])];
+    const existing = Number(album?.dataset.existingImagesCount || 0);
+    if (!album || !previews || !files.length) return;
+    if (existing + files.length > 10) { input.value = ""; alert("Можно добавить не более 10 фотографий в альбом."); return; }
+    previews.querySelectorAll("[data-visit-photo-pending]").forEach((preview) => preview.remove());
+    previews.insertAdjacentHTML("beforeend", files.map((file) => `<figure class="service-image-preview" data-visit-photo-pending><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр фотографии визита"></figure>`).join(""));
+  };
+
+  const previewServiceImages = (input) => {
+    const album = input.closest("[data-service-image-album]");
+    const previews = album?.querySelector("[data-service-image-previews]");
+    const files = [...(input.files || [])];
+    const existing = Number(album?.dataset.existingImagesCount || 0);
+    if (!album || !previews || !files.length) return;
+    if (existing + files.length > 10) {
+      input.value = "";
+      alert("Можно добавить не более 10 изображений услуги.");
+      return;
+    }
+    previews.querySelectorAll("[data-service-image-pending]").forEach((preview) => preview.remove());
+    previews.insertAdjacentHTML("beforeend", files.map((file) => `<figure class="service-image-preview" data-service-image-pending><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр изображения услуги"></figure>`).join(""));
   };
 
   root.addEventListener("input", (event) => {
@@ -2535,26 +2668,32 @@ export function bindSettings(root, ctx) {
       userFilterDepartmentId = "";
       userFilterWorkplaceId = "";
       userPage = 1;
-      ctx.reload();
+      updateUserList();
       return;
     }
     if (event.target.matches("[data-user-filter-role]")) {
       userFilterRoleId = event.target.value || "";
       userPage = 1;
-      ctx.reload();
+      updateUserList();
       return;
     }
     if (event.target.matches("[data-user-filter-department]")) {
       userFilterDepartmentId = event.target.value || "";
       userFilterWorkplaceId = "";
       userPage = 1;
-      ctx.reload();
+      updateUserList();
       return;
     }
     if (event.target.matches("[data-user-filter-workplace]")) {
       userFilterWorkplaceId = event.target.value || "";
       userPage = 1;
-      ctx.reload();
+      updateUserList();
+      return;
+    }
+    if (event.target.matches("[data-user-hide-inactive]")) {
+      userHideInactive = event.target.checked;
+      userPage = 1;
+      updateUserList();
       return;
     }
     if (event.target.matches("[data-audit-page-size]")) {
@@ -2637,6 +2776,10 @@ export function bindSettings(root, ctx) {
           source: optional(data.source),
           comment: optional(data.comment),
         });
+        await Promise.all([
+          form.elements.visit_before_photos?.files?.length ? api.uploadVisitPhotos(form.dataset.visitId, "before", form.elements.visit_before_photos.files) : null,
+          form.elements.visit_after_photos?.files?.length ? api.uploadVisitPhotos(form.dataset.visitId, "after", form.elements.visit_after_photos.files) : null,
+        ].filter(Boolean));
         selectedEventVisit = null;
         form.closest("[data-event-visit-modal]")?.remove();
         ctx.reload();
@@ -2770,6 +2913,11 @@ export function bindSettings(root, ctx) {
       selectedEventVisit = visitRef.startsWith("audit:")
         ? (cache.auditLogs || []).find((item) => String(item.id) === visitRef.slice(6)) || null
         : (cache.events || []).find((item) => String(item.id) === visitRef) || null;
+      const visitId = eventVisitId(selectedEventVisit);
+      if (visitId) {
+        const visit = await api.clientVisit(visitId).catch(() => null);
+        if (visit) selectedEventVisit = { ...selectedEventVisit, payload: visit };
+      }
       ctx.reload();
       return;
     }
@@ -2784,7 +2932,7 @@ export function bindSettings(root, ctx) {
     const userPageButton = event.target.closest("[data-user-page]");
     if (userPageButton && !userPageButton.disabled) {
       userPage = Number(userPageButton.dataset.userPage) || 1;
-      ctx.reload();
+      updateUserList();
       return;
     }
 
@@ -2834,13 +2982,36 @@ export function bindSettings(root, ctx) {
     }
   });
 
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     if (handleAchievementConditionClick(event)) return;
     if (handleProductAmountClick(event)) return;
 
-    const removeStaffButton = event.target.closest("[data-remove-service-staff]");
-    if (removeStaffButton) {
-      removeStaffButton.closest("[data-master-service-row]")?.remove();
+    const removeVisitPhoto = event.target.closest("[data-remove-visit-photo]");
+    if (removeVisitPhoto) {
+      const album = removeVisitPhoto.closest("[data-visit-photo-album]");
+      const form = removeVisitPhoto.closest("form");
+      try {
+        await api.deleteVisitPhoto(form?.dataset.visitId, album?.dataset.visitPhotoStage, removeVisitPhoto.dataset.photoId);
+        removeVisitPhoto.closest(".service-image-preview")?.remove();
+        if (album) album.dataset.existingImagesCount = String(Math.max(Number(album.dataset.existingImagesCount || 1) - 1, 0));
+      } catch (error) {
+        alert(error.message);
+      }
+      return;
+    }
+
+    const removeServiceImage = event.target.closest("[data-remove-service-image]");
+    if (removeServiceImage) {
+      const album = removeServiceImage.closest("[data-service-image-album]");
+      const form = removeServiceImage.closest("form");
+      const itemId = Number(form?.dataset.id || form?.querySelector('[name="id"]')?.value || 0);
+      try {
+        await api.deleteProductItemImage(itemId, removeServiceImage.dataset.imageId);
+        removeServiceImage.closest(".service-image-preview")?.remove();
+        if (album) album.dataset.existingImagesCount = String(Math.max(Number(album.dataset.existingImagesCount || 1) - 1, 0));
+      } catch (error) {
+        alert(error.message);
+      }
       return;
     }
 
@@ -2906,12 +3077,38 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("change", (event) => {
-    if (event.target.matches("[data-service-staff-search]")) {
-      addServiceStaffFromSearch(event.target);
+    if (event.target.matches("[data-master-service-enabled]")) {
+      const editor = event.target.closest("[data-service-staff-editor]");
+      syncServiceStaffRow(event.target.closest("[data-master-service-row]"));
+      syncServiceStaffTable(editor);
+      return;
+    }
+    if (event.target.matches("[data-select-all-service-staff]")) {
+      const editor = event.target.closest("[data-service-staff-editor]");
+      editor?.querySelectorAll("[data-master-service-enabled]").forEach((input) => {
+        input.checked = event.target.checked;
+      });
+      syncServiceStaffTable(editor);
+      return;
+    }
+    if (event.target.matches("[data-hide-inactive-service-staff]")) {
+      syncServiceStaffTable(event.target.closest("[data-service-staff-editor]"));
       return;
     }
     if (event.target.matches('[data-entity-edit][data-type="achievement"] [name="photo_file"]')) {
       previewAchievementPhoto(event.target);
+      return;
+    }
+    if (event.target.matches('[data-entity-edit][data-type="user"] [name="user_photo_file"]')) {
+      previewAchievementPhoto(event.target);
+      return;
+    }
+    if (event.target.matches('[data-entity-edit][data-type="productItem"] [name="service_images"]')) {
+      previewServiceImages(event.target);
+      return;
+    }
+    if (event.target.matches('[data-event-visit-edit] [name="visit_before_photos"], [data-event-visit-edit] [name="visit_after_photos"]')) {
+      previewVisitPhotos(event.target);
       return;
     }
     if (event.target.matches('[name="user_branch_ids"]')) {
@@ -2944,7 +3141,4 @@ export function bindSettings(root, ctx) {
     }
   });
 
-  document.addEventListener("input", (event) => {
-    if (event.target.matches("[data-service-staff-search]")) addServiceStaffFromSearch(event.target);
-  });
 }

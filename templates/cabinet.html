@@ -56,8 +56,8 @@
               <label>
                 <span>Онлайн-запись</span>
                 <select name="branch_id" required><option value="">Выберите филиал</option></select>
-                <span class="cabinet-booking-branch-meta" data-client-booking-branch-meta hidden></span>
               </label>
+              <div class="cabinet-booking-branch-meta" data-client-booking-branch-meta hidden></div>
             </div>
             <h1 class="cabinet-booking-title">Записаться на услугу</h1>
             <section class="cabinet-booking-step">
@@ -118,9 +118,32 @@
             </section>
           </form>
           <section class="cabinet-my-bookings">
-            <h2 class="cabinet-subtitle">Мои визиты</h2>
-            <div data-client-booking-list></div>
+            <button type="button" class="cabinet-history-trigger" data-client-booking-visits-toggle aria-expanded="false">
+              <span>Мои визиты</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="cabinet-booking-visits-accordion"><div class="cabinet-booking-visits-content"><div data-client-booking-list></div></div></div>
           </section>
+        </div>
+        <div class="cabinet-panel cabinet-employee-reviews-page" data-cabinet-view="employee_reviews" hidden>
+          <button type="button" class="cabinet-employee-reviews-back" data-employee-reviews-back>&#8249; &#1053;&#1072;&#1079;&#1072;&#1076; &#1082; &#1079;&#1072;&#1087;&#1080;&#1089;&#1080;</button>
+          <section class="cabinet-employee-review-profile" data-employee-reviews-profile></section>
+          <section class="cabinet-employee-reviews-card">
+            <h1>&#1054;&#1090;&#1079;&#1099;&#1074;&#1099;</h1>
+            <div class="cabinet-employee-reviews-list" data-employee-reviews-list></div>
+          </section>
+        </div>
+        <div class="cabinet-panel cabinet-create-review-page" data-cabinet-view="create_review" hidden>
+          <button type="button" class="cabinet-employee-reviews-back" data-visit-review-back>&#8249; &#1053;&#1072;&#1079;&#1072;&#1076; &#1082; &#1074;&#1080;&#1079;&#1080;&#1090;&#1072;&#1084;</button>
+          <form class="cabinet-create-review-form" data-visit-review-form>
+            <input type="hidden" name="employee_id">
+            <input type="hidden" name="visit_id">
+            <h1>&#1054;&#1089;&#1090;&#1072;&#1074;&#1080;&#1090;&#1100; &#1086;&#1090;&#1079;&#1099;&#1074;</h1>
+            <p data-visit-review-master></p>
+            <fieldset><legend>&#1042;&#1072;&#1096;&#1072; &#1086;&#1094;&#1077;&#1085;&#1082;&#1072;</legend><div class="cabinet-create-review-stars" data-visit-review-stars></div></fieldset>
+            <label><span>&#1054;&#1090;&#1079;&#1099;&#1074;</span><textarea name="text" rows="6" maxlength="5000" required placeholder="&#1056;&#1072;&#1089;&#1089;&#1082;&#1072;&#1078;&#1080;&#1090;&#1077; &#1086; &#1074;&#1072;&#1096;&#1077;&#1084; &#1074;&#1080;&#1079;&#1080;&#1090;&#1077;"></textarea></label>
+            <p class="cabinet-message" data-visit-review-message></p>
+            <button type="submit" data-visit-review-submit disabled>&#1054;&#1087;&#1091;&#1073;&#1083;&#1080;&#1082;&#1086;&#1074;&#1072;&#1090;&#1100; &#1086;&#1090;&#1079;&#1099;&#1074;</button>
+          </form>
         </div>
         <div class="cabinet-panel" data-cabinet-view="achievements" hidden>
           <div class="cabinet-heading"><p>Личный кабинет</p><h1>Мои достижения</h1></div>
@@ -135,12 +158,27 @@
           <button type="button" class="cabinet-drawer-close" data-cabinet-menu-close aria-label="Закрыть">×</button>
         </div>
         <nav class="cabinet-drawer-nav">
-          <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile">Мои данные</a>
-          <a class="cabinet-nav-link active" href="#my-booking" data-cabinet-tab="client_booking">Мои записи</a>
-          <a class="cabinet-nav-link" href="#achievements" data-cabinet-tab="achievements">Мои достижения</a>
+          <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile"><img src="/fronted/icons/profile.svg" alt="" aria-hidden="true">Мои данные</a>
+          <a class="cabinet-nav-link active" href="#my-booking" data-cabinet-tab="client_booking"><img src="/fronted/icons/recorsd.svg" alt="" aria-hidden="true">Мои записи</a>
+          <a class="cabinet-nav-link" href="#achievements" data-cabinet-tab="achievements"><img src="/fronted/icons/achiv.svg" alt="" aria-hidden="true">Мои достижения</a>
           <button type="button" class="cabinet-logout" data-cabinet-logout>Выход</button>
         </nav>
       </aside>
+    </div>
+    <div class="modal-backdrop" data-public-booking-registration hidden>
+      <form class="modal-card cabinet-public-registration" data-public-booking-registration-form>
+        <div class="modal-head">
+          <h3>Регистрация клиента</h3>
+          <button type="button" class="ghost" data-public-booking-registration-close>Закрыть</button>
+        </div>
+        <p>Для завершения записи заполните данные.</p>
+        <label class="field"><span>Имя *</span><input name="first_name" required maxlength="128" autocomplete="given-name"></label>
+        <label class="field"><span>Фамилия *</span><input name="last_name" required maxlength="128" autocomplete="family-name"></label>
+        <label class="field"><span>Телефон *</span><input name="phone" type="tel" required maxlength="32" autocomplete="tel"></label>
+        <label class="field"><span>Пол *</span><select name="gender" required><option value="">Выберите пол</option><option value="male">Мужской</option><option value="female">Женский</option></select></label>
+        <p class="cabinet-message" data-public-booking-registration-message></p>
+        <button type="submit">Записаться</button>
+      </form>
     </div>
     <div class="modal-backdrop" data-cabinet-notifications-modal hidden>
       <div class="modal-card cabinet-notifications-modal">
@@ -189,6 +227,10 @@
       const clientBookingSlots = document.querySelector("[data-client-booking-slots]");
       const clientBookingMessage = document.querySelector("[data-client-booking-message]");
       const clientBookingList = document.querySelector("[data-client-booking-list]");
+      const publicBookingMatch = window.location.pathname.match(/^\/online-booking\/(\d+)\/?$/);
+      const publicBookingOrganizationId = publicBookingMatch ? Number(publicBookingMatch[1]) : 0;
+      const publicBookingRegistration = document.querySelector("[data-public-booking-registration]");
+      const publicBookingRegistrationForm = document.querySelector("[data-public-booking-registration-form]");
       const token = new URLSearchParams(window.location.search).get("token");
       const submitButton = form.querySelector("button");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
@@ -197,8 +239,19 @@
       let currentClient = null;
       let cabinetData = null;
       let selectedVisit = null;
+      let visitsPage = 1;
+      let visitsExpanded = false;
+      let bookingVisitsExpanded = false;
+      let branchReviewsRequestId = 0;
+      let openServiceCategoryId = null;
+      let visitReviewRating = 0;
+      const reviewedVisitIds = new Set(JSON.parse(sessionStorage.getItem("cabinet.reviewedVisitIds") || "[]"));
+      const VISITS_PER_PAGE = 5;
       let clientBookingOptions = null;
+      let publicBookingAnonymous = false;
       let clientBookingMasterPreviews = null;
+      let clientBookingMastersRequestId = 0;
+      let clientBookingMastersLoadingKey = "";
       let clientBookingCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
@@ -221,6 +274,115 @@
       function escapeHtml(value) {
         return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
       }
+
+      let bookingLoadingCount = 0;
+
+      function setBookingLoader(active, label = "\u0421\u043e\u0437\u0434\u0430\u0451\u043c \u0437\u0430\u043f\u0438\u0441\u044c\u2026") {
+        bookingLoadingCount = Math.max(0, bookingLoadingCount + (active ? 1 : -1));
+        let loader = document.querySelector("[data-booking-loader]");
+        if (!bookingLoadingCount) {
+          loader?.remove();
+          return;
+        }
+        if (loader) return;
+        loader = document.createElement("div");
+        loader.className = "cabinet-booking-loader";
+        loader.dataset.bookingLoader = "";
+        loader.setAttribute("role", "status");
+        loader.innerHTML = `<span class="cabinet-booking-spinner" aria-hidden="true"></span><b>${escapeHtml(label)}</b>`;
+        document.body.append(loader);
+      }
+
+      function showBookingSuccessToast(message = "\u0412\u044b \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0437\u0430\u043f\u0438\u0441\u0430\u043d\u044b") {
+        return new Promise((resolve) => {
+          const toast = document.createElement("div");
+          toast.className = "cabinet-booking-toast";
+          toast.setAttribute("role", "status");
+          toast.innerHTML = `<span aria-hidden="true">\u2713</span><b>${escapeHtml(message)}</b>`;
+          document.body.append(toast);
+          requestAnimationFrame(() => toast.classList.add("is-visible"));
+          window.setTimeout(() => {
+            toast.classList.remove("is-visible");
+            window.setTimeout(() => {
+              toast.remove();
+              resolve();
+            }, 220);
+          }, 1600);
+        });
+      }
+
+      let serviceGalleryUrls = [];
+      let serviceGalleryIndex = 0;
+      let serviceGalleryTitle = "";
+
+      function updateServiceGallery() {
+        const lightbox = document.querySelector("[data-service-gallery-lightbox]");
+        if (!lightbox || !serviceGalleryUrls.length) return;
+        const image = lightbox.querySelector("[data-service-gallery-image]");
+        image.classList.add("is-loading");
+        image.onload = () => {
+          image.classList.remove("is-loading");
+          const preload = () => {
+            [-1, 1].forEach((offset) => {
+              if (serviceGalleryUrls.length < 2) return;
+              const next = new Image();
+              next.src = serviceGalleryUrls[(serviceGalleryIndex + offset + serviceGalleryUrls.length) % serviceGalleryUrls.length];
+            });
+          };
+          if ("requestIdleCallback" in window) window.requestIdleCallback(preload, { timeout: 1000 });
+          else window.setTimeout(preload, 100);
+        };
+        image.src = serviceGalleryUrls[serviceGalleryIndex];
+        image.alt = serviceGalleryTitle;
+        lightbox.querySelector("[data-service-gallery-count]").textContent = String(serviceGalleryIndex + 1) + " / " + String(serviceGalleryUrls.length);
+        lightbox.querySelectorAll("[data-service-gallery-step]").forEach((button) => {
+          button.hidden = serviceGalleryUrls.length < 2;
+        });
+      }
+
+      function openServiceGallery(imageUrls, title) {
+        serviceGalleryUrls = imageUrls;
+        serviceGalleryIndex = 0;
+        serviceGalleryTitle = title || "";
+        document.body.insertAdjacentHTML("beforeend", `<div class="cabinet-service-lightbox" data-service-gallery-lightbox role="dialog" aria-modal="true">
+          <button type="button" class="cabinet-service-lightbox-close" data-service-gallery-close aria-label="\u0417\u0430\u043a\u0440\u044b\u0442\u044c">&times;</button>
+          <button type="button" class="cabinet-service-lightbox-arrow prev" data-service-gallery-step="-1" aria-label="\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0435\u0435 \u0444\u043e\u0442\u043e">&lsaquo;</button>
+          <img data-service-gallery-image decoding="async" alt="">
+          <button type="button" class="cabinet-service-lightbox-arrow next" data-service-gallery-step="1" aria-label="\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0444\u043e\u0442\u043e">&rsaquo;</button>
+          <span class="cabinet-service-lightbox-count" data-service-gallery-count></span>
+        </div>`);
+        document.body.classList.add("service-gallery-open");
+        updateServiceGallery();
+        document.querySelector("[data-service-gallery-close]")?.focus();
+      }
+
+      function closeServiceGallery() {
+        document.querySelector("[data-service-gallery-lightbox]")?.remove();
+        document.body.classList.remove("service-gallery-open");
+        serviceGalleryUrls = [];
+      }
+
+      document.addEventListener("click", (event) => {
+        const step = event.target.closest("[data-service-gallery-step]");
+        if (step && serviceGalleryUrls.length) {
+          serviceGalleryIndex = (serviceGalleryIndex + Number(step.dataset.serviceGalleryStep) + serviceGalleryUrls.length) % serviceGalleryUrls.length;
+          updateServiceGallery();
+          return;
+        }
+        if (event.target.closest("[data-service-gallery-close]") || event.target.matches("[data-service-gallery-lightbox]")) {
+          closeServiceGallery();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (!document.querySelector("[data-service-gallery-lightbox]")) return;
+        if (event.key === "Escape") closeServiceGallery();
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          const offset = event.key === "ArrowLeft" ? -1 : 1;
+          serviceGalleryIndex = (serviceGalleryIndex + offset + serviceGalleryUrls.length) % serviceGalleryUrls.length;
+          updateServiceGallery();
+        }
+      });
 
       function pushContext() {
         const client = cabinetData?.client || currentClient || {};
@@ -481,6 +643,14 @@
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ru-RU");
       }
 
+      function visitDateTime(value) {
+        if (!value) return "";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ru-RU", {
+          year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+        });
+      }
+
       function visitStatus(status) {
         const labels = {
           completed: "\u0417\u0430\u0432\u0435\u0440\u0448\u0451\u043d",
@@ -489,6 +659,24 @@
           no_show: "\u041d\u0435 \u043f\u0440\u0438\u0448\u0451\u043b",
         };
         return labels[status] || status || "-";
+      }
+
+      function reviewStar(active) {
+        const color = active ? "#F5B301" : "#D0D5DD";
+        return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${active ? color : "none"}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.73 3.51001L15.49 7.03001C15.73 7.52002 16.37 7.99001 16.91 8.08001L20.1 8.61001C22.14 8.95001 22.62 10.43 21.15 11.89L18.67 14.37C18.25 14.79 18.02 15.6 18.15 16.18L18.86 19.25C19.42 21.68 18.13 22.62 15.98 21.35L12.99 19.58C12.45 19.26 11.56 19.26 11.01 19.58L8.01997 21.35C5.87997 22.62 4.57997 21.67 5.13997 19.25L5.84997 16.18C5.97997 15.6 5.74997 14.79 5.32997 14.37L2.84997 11.89C1.38997 10.43 1.85997 8.95001 3.89997 8.61001L7.08997 8.08001C7.61997 7.99001 8.25997 7.52002 8.49997 7.03001L10.26 3.51001C11.22 1.60001 12.78 1.60001 13.73 3.51001Z" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      }
+
+      function reviewStars(value) {
+        const rating = Math.max(0, Math.min(5, Number(value) || 0));
+        return Array.from({ length: 5 }, (_, index) => reviewStar(index < rating)).join("");
+      }
+
+      function reviewsCountLabel(value) {
+        const count = Math.max(0, Number(value) || 0);
+        const mod100 = count % 100;
+        const mod10 = count % 10;
+        const word = mod100 >= 11 && mod100 <= 14 ? "отзывов" : mod10 === 1 ? "отзыв" : mod10 >= 2 && mod10 <= 4 ? "отзыва" : "отзывов";
+        return `${count} ${word}`;
       }
 
       function bonusName(section) {
@@ -532,6 +720,57 @@
         const list = Array.isArray(items) ? items : [];
         if (!list.length) return `<p class="cabinet-history-empty">${escapeHtml(emptyText)}</p>`;
         return `<ul class="cabinet-visit-items">${list.map((item) => `<li>${escapeHtml(visitItemName(item, kind))}</li>`).join("")}</ul>`;
+      }
+
+      function visitPersonName(visit) {
+        const staff = visit.yclients_staff || {};
+        return visit.employee_name || staff.name || staff.title || [staff.last_name, staff.first_name, staff.middle_name].filter(Boolean).join(" ") || (visit.employee_id ? `#${visit.employee_id}` : "-");
+      }
+
+      function visitBranchName(visit) {
+        const branch = visit.branch || visit.yclients_branch || visit.yclients_company || {};
+        return visit.branch_name || branch.name || branch.title || (visit.branch_id ? `#${visit.branch_id}` : "-");
+      }
+
+      function visitEmployeeId(visit) {
+        return Number(visit.employee_id || visit.master_id || visit.yclients_staff?.id || 0);
+      }
+
+      function visitIsCompleted(visit) {
+        const value = String(visit.visit_status || visit.attendance_title || "").toLowerCase();
+        return value === "completed" || value === "\u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043d";
+      }
+
+      function visitHistoryItems(item) {
+        const visit = item.visit || item;
+        const parsed = parseVisitComment(visit.comment);
+        const services = (item.services || visit.yclients_services || []).length
+          ? (item.services || visit.yclients_services || [])
+          : parsed.serviceNames.split(",").map((name) => ({ name: name.trim() })).filter((service) => service.name);
+        const products = (item.products || visit.yclients_goods_transactions || []).length
+          ? (item.products || visit.yclients_goods_transactions || [])
+          : parsed.productNames.split(",").map((name) => ({ name: name.trim() })).filter((product) => product.name);
+        const employeeId = visitEmployeeId(visit);
+        const visitId = String(visit.id || item.id || "");
+        return `
+          <article class="cabinet-visit-card">
+            <div class="cabinet-visit-card-head"><b>${escapeHtml(visitDateTime(visit.visit_at || visit.created_at) || "Дата не указана")}</b><span>${escapeHtml(visitStatus(visit.visit_status || visit.attendance_title || visit.source))}</span></div>
+            <div class="cabinet-visit-details">
+              <div><span>Филиал</span><b>${escapeHtml(visitBranchName(visit))}</b></div>
+              <div><span>Мастер</span><b>${escapeHtml(visitPersonName(visit))}</b></div>
+              <div><span>Услуги</span>${visitItems(services, "Услуг нет", "Услуга")}</div>
+              <div><span>Товары</span>${visitItems(products, "Товаров нет", "Товар")}</div>
+              <div><span>Стоимость</span><b>${escapeHtml(money(visit.total_cost || visit.paid_amount))}</b></div>
+            </div>
+            ${visitIsCompleted(visit) && employeeId ? (reviewedVisitIds.has(visitId) ? '<span class="cabinet-visit-review-done">\u041e\u0442\u0437\u044b\u0432 \u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d</span>' : `<button type="button" class="cabinet-visit-review-button" data-visit-review data-visit-id="${escapeHtml(visitId)}" data-employee-id="${escapeHtml(employeeId)}" data-employee-name="${escapeHtml(visitPersonName(visit))}">\u041e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0442\u0437\u044b\u0432</button>`) : ""}
+          </article>
+        `;
+      }
+
+      function visitPagination(visits) {
+        const pages = Math.ceil(visits.length / VISITS_PER_PAGE);
+        if (pages <= 1) return "";
+        return `<div class="cabinet-visit-pagination"><button type="button" class="ghost" data-cabinet-visits-page="prev" ${visitsPage === 1 ? "disabled" : ""}>Назад</button><span>${visitsPage} / ${pages}</span><button type="button" class="ghost" data-cabinet-visits-page="next" ${visitsPage === pages ? "disabled" : ""}>Вперёд</button></div>`;
       }
 
       function visitModal() {
@@ -578,13 +817,14 @@
         if (section === "client_visits") {
           const visits = cabinetData?.visits || [];
           if (!visits.length) return `<p class="cabinet-history-empty">\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</p>`;
+          const pages = Math.ceil(visits.length / VISITS_PER_PAGE);
+          visitsPage = Math.min(visitsPage, pages);
+          const pageVisits = visits.slice((visitsPage - 1) * VISITS_PER_PAGE, visitsPage * VISITS_PER_PAGE);
           return `
             <div class="cabinet-visit-list">
-              ${visits.slice(0, 10).map((item) => {
-                const visit = item.visit || item;
-                return `<button type="button" class="cabinet-visit-button" data-cabinet-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at || visit.created_at) || "\u0414\u0430\u0442\u0430 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u0430")}</b><span>${escapeHtml(visitStatus(visit.visit_status || visit.source))}</span></button>`;
-              }).join("")}
+              ${pageVisits.map(visitHistoryItems).join("")}
             </div>
+            ${visitPagination(visits)}
           `;
         }
         if (section === "client_personal_link") {
@@ -592,7 +832,7 @@
           const invitesCount = Number(cabinetData?.referral_invites_count || 0);
           return `
             ${referralLink
-              ? `<div class="inline-form compact"><label><span>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost" data-cabinet-copy-referral>\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button></div>`
+              ? `<div class="inline-form compact"><label><span>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost" data-cabinet-copy-referral aria-label="\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0440\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0443\u044e \u0441\u0441\u044b\u043b\u043a\u0443" title="\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c"><img src="/fronted/icons/copy.svg" alt="\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c"></button></div>`
               : `<p class="cabinet-history-empty">\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430 \u043f\u043e\u043a\u0430 \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d\u0430.</p>`}
             <p>\u041f\u0440\u0438\u0433\u043b\u0430\u0448\u0451\u043d\u043d\u044b\u0445: <b>${escapeHtml(Number.isFinite(invitesCount) ? invitesCount : 0)}</b></p>
           `;
@@ -612,7 +852,14 @@
           historyList.innerHTML = '<p class="cabinet-history-empty">\u0414\u043b\u044f \u044d\u0442\u043e\u0433\u043e \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0440\u0430\u0437\u0434\u0435\u043b\u044b \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u0442\u044b.</p>';
           return;
         }
-        historyList.innerHTML = enabled.map((section) => `
+        historyList.innerHTML = enabled.map((section) => section === "client_visits" ? `
+          <article class="cabinet-history-card cabinet-history-card--visits ${visitsExpanded ? "is-expanded" : ""}">
+            <button type="button" class="cabinet-history-trigger" data-cabinet-visits-toggle aria-expanded="${visitsExpanded}">
+              <span>${escapeHtml(sectionTitle(section))}</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="cabinet-history-accordion"><div class="cabinet-history-accordion-content"><div class="cabinet-history-body">${sectionBody(section)}</div></div></div>
+          </article>
+        ` : `
           <article class="cabinet-history-card">
             <span>${escapeHtml(sectionTitle(section))}</span>
             <div class="cabinet-history-body">${sectionBody(section)}</div>
@@ -641,17 +888,35 @@
         return entries.length ? entries.join(" \u00b7 ") : "\u0413\u0440\u0430\u0444\u0438\u043a \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
       }
 
-      function renderClientBookingBranchMeta() {
+      async function renderClientBookingBranchMeta() {
         const meta = clientBookingForm.querySelector("[data-client-booking-branch-meta]");
         const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
         const branch = clientBookingOptions?.branches?.find((item) => Number(item.id) === branchId);
+        const requestId = ++branchReviewsRequestId;
         if (!branch) {
           meta.hidden = true;
           meta.innerHTML = "";
           return;
         }
         meta.hidden = false;
-        meta.innerHTML = `<span>${escapeHtml(branch.address || "Адрес не указан")}</span><span>${escapeHtml(bookingScheduleLabel(branch.work_schedule))}</span>`;
+        meta.innerHTML = `<span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 13.4299C13.7231 13.4299 15.12 12.0331 15.12 10.3099C15.12 8.58681 13.7231 7.18994 12 7.18994C10.2769 7.18994 8.88 8.58681 8.88 10.3099C8.88 12.0331 10.2769 13.4299 12 13.4299Z" stroke="#292D32" stroke-width="1.5"/><path d="M3.62001 8.49C5.59001 -0.169998 18.42 -0.159997 20.38 8.5C21.53 13.58 18.37 17.88 15.6 20.54C13.59 22.48 10.41 22.48 8.39001 20.54C5.63001 17.88 2.47001 13.57 3.62001 8.49Z" stroke="#292D32" stroke-width="1.5"/></svg>${escapeHtml(branch.address || "Адрес не указан")}</span><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22 12C22 17.52 17.52 22 12 22C6.48 22 2 17.52 2 12C2 6.48 6.48 2 12 2C17.52 2 22 6.48 22 12Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.71 15.18L12.61 13.33C12.07 13.01 11.63 12.24 11.63 11.61V7.51001" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>${escapeHtml(bookingScheduleLabel(branch.work_schedule))}</span><button type="button" class="cabinet-branch-reviews-trigger" data-cabinet-branch-reviews-toggle aria-expanded="false"><span class="cabinet-branch-reviews-summary"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F5B301" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.73 3.51001L15.49 7.03001C15.73 7.52002 16.37 7.99001 16.91 8.08001L20.1 8.61001C22.14 8.95001 22.62 10.43 21.15 11.89L18.67 14.37C18.25 14.79 18.02 15.6 18.15 16.18L18.86 19.25C19.42 21.68 18.13 22.62 15.98 21.35L12.99 19.58C12.45 19.26 11.56 19.26 11.01 19.58L8.01997 21.35C5.87997 22.62 4.57997 21.67 5.13997 19.25L5.84997 16.18C5.97997 15.6 5.74997 14.79 5.32997 14.37L2.84997 11.89C1.38997 10.43 1.85997 8.95001 3.89997 8.61001L7.08997 8.08001C7.61997 7.99001 8.25997 7.52002 8.49997 7.03001L10.26 3.51001C11.22 1.60001 12.78 1.60001 13.73 3.51001Z" stroke="#F5B301" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-cabinet-branch-reviews-count>… отзывов</span></span><svg class="cabinet-branch-reviews-chevron" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="cabinet-branch-reviews-panel"><div class="cabinet-branch-reviews-content" data-cabinet-branch-reviews-list><p class="cabinet-history-empty">Загружаем отзывы…</p></div></div>`;
+        const organizationId = cabinetData?.organization_id || cabinetData?.client?.organization_id || currentClient?.organization_id;
+        if (!organizationId) return;
+        try {
+          const [reviews, rating] = await Promise.all([
+            requestJson(`/crm-api/client-reviews?organization_id=${encodeURIComponent(organizationId)}&branch_id=${encodeURIComponent(branchId)}&limit=200`, { cache: "no-store" }),
+            requestJson(`/crm-api/client-reviews/ratings/branch/${encodeURIComponent(branchId)}?organization_id=${encodeURIComponent(organizationId)}`, { cache: "no-store" }),
+          ]);
+          if (requestId !== branchReviewsRequestId) return;
+          meta.querySelector("[data-cabinet-branch-reviews-count]").textContent = reviewsCountLabel(rating?.reviews_count ?? reviews.length);
+          meta.querySelector("[data-cabinet-branch-reviews-list]").innerHTML = reviews.length
+            ? reviews.map((review) => `<article class="cabinet-branch-review"><div><b>${escapeHtml(review.client_name || "Клиент")}</b><span class="cabinet-review-stars" aria-label="Оценка ${escapeHtml(review.rating)} из 5">${reviewStars(review.rating)}</span></div><p>${escapeHtml(review.text)}</p></article>`).join("")
+            : '<p class="cabinet-history-empty">Отзывов пока нет.</p>';
+        } catch {
+          if (requestId !== branchReviewsRequestId) return;
+          meta.querySelector("[data-cabinet-branch-reviews-count]").textContent = reviewsCountLabel(0);
+          meta.querySelector("[data-cabinet-branch-reviews-list]").innerHTML = '<p class="cabinet-history-empty">Не удалось загрузить отзывы.</p>';
+        }
       }
 
       function bookingDurationLabel(seconds) {
@@ -660,6 +925,16 @@
         const hours = Math.floor(minutes / 60);
         const rest = minutes % 60;
         return [hours ? `${hours} ч` : "", rest ? `${rest} мин` : ""].filter(Boolean).join(" ");
+      }
+
+      function bookingServicePriceLabel(item) {
+        const minimum = item.price_min ?? item.price;
+        const maximum = item.price_max ?? item.price;
+        if (minimum === null || minimum === undefined) return "";
+        if (maximum !== null && maximum !== undefined && Number(maximum) !== Number(minimum)) {
+          return `${money(minimum)} \u2013 ${money(maximum)} \u20bd`;
+        }
+        return `${money(minimum)} \u20bd`;
       }
 
       function bookingDateIso(value) {
@@ -745,14 +1020,9 @@
           const rightVisit = right.visit || right;
           return new Date(rightVisit.visit_at) - new Date(leftVisit.visit_at);
         });
-        clientBookingList.innerHTML = visits.length ? visits.map((item) => {
-          const visit = item.visit || item;
-          return `<article class="cabinet-booking-visit">
-            <b>${escapeHtml(visitServiceTitle(item))}</b>
-            <span>${escapeHtml(new Date(visit.visit_at).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" }))}</span>
-            <small>${escapeHtml(visitStatus(visit.visit_status))}</small>
-          </article>`;
-        }).join("") : '<p class="cabinet-history-empty">Записей пока нет.</p>';
+        clientBookingList.innerHTML = visits.length
+          ? `<div class="cabinet-visit-list">${visits.map(visitHistoryItems).join("")}</div>`
+          : '<p class="cabinet-history-empty">Записей пока нет.</p>';
       }
 
       function renderClientBookingServices() {
@@ -764,26 +1034,28 @@
         );
         const groups = new Map();
         services.forEach((item) => {
-          const title = item.category_title || "Услуги";
-          if (!groups.has(title)) groups.set(title, []);
-          groups.get(title).push(item);
+          const id = String(item.category_id || item.category_title || "services");
+          if (!groups.has(id)) groups.set(id, { title: item.category_title || "\u0423\u0441\u043b\u0443\u0433\u0438", items: [] });
+          groups.get(id).items.push(item);
         });
         clientBookingServices.disabled = !branchId;
-        clientBookingServices.innerHTML = `<legend>Услуги</legend>${services.length ? [...groups.entries()].map(([title, items]) => `
-          <section class="cabinet-booking-service-group">
-            <h3>${escapeHtml(title)}</h3>
-            ${items.map((item) => {
-              const meta = [
-                bookingDurationLabel(item.duration),
-                item.price === null || item.price === undefined ? "" : `${item.price} ₽`,
-              ].filter(Boolean).join(" · ");
+        clientBookingServices.innerHTML = `<legend>\u0423\u0441\u043b\u0443\u0433\u0438</legend>${services.length ? [...groups.entries()].map(([categoryId, group]) => `
+          <section class="cabinet-booking-service-group ${openServiceCategoryId === categoryId ? "is-expanded" : ""}" data-booking-service-category="${escapeHtml(categoryId)}">
+            <button type="button" class="cabinet-booking-category-trigger" data-booking-service-category-toggle="${escapeHtml(categoryId)}" aria-expanded="${openServiceCategoryId === categoryId}"><span>${escapeHtml(group.title)}</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <div class="cabinet-booking-category-panel"><div class="cabinet-booking-category-content">${group.items.map((item) => {
+              const duration = bookingDurationLabel(item.duration);
+              const price = bookingServicePriceLabel(item);
+              const imageUrls = [...new Set((Array.isArray(item.image_urls) ? item.image_urls : [item.image_url]).filter(Boolean))];
+              const gallery = imageUrls.length ? `<button type="button" class="cabinet-booking-service-gallery-open" data-service-gallery-open data-service-gallery-images="${escapeHtml(JSON.stringify(imageUrls))}" data-service-gallery-title="${escapeHtml(item.title || "")}" aria-label="\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0433\u0430\u043b\u0435\u0440\u0435\u044e">
+                <img class="cabinet-booking-service-photo" src="${escapeHtml(imageUrls[0])}" alt="${escapeHtml(item.title || "")}" loading="lazy" decoding="async" fetchpriority="low" />
+              </button>` : "";
               return `<label class="cabinet-booking-service">
-                <span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(meta)}</small></span>
-                <input type="checkbox" name="service_ids" value="${escapeHtml(item.id)}" ${selectedIds.has(Number(item.id)) ? "checked" : ""} />
+                ${gallery}
+                <span class="cabinet-booking-service-content"><span class="cabinet-booking-service-title"><b>${escapeHtml(item.title)}</b><input type="checkbox" name="service_ids" value="${escapeHtml(item.id)}" ${selectedIds.has(Number(item.id)) ? "checked" : ""} /></span>${duration ? `<small>${escapeHtml(duration)}</small>` : ""}${item.description ? `<span class="cabinet-booking-service-description">${escapeHtml(item.description)}</span>` : ""}${price ? `<strong>${escapeHtml(price)}</strong>` : ""}</span>
               </label>`;
-            }).join("")}
+            }).join("")}</div></div>
           </section>
-        `).join("") : '<p class="cabinet-history-empty">Подходящих услуг не найдено.</p>'}`;
+        `).join("") : '<p class="cabinet-history-empty">\u041f\u043e\u0434\u0445\u043e\u0434\u044f\u0449\u0438\u0445 \u0443\u0441\u043b\u0443\u0433 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e.</p>'}`;
         updateClientBookingSummaries();
       }
 
@@ -800,24 +1072,31 @@
         clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = !branchId;
         clientBookingForm.elements.booking_date.disabled = !branchId;
         const availableIds = new Set(availableMasters.map((item) => Number(item.id)));
-        const masters = clientBookingMasterPreviews === null
-          ? availableMasters.map((item) => ({ ...item, nearest_slots: null }))
+        const mastersLoading = clientBookingMasterPreviews === null;
+        const masters = mastersLoading
+          ? []
           : clientBookingMasterPreviews.filter((item) => availableIds.has(Number(item.id)));
         const container = clientBookingForm.querySelector("[data-client-booking-masters]");
         container.innerHTML = !branchId
           ? '<p class="cabinet-history-empty">Сначала выберите филиал.</p>'
+          : mastersLoading ? '<p class="cabinet-history-empty">\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u043e\u0432\u2026</p>'
           : masters.length ? masters.map((item) => {
             const initials = String(item.name || "?").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
             const slots = item.nearest_slots;
             const nearestDate = slots?.[0]?.date
               ? new Date(`${slots[0].date}T00:00:00`).toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long" })
               : "";
-            return `<article class="cabinet-booking-master${String(item.id) === masterInput.value ? " selected" : ""}">
-              <label>
-                <input type="radio" name="master_choice" value="${escapeHtml(item.id)}" ${String(item.id) === masterInput.value ? "checked" : ""} />
-                <span class="cabinet-booking-master-avatar">${escapeHtml(initials)}</span>
-                <span><b>${escapeHtml(item.name)}</b><small>Оказывает услуг: ${escapeHtml(item.service_ids?.length || 0)}</small></span>
-              </label>
+            return `<article class="cabinet-booking-master${String(item.id) === masterInput.value ? " selected" : ""}" data-booking-master-card="${escapeHtml(item.id)}">
+              <div class="cabinet-booking-master-main">
+                <label for="booking-master-${escapeHtml(item.id)}">
+                <span class="cabinet-booking-master-avatar">${item.photo_url ? `<img src="${escapeHtml(item.photo_url)}" alt="" loading="lazy" />` : escapeHtml(initials)}</span>
+                <span class="cabinet-booking-master-details"><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.position || "Специалист")}</small><span class="cabinet-booking-master-rating"><span class="cabinet-review-stars" aria-label="Рейтинг ${escapeHtml(item.rating || 0)} из 5">${reviewStars(item.rating || 0)}</span><small>${reviewsCountLabel(item.reviews_count || 0)}</small></span></span>
+                </label>
+                <div class="cabinet-booking-master-actions">
+                  <button type="button" class="cabinet-booking-master-info" data-booking-master-reviews="${escapeHtml(item.id)}" data-booking-master-name="${escapeHtml(item.name)}" data-booking-master-position="${escapeHtml(item.position || "\u0421\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442")}" data-booking-master-rating="${escapeHtml(item.rating || 0)}" data-booking-master-reviews-count="${escapeHtml(item.reviews_count || 0)}" data-booking-master-photo="${escapeHtml(item.photo_url || "")}" aria-label="&#1042;&#1089;&#1077; &#1086;&#1090;&#1079;&#1099;&#1074;&#1099; &#1086; ${escapeHtml(item.name)}" title="&#1042;&#1089;&#1077; &#1086;&#1090;&#1079;&#1099;&#1074;&#1099;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8V13" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.9945 16H12.0035" stroke="#292D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <input id="booking-master-${escapeHtml(item.id)}" type="radio" name="master_choice" value="${escapeHtml(item.id)}" ${String(item.id) === masterInput.value ? "checked" : ""} />
+                </div>
+              </div>
               <div class="cabinet-booking-master-nearest">
                 ${slots === null ? '<small>Ищем ближайшее время…</small>' : slots.length
                   ? `<small>Ближайшее время для записи, ${escapeHtml(nearestDate)}:</small><span>${slots.map((slot) => `<button type="button" data-booking-nearest-slot data-master-id="${escapeHtml(item.id)}" data-start="${escapeHtml(slot.start)}">${escapeHtml(slot.time)}</button>`).join("")}</span>`
@@ -830,8 +1109,22 @@
 
       async function loadClientBookingMasters() {
         const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+        const loadingKey = `${branchId}:${selectedBookingServiceIds().join(",")}`;
+        if (clientBookingMastersLoadingKey === loadingKey) return;
+        clientBookingMastersLoadingKey = loadingKey;
+        const requestId = ++clientBookingMastersRequestId;
         if (!branchId) {
+          clientBookingMastersLoadingKey = "";
           clientBookingMasterPreviews = [];
+          renderClientBookingMasters();
+          return;
+        }
+        if (publicBookingOrganizationId) {
+          clientBookingMasterPreviews = (clientBookingOptions?.masters || []).map((master) => ({
+            ...master,
+            nearest_slots: [],
+          }));
+          clientBookingMastersLoadingKey = "";
           renderClientBookingMasters();
           return;
         }
@@ -844,12 +1137,25 @@
         });
         try {
           const result = await requestJson(`/booking-api/client-booking/masters?${params}`, { cache: "no-store" });
-          clientBookingMasterPreviews = result.masters || [];
+          const masters = result.masters || [];
+          if (requestId !== clientBookingMastersRequestId) return;
+          clientBookingMastersLoadingKey = "";
+          clientBookingMasterPreviews = masters;
+          const mastersById = new Map(masters.map((master) => [Number(master.id), master]));
+          (clientBookingOptions?.masters || []).forEach((master) => {
+            const preview = mastersById.get(Number(master.id));
+            if (preview) {
+              master.rating = preview.rating;
+              master.reviews_count = preview.reviews_count;
+            }
+          });
           renderClientBookingMasters();
         } catch (error) {
+          if (requestId !== clientBookingMastersRequestId) return;
+          clientBookingMastersLoadingKey = "";
           clientBookingMasterPreviews = [];
           clientBookingForm.querySelector("[data-client-booking-masters]").innerHTML =
-            `<p class="cabinet-message error">${escapeHtml(error.message || "Не удалось загрузить специалистов.")}</p>`;
+            `<p class="cabinet-message error">${escapeHtml(error.message || "?? ??????? ????????? ????????????.")}</p>`;
         }
       }
 
@@ -874,7 +1180,9 @@
           days: "1",
         });
         try {
-          const result = await requestJson(`/booking-api/client-booking/slots?${params}`);
+          if (publicBookingOrganizationId) params.set("organization_id", String(publicBookingOrganizationId));
+          const slotsPath = publicBookingOrganizationId ? "public-booking/slots" : "client-booking/slots";
+          const result = await requestJson(`/booking-api/${slotsPath}?${params}`);
           const slotGroups = [
             ["Утро", result.slots.filter((slot) => Number(slot.time.slice(0, 2)) < 12)],
             ["День", result.slots.filter((slot) => {
@@ -906,7 +1214,10 @@
         clientBookingMessage.className = "cabinet-message";
         clientBookingMessage.textContent = "Загружаем варианты записи…";
         try {
-          clientBookingOptions = await requestJson("/booking-api/client-booking/options", { cache: "no-store" });
+          const optionsPath = publicBookingOrganizationId
+            ? `/booking-api/public-booking/options?organization_id=${encodeURIComponent(publicBookingOrganizationId)}`
+            : "/booking-api/client-booking/options";
+          clientBookingOptions = await requestJson(optionsPath, { cache: "no-store" });
           const branchSelect = clientBookingForm.elements.branch_id;
           branchSelect.innerHTML = `<option value="">Выберите филиал</option>${clientBookingOptions.branches.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}`;
           renderClientBookingBranchMeta();
@@ -959,6 +1270,60 @@
           <h4 class="cabinet-achievement-modal-title">${escapeHtml(item.name)}</h4>
         `;
         achievementModal.hidden = false;
+      }
+
+      function reviewDateLabel(value) {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+      }
+
+      function renderVisitReviewStars() {
+        const container = document.querySelector("[data-visit-review-stars]");
+        if (!container) return;
+        container.innerHTML = Array.from({ length: 5 }, (_, index) => `<button type="button" data-visit-review-rating="${index + 1}" aria-label="Оценка ${index + 1}">${reviewStar(index < visitReviewRating)}</button>`).join("");
+        document.querySelector("[data-visit-review-submit]").disabled = !visitReviewRating;
+      }
+
+      function openVisitReview(visitId, employeeId, employeeName) {
+        const reviewForm = document.querySelector("[data-visit-review-form]");
+        visitReviewRating = 0;
+        reviewForm.reset();
+        reviewForm.elements.employee_id.value = employeeId;
+        reviewForm.elements.visit_id.value = visitId;
+        reviewForm.querySelector("[data-visit-review-master]").textContent = `Ваш отзыв будет опубликован для мастера ${employeeName || ""}.`;
+        reviewForm.querySelector("[data-visit-review-message]").textContent = "";
+        renderVisitReviewStars();
+        setCabinetTab("create_review");
+      }
+
+      async function openEmployeeReviews(employeeId, employeeName, details = {}) {
+        const profile = document.querySelector("[data-employee-reviews-profile]");
+        const list = document.querySelector("[data-employee-reviews-list]");
+        const initials = String(employeeName || "?").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+        profile.innerHTML = `${details.photoUrl ? `<img src="${escapeHtml(details.photoUrl)}" alt="" class="cabinet-employee-review-photo" />` : `<span class="cabinet-employee-review-photo cabinet-employee-review-initials">${escapeHtml(initials)}</span>`}<h1>${escapeHtml(employeeName || "\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a")}</h1><p>${escapeHtml(details.position || "\u0421\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442")}</p><div class="cabinet-employee-review-summary"><span class="cabinet-review-stars" data-employee-review-profile-stars>${reviewStars(details.rating || 0)}</span><small data-employee-review-profile-count>${reviewsCountLabel(details.reviewsCount || 0)}</small></div>`;
+        list.innerHTML = '<p class="cabinet-history-empty">\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c \u043e\u0442\u0437\u044b\u0432\u044b\u2026</p>';
+        setCabinetTab("employee_reviews");
+        try {
+          const reviews = await requestJson(`/crm-api/client-reviews?organization_id=${encodeURIComponent(clientBookingOptions?.organization_id)}&employee_id=${encodeURIComponent(employeeId)}&limit=200`, { cache: "no-store" });
+          const reviewsCount = reviews.length;
+          const rating = reviewsCount ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviewsCount : 0;
+          profile.querySelector("[data-employee-review-profile-stars]").innerHTML = reviewStars(rating);
+          profile.querySelector("[data-employee-review-profile-count]").textContent = reviewsCountLabel(reviewsCount);
+          const updateMaster = (master) => {
+            if (Number(master.id) === Number(employeeId)) {
+              master.rating = Number(rating.toFixed(2));
+              master.reviews_count = reviewsCount;
+            }
+          };
+          (clientBookingMasterPreviews || []).forEach(updateMaster);
+          (clientBookingOptions?.masters || []).forEach(updateMaster);
+          renderClientBookingMasters();
+          list.innerHTML = reviewsCount
+            ? reviews.map((review) => { const name = review.client_name || "\u041a\u043b\u0438\u0435\u043d\u0442"; return `<article class="cabinet-employee-review"><header><div><b>${escapeHtml(name)}</b><span><span class="cabinet-review-stars">${reviewStars(review.rating)}</span><small>${escapeHtml(reviewDateLabel(review.created_at || review.date))}</small></span></div></header>${review.text ? `<p>${escapeHtml(review.text)}</p>` : ""}</article>`; }).join("")
+            : '<p class="cabinet-history-empty">\u041e\u0442\u0437\u044b\u0432\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</p>';
+        } catch {
+          list.innerHTML = '<p class="cabinet-history-empty">\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043e\u0442\u0437\u044b\u0432\u044b.</p>';
+        }
       }
 
       function setCabinetTab(tab) {
@@ -1075,6 +1440,23 @@
         applyRegistrationFields([]);
         renderHistorySections([]);
         setRegistrationMode(false);
+        if (publicBookingOrganizationId) {
+          document.body.classList.add("cabinet-public-booking-mode");
+          const result = await currentUser().catch(() => null);
+          if (result) {
+            const cabinetResponse = await fetch("/auth/cabinet");
+            cabinetData = cabinetResponse.ok ? await cabinetResponse.json() : null;
+            currentClient = cabinetData?.client || null;
+          }
+          const sessionOrganizationId = Number(cabinetData?.organization_id || currentClient?.organization_id || 0);
+          publicBookingAnonymous = !result || sessionOrganizationId !== publicBookingOrganizationId;
+          if (publicBookingAnonymous) {
+            cabinetData = null;
+            currentClient = null;
+          }
+          setCabinetTab("client_booking");
+          return;
+        }
         if (!token) {
           try {
             const result = await currentUser();
@@ -1139,8 +1521,55 @@
           return;
         }
 
+        if (event.target.closest("[data-employee-reviews-back]")) {
+          setCabinetTab("client_booking");
+          return;
+        }
+
+        if (event.target.closest("[data-visit-review-back]")) {
+          setCabinetTab("profile");
+          return;
+        }
+
+        const visitReviewButton = event.target.closest("[data-visit-review]");
+        if (visitReviewButton) {
+          openVisitReview(visitReviewButton.dataset.visitId, visitReviewButton.dataset.employeeId, visitReviewButton.dataset.employeeName);
+          return;
+        }
+
+        const reviewRatingButton = event.target.closest("[data-visit-review-rating]");
+        if (reviewRatingButton) {
+          visitReviewRating = Number(reviewRatingButton.dataset.visitReviewRating);
+          renderVisitReviewStars();
+          return;
+        }
+
         if (event.target.closest("[data-cabinet-edit]")) {
           setCabinetEditMode(true);
+          return;
+        }
+
+        const visitsToggle = event.target.closest("[data-cabinet-visits-toggle]");
+        if (visitsToggle) {
+          visitsExpanded = !visitsExpanded;
+          visitsToggle.setAttribute("aria-expanded", String(visitsExpanded));
+          visitsToggle.closest(".cabinet-history-card--visits")?.classList.toggle("is-expanded", visitsExpanded);
+          return;
+        }
+
+        const bookingVisitsToggle = event.target.closest("[data-client-booking-visits-toggle]");
+        if (bookingVisitsToggle) {
+          bookingVisitsExpanded = !bookingVisitsExpanded;
+          bookingVisitsToggle.setAttribute("aria-expanded", String(bookingVisitsExpanded));
+          bookingVisitsToggle.closest(".cabinet-my-bookings")?.classList.toggle("is-expanded", bookingVisitsExpanded);
+          return;
+        }
+
+        const branchReviewsToggle = event.target.closest("[data-cabinet-branch-reviews-toggle]");
+        if (branchReviewsToggle) {
+          const isExpanded = branchReviewsToggle.getAttribute("aria-expanded") !== "true";
+          branchReviewsToggle.setAttribute("aria-expanded", String(isExpanded));
+          branchReviewsToggle.closest("[data-cabinet-booking-branch-meta]")?.classList.toggle("reviews-expanded", isExpanded);
           return;
         }
 
@@ -1187,6 +1616,15 @@
           return;
         }
 
+        const visitsPageButton = event.target.closest("[data-cabinet-visits-page]");
+        if (visitsPageButton) {
+          const totalPages = Math.ceil((cabinetData?.visits || []).length / VISITS_PER_PAGE);
+          visitsPage += visitsPageButton.dataset.cabinetVisitsPage === "next" ? 1 : -1;
+          visitsPage = Math.max(1, Math.min(visitsPage, totalPages));
+          renderHistorySections(currentCardSections);
+          return;
+        }
+
         const visitButton = event.target.closest("[data-cabinet-visit]");
         if (visitButton) {
           selectedVisit = (cabinetData?.visits || []).find((item) => String((item.visit || item).id) === String(visitButton.dataset.cabinetVisit)) || null;
@@ -1224,9 +1662,54 @@
         }
       });
 
+      document.querySelector("[data-visit-review-form]").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const reviewForm = event.currentTarget;
+        const message = reviewForm.querySelector("[data-visit-review-message]");
+        const submit = reviewForm.querySelector("[data-visit-review-submit]");
+        const organizationId = clientBookingOptions?.organization_id || cabinetData?.organization_id || currentClient?.organization_id;
+        const clientId = clientBookingOptions?.client_id || cabinetData?.client_id || currentClient?.id;
+        const employeeId = Number(reviewForm.elements.employee_id.value || 0);
+        const visitId = String(reviewForm.elements.visit_id.value || "");
+        const text = reviewForm.elements.text.value.trim();
+        if (!organizationId || !clientId || !employeeId || !visitReviewRating || !text) return;
+        submit.disabled = true;
+        setBookingLoader(true, "\u041f\u0443\u0431\u043b\u0438\u043a\u0443\u0435\u043c \u043e\u0442\u0437\u044b\u0432\u2026");
+        message.textContent = "\u041f\u0443\u0431\u043b\u0438\u043a\u0443\u0435\u043c \u043e\u0442\u0437\u044b\u0432\u2026";
+        try {
+          await requestJson("/crm-api/client-reviews", {
+            method: "POST",
+            body: JSON.stringify({ organization_id: Number(organizationId), client_id: Number(clientId), employee_id: employeeId, rating: visitReviewRating, text }),
+          });
+          reviewedVisitIds.add(visitId);
+          sessionStorage.setItem("cabinet.reviewedVisitIds", JSON.stringify([...reviewedVisitIds]));
+          const updateMaster = (master) => {
+            if (Number(master.id) !== employeeId) return;
+            const count = Number(master.reviews_count || 0);
+            const rating = Number(master.rating || 0);
+            master.rating = Number(((rating * count + visitReviewRating) / (count + 1)).toFixed(2));
+            master.reviews_count = count + 1;
+          };
+          (clientBookingMasterPreviews || []).forEach(updateMaster);
+          (clientBookingOptions?.masters || []).forEach(updateMaster);
+          renderClientBookingMasters();
+          renderHistorySections(currentCardSections);
+          message.textContent = "\u041e\u0442\u0437\u044b\u0432 \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d.";
+          setBookingLoader(false);
+          await showBookingSuccessToast("\u041e\u0442\u0437\u044b\u0432 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d");
+          setCabinetTab("profile");
+        } catch {
+          message.textContent = "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c \u043e\u0442\u0437\u044b\u0432. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.";
+          submit.disabled = false;
+        } finally {
+          setBookingLoader(false);
+        }
+      });
+
       clientBookingForm.addEventListener("change", async (event) => {
         clientBookingMessage.textContent = "";
         if (event.target.name === "branch_id") {
+          openServiceCategoryId = null;
           renderClientBookingBranchMeta();
           clientBookingForm.querySelectorAll('[name="service_ids"]').forEach((input) => { input.checked = false; });
           clientBookingForm.querySelector("[data-client-booking-service-search]").value = "";
@@ -1266,6 +1749,43 @@
       });
 
       clientBookingForm.addEventListener("click", async (event) => {
+        const galleryButton = event.target.closest("[data-service-gallery-open]");
+        if (galleryButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const imageUrls = JSON.parse(galleryButton.dataset.serviceGalleryImages || "[]");
+          if (imageUrls.length) openServiceGallery(imageUrls, galleryButton.dataset.serviceGalleryTitle);
+          return;
+        }
+        const masterReviewsButton = event.target.closest("[data-booking-master-reviews]");
+        if (masterReviewsButton) {
+          await openEmployeeReviews(masterReviewsButton.dataset.bookingMasterReviews, masterReviewsButton.dataset.bookingMasterName, { position: masterReviewsButton.dataset.bookingMasterPosition, rating: masterReviewsButton.dataset.bookingMasterRating, reviewsCount: masterReviewsButton.dataset.bookingMasterReviewsCount, photoUrl: masterReviewsButton.dataset.bookingMasterPhoto });
+          return;
+        }
+
+        const masterChoice = event.target.closest('[name="master_choice"]');
+        if (masterChoice && clientBookingForm.elements.master_id.value === masterChoice.value) {
+          event.preventDefault();
+          clientBookingForm.elements.master_id.value = "";
+          renderClientBookingMasters();
+          await loadClientBookingSlots();
+          updateClientBookingSummaries();
+          return;
+        }
+
+        const categoryTrigger = event.target.closest("[data-booking-service-category-toggle]");
+        if (categoryTrigger) {
+          const categoryId = categoryTrigger.dataset.bookingServiceCategoryToggle;
+          const shouldOpen = openServiceCategoryId !== categoryId;
+          openServiceCategoryId = shouldOpen ? categoryId : null;
+          clientBookingForm.querySelectorAll("[data-booking-service-category]").forEach((category) => {
+            const isCurrent = shouldOpen && category.dataset.bookingServiceCategory === categoryId;
+            category.classList.toggle("is-expanded", isCurrent);
+            category.querySelector("[data-booking-service-category-toggle]")?.setAttribute("aria-expanded", String(isCurrent));
+          });
+          return;
+        }
+
         const trigger = event.target.closest("[data-booking-step-toggle]");
         if (trigger) {
           setClientBookingStep(trigger.dataset.bookingStepToggle);
@@ -1319,7 +1839,13 @@
         const startsAt = clientBookingForm.querySelector('[name="starts_at"]:checked')?.value;
         const submit = clientBookingForm.querySelector("[data-client-booking-submit]");
         if (!startsAt) return;
+        if (publicBookingAnonymous) {
+          publicBookingRegistration.hidden = false;
+          publicBookingRegistrationForm.elements.first_name.focus();
+          return;
+        }
         submit.disabled = true;
+        setBookingLoader(true);
         clientBookingMessage.className = "cabinet-message";
         clientBookingMessage.textContent = "Создаём запись…";
         try {
@@ -1332,6 +1858,12 @@
               starts_at: startsAt,
             }),
           });
+          if (publicBookingOrganizationId) {
+            setBookingLoader(false);
+            await showBookingSuccessToast();
+            location.href = "/cabinet.html#my-booking";
+            return;
+          }
           cabinetData = await requestJson("/auth/cabinet", { cache: "no-store" });
           renderClientBookingList();
           clientBookingMessage.textContent = "Запись успешно создана.";
@@ -1340,10 +1872,45 @@
           clientBookingMessage.className = "cabinet-message error";
           clientBookingMessage.textContent = error.message || "Не удалось создать запись.";
           submit.disabled = false;
+        } finally {
+          setBookingLoader(false);
         }
       });
 
-      setCabinetTab("profile");
+      publicBookingRegistrationForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const message = publicBookingRegistrationForm.querySelector("[data-public-booking-registration-message]");
+        const submit = publicBookingRegistrationForm.querySelector('button[type="submit"]');
+        message.textContent = "Проверяем данные…";
+        submit.disabled = true;
+        setBookingLoader(true);
+        try {
+          const data = Object.fromEntries(new FormData(publicBookingRegistrationForm));
+          const response = await fetch("/public-api/online-booking/client", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ organization_id: publicBookingOrganizationId, ...data }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.detail || "Не удалось зарегистрировать клиента.");
+          if (result.session_token) localStorage.setItem(SESSION_TOKEN_KEY, result.session_token);
+          publicBookingAnonymous = false;
+          publicBookingRegistration.hidden = true;
+          clientBookingForm.requestSubmit();
+        } catch (error) {
+          message.textContent = error.message;
+          submit.disabled = false;
+        } finally {
+          setBookingLoader(false);
+        }
+      });
+
+      document.querySelector("[data-public-booking-registration-close]").addEventListener("click", () => {
+        publicBookingRegistration.hidden = true;
+      });
+
+      if (!publicBookingOrganizationId) setCabinetTab("profile");
       consumeLink();
 
       form.addEventListener("submit", async (event) => {
