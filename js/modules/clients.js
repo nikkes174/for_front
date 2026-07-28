@@ -1159,12 +1159,57 @@ async function loadClientDetails(client, orgId, { force = false } = {}) {
   }
 }
 
+async function prepareExternalClientCard(clientId, orgId, resources = {}) {
+  const client = await api.client(clientId, orgId);
+  state = {
+    ...state,
+    clients: [client],
+    branches: resources.branches || [],
+    departments: resources.departments || [],
+    workplaces: resources.workplaces || [],
+    users: resources.users || [],
+    memberships: resources.memberships || [],
+    branchMemberships: resources.branchMemberships || [],
+    roles: resources.roles || [],
+    segments: resources.segments || [],
+    productCategories: resources.productCategories || [],
+    productItems: resources.productItems || [],
+    registrationLink: resources.registrationLink || null,
+  };
+  clearPhotoPreview();
+  state.selectedVisit = null;
+  state.visitPage = 1;
+  state.selectedVisitDraft = {};
+  state.visitDraft = {};
+  state.visitErrors = {};
+  state.clientAuthLink = null;
+  state.selectedClient = await loadClientDetails(client, orgId);
+}
+
+export async function openExternalClientCard(ctx, clientId, resources = {}) {
+  await prepareExternalClientCard(clientId, ctx.org.id, resources);
+  const host = document.createElement("div");
+  host.dataset.externalClientCardHost = "";
+  host.innerHTML = modal(state.selectedClient);
+  document.body.append(host);
+  host.querySelectorAll("[data-client-modal] [data-permission]").forEach((node) => {
+    if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();
+  });
+  bindClients(host, ctx);
+  const observer = new MutationObserver(() => {
+    if (host.querySelector("[data-client-modal]")) return;
+    observer.disconnect();
+    host.remove();
+  });
+  observer.observe(host, { childList: true, subtree: true });
+}
+
 function refreshSelectedClientModal(root, ctx) {
   const pageContent = root.querySelector("[data-page-content]") || root;
   pageContent.querySelector("[data-client-modal]")?.remove();
   pageContent.insertAdjacentHTML("beforeend", modal(state.selectedClient));
   pageContent.querySelectorAll("[data-client-modal] [data-permission]").forEach((node) => {
-    if (!ctx.can(node.dataset.permission)) node.remove();
+    if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();
   });
 }
 
@@ -1990,7 +2035,11 @@ export function bindClients(root, ctx) {
     if (visitButton && state.selectedClient) {
       state.selectedVisit = (state.selectedClient.visits || []).find((item) => String((item.visit || item).id) === String(visitButton.dataset.openVisit));
       state.selectedVisitDraft = {};
-      ctx.reload();
+      root.querySelector("[data-visit-modal]")?.remove();
+      root.insertAdjacentHTML("beforeend", editableVisitModal(state.selectedClient));
+      root.querySelectorAll("[data-visit-modal] [data-permission]").forEach((node) => {
+        if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();
+      });
       return;
     }
 

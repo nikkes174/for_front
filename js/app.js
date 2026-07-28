@@ -47,6 +47,7 @@ const TASK_PERMISSIONS = [
 ];
 const SETTINGS_MENU_SECTIONS = [
   { slug: "legal", label: "Юр лица", permissions: ["settings.legal.view", "settings.legal.create"] },
+    { slug: "org", label: "Организации", permissions: ["settings.org.view", "settings.org.create"] },
   { slug: "branches", label: "Филиалы", permissions: ["settings.branches.view", "settings.branches.create"] },
   { slug: "departments", label: "Подразделения", permissions: ["settings.departments.view", "settings.departments.create"] },
   { slug: "workplaces", label: "Рабочие места", permissions: ["settings.workplaces.view", "settings.workplaces.create"] },

@@ -1045,9 +1045,11 @@
 }
 
 .cabinet-booking-logo {
+  position: relative;
   display: grid;
   width: 54px;
   height: 54px;
+  overflow: hidden;
   place-items: center;
   border-radius: 50%;
   background: linear-gradient(135deg, #111827, #667085);
@@ -1055,6 +1057,8 @@
   font-size: 22px;
   font-weight: 700;
 }
+
+.cabinet-booking-logo .cabinet-booking-service-photo { position: absolute; inset: 0; }
 
 .cabinet-booking-brand label {
   display: grid;
@@ -1702,6 +1706,11 @@ body.service-gallery-open { overflow: hidden; }
   color: #172033;
   line-height: 1.48;
 }
+
+.cabinet-visit-comment { white-space: pre-wrap; }
+.cabinet-visit-comment-photos { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+.cabinet-visit-comment-photos a { display: block; }
+.cabinet-visit-comment-photos img { display: block; width: 96px; height: 76px; object-fit: cover; border: 1px solid #e5e7eb; border-radius: 9px; }
 
 .cabinet-visit-review-button {
   justify-self: start;

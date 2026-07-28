@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</title>
     <link rel="stylesheet" href="/css/styles.css" />
-    <link rel="stylesheet" href="/css/cabinet.css" />
+    <link rel="stylesheet" href="/css/cabinet.css?v=7-photo" />
   </head>
   <body>
     <main class="cabinet-shell">
@@ -52,7 +52,7 @@
         <div class="cabinet-panel" data-cabinet-view="client_booking" hidden>
           <form class="cabinet-booking-form" data-client-booking-form>
             <div class="cabinet-booking-brand">
-              <span class="cabinet-booking-logo" aria-hidden="true">L</span>
+              <span class="cabinet-booking-logo" data-client-booking-logo aria-hidden="true">L</span>
               <label>
                 <span>Онлайн-запись</span>
                 <select name="branch_id" required><option value="">Выберите филиал</option></select>
@@ -249,6 +249,7 @@
       const VISITS_PER_PAGE = 5;
       let clientBookingOptions = null;
       let publicBookingAnonymous = false;
+      let publicBookingClientId = null;
       let clientBookingMasterPreviews = null;
       let clientBookingMastersRequestId = 0;
       let clientBookingMastersLoadingKey = "";
@@ -267,7 +268,7 @@
 
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/service-worker.js").catch(() => null);
+          navigator.serviceWorker.register("/service-worker.js?v=7-photo", { updateViaCache: "none" }).catch(() => null);
         });
       }
 
@@ -444,7 +445,7 @@
           pushStatus.textContent = "Клиент не найден.";
           return null;
         }
-        const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.register("/service-worker.js").catch(() => null) : null;
+        const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.register("/service-worker.js?v=7-photo", { updateViaCache: "none" }).catch(() => null) : null;
         const subscription = await registration?.pushManager?.getSubscription?.();
         const endpoint = subscription?.endpoint ? `&endpoint=${encodeURIComponent(subscription.endpoint)}` : "";
         const state = await requestJson(`/crm-api/client-communications/push/status?organization_id=${organizationId}&client_id=${clientId}${endpoint}`, { cache: "no-store" });
@@ -710,6 +711,7 @@
         for (const line of lines) {
           if (line.startsWith("__services:")) meta.serviceNames = line.slice("__services:".length).trim();
           else if (line.startsWith("__products:")) meta.productNames = line.slice("__products:".length).trim();
+          else if (line.startsWith("__")) continue;
           else commentLines.push(line);
         }
         meta.comment = commentLines.join("\n").trim();
@@ -734,6 +736,12 @@
 
       function visitEmployeeId(visit) {
         return Number(visit.employee_id || visit.master_id || visit.yclients_staff?.id || 0);
+      }
+
+      function visitCommentPhotos(visit) {
+        const photos = Array.isArray(visit?.photos_comment) ? visit.photos_comment : [];
+        if (!photos.length || !visit?.id) return "";
+        return `<div class="cabinet-visit-comment-photos">${photos.map((photo) => `<a href="/crm-api/client-history/visits/${escapeHtml(visit.id)}/photos/comment/${escapeHtml(photo.id)}" target="_blank" rel="noopener"><img src="/crm-api/client-history/visits/${escapeHtml(visit.id)}/photos/comment/${escapeHtml(photo.id)}" alt="Фото к комментарию" loading="lazy" decoding="async"></a>`).join("")}</div>`;
       }
 
       function visitIsCompleted(visit) {
@@ -761,6 +769,8 @@
               <div><span>Услуги</span>${visitItems(services, "Услуг нет", "Услуга")}</div>
               <div><span>Товары</span>${visitItems(products, "Товаров нет", "Товар")}</div>
               <div><span>Стоимость</span><b>${escapeHtml(money(visit.total_cost || visit.paid_amount))}</b></div>
+              ${parsed.comment ? `<div><span>Комментарий</span><b class="cabinet-visit-comment">${escapeHtml(parsed.comment)}</b></div>` : ""}
+              ${visitCommentPhotos(visit)}
             </div>
             ${visitIsCompleted(visit) && employeeId ? (reviewedVisitIds.has(visitId) ? '<span class="cabinet-visit-review-done">\u041e\u0442\u0437\u044b\u0432 \u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d</span>' : `<button type="button" class="cabinet-visit-review-button" data-visit-review data-visit-id="${escapeHtml(visitId)}" data-employee-id="${escapeHtml(employeeId)}" data-employee-name="${escapeHtml(visitPersonName(visit))}">\u041e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0442\u0437\u044b\u0432</button>`) : ""}
           </article>
@@ -801,6 +811,8 @@
                 <div class="readonly-field"><span>\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</span><b>${escapeHtml(money(visit.total_cost))}</b></div>
                 <div class="readonly-field"><span>\u0421\u043a\u0438\u0434\u043a\u0430</span><b>${escapeHtml(money(visit.discount_amount))}</b></div>
                 <div class="readonly-field"><span>\u041e\u043f\u043b\u0430\u0447\u0435\u043d\u043e</span><b>${escapeHtml(money(visit.paid_amount))}</b></div>
+                ${parsed.comment ? `<div class="readonly-field modal-full"><span>Комментарий</span><b class="cabinet-visit-comment">${escapeHtml(parsed.comment)}</b></div>` : ""}
+                ${visitCommentPhotos(visit)}
               </div>
             </div>
           </div>
@@ -888,11 +900,31 @@
         return entries.length ? entries.join(" \u00b7 ") : "\u0413\u0440\u0430\u0444\u0438\u043a \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
       }
 
+      function renderClientBookingLogo(branch = null) {
+        const logo = clientBookingForm.querySelector("[data-client-booking-logo]");
+        if (!logo) return;
+        const organizationId = Number(
+          clientBookingOptions?.organization_id
+          || publicBookingOrganizationId
+          || cabinetData?.organization_id
+          || cabinetData?.client?.organization_id
+          || currentClient?.organization_id
+          || 0
+        );
+        const photoUrl = branch?.id
+          ? `/organizations/branches/${encodeURIComponent(branch.id)}/photo-file?v=${encodeURIComponent(branch.photo_file_id || "7-photo")}`
+          : organizationId
+            ? `/organizations/${encodeURIComponent(organizationId)}/photo-file?v=7-photo`
+            : "";
+        logo.innerHTML = `<span>L</span>${photoUrl ? `<img class="cabinet-booking-service-photo" src="${escapeHtml(photoUrl)}" alt="" loading="lazy" decoding="async" onload="this.previousElementSibling.hidden=true" onerror="this.remove()" />` : ""}`;
+      }
+
       async function renderClientBookingBranchMeta() {
         const meta = clientBookingForm.querySelector("[data-client-booking-branch-meta]");
         const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
         const branch = clientBookingOptions?.branches?.find((item) => Number(item.id) === branchId);
         const requestId = ++branchReviewsRequestId;
+        renderClientBookingLogo(branch);
         if (!branch) {
           meta.hidden = true;
           meta.innerHTML = "";
@@ -1099,7 +1131,7 @@
               </div>
               <div class="cabinet-booking-master-nearest">
                 ${slots === null ? '<small>Ищем ближайшее время…</small>' : slots.length
-                  ? `<small>Ближайшее время для записи, ${escapeHtml(nearestDate)}:</small><span>${slots.map((slot) => `<button type="button" data-booking-nearest-slot data-master-id="${escapeHtml(item.id)}" data-start="${escapeHtml(slot.start)}">${escapeHtml(slot.time)}</button>`).join("")}</span>`
+                  ? `<small>Ближайшее время для записи, ${escapeHtml(nearestDate)}:</small><span><button type="button" data-booking-nearest-slot data-master-id="${escapeHtml(item.id)}" data-start="${escapeHtml(slots[0].start)}">${escapeHtml(slots[0].time)}</button></span>`
                   : '<small>На ближайшие дни свободного времени нет.</small>'}
               </div>
             </article>`;
@@ -1856,6 +1888,7 @@
               service_ids: selectedBookingServiceIds(),
               master_id: Number(clientBookingForm.elements.master_id.value),
               starts_at: startsAt,
+              client_id: publicBookingClientId,
             }),
           });
           if (publicBookingOrganizationId) {
@@ -1895,6 +1928,7 @@
           const result = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(result.detail || "Не удалось зарегистрировать клиента.");
           if (result.session_token) localStorage.setItem(SESSION_TOKEN_KEY, result.session_token);
+          publicBookingClientId = Number(result.client_id) || null;
           publicBookingAnonymous = false;
           publicBookingRegistration.hidden = true;
           clientBookingForm.requestSubmit();

@@ -72,10 +72,21 @@ export const api = {
 
   organizations: () => request("/organizations"),
   createOrganization: (body) => request("/organizations", { method: "POST", body: JSON.stringify(body) }),
+  updateOrganization: (id, body) => request(`/organizations/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  uploadOrganizationPhoto: (id, file) => {
+    const data = new FormData();
+    data.append("file", file);
+    return upload(`/organizations/${id}/photo`, data);
+  },
 
   branches: (orgId) => request(`/organizations/${orgId}/branches`),
   createBranch: (body) => request("/organizations/branches", { method: "POST", body: JSON.stringify(body) }),
   updateBranch: (id, body) => request(`/organizations/branches/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  uploadBranchPhoto: (id, file) => {
+    const data = new FormData();
+    data.append("file", file);
+    return upload(`/organizations/branches/${id}/photo`, data);
+  },
   deleteBranch: (id) => request(`/organizations/branches/${id}`, { method: "DELETE" }),
 
   brands: (orgId) => request(`/organizations/${orgId}/brands`),
@@ -119,6 +130,7 @@ export const api = {
 
   departments: (orgId) => request(`/organizations/${orgId}/departments`),
   createDepartment: (body) => request("/organizations/departments", { method: "POST", body: JSON.stringify(body) }),
+  createDepartments: (body) => request("/organizations/departments/bulk", { method: "POST", body: JSON.stringify(body) }),
   updateDepartment: (id, body) => request(`/organizations/departments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteDepartment: (id) => request(`/organizations/departments/${id}`, { method: "DELETE" }),
 
@@ -203,6 +215,7 @@ export const api = {
   createClientVisit: (body) => request("/crm-api/client-history/visits", { method: "POST", body: JSON.stringify(body) }),
   updateClientVisit: (id, body) => request(`/crm-api/client-history/visits/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   clientVisit: (id) => request(`/crm-api/client-history/visits/${id}`),
+  clientVisitDetails: (id) => request(`/crm-api/client-history/visits/${id}/details`),
   uploadVisitPhotos: (id, stage, files) => {
     const data = new FormData();
     [...files].forEach((file) => data.append("files", file));

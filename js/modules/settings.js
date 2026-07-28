@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
+import { openExternalClientCard } from "./clients.js";
 
 
 const no = "Не указано";
@@ -13,6 +14,7 @@ let userFilterBranchId = "";
 let userFilterRoleId = "";
 let userFilterDepartmentId = "";
 let userFilterWorkplaceId = "";
+let userSearchQuery = "";
 let userHideInactive = false;
 let userPage = 1;
 let auditPage = 1;
@@ -24,6 +26,7 @@ const USER_PAGE_SIZE = 20;
 const LOG_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const SETTINGS_TABS = [
   { slug: "legal", label: "Юр лица", permissions: ["settings.legal.view", "settings.legal.create"] },
+  { slug: "org", label: "Организации", permissions: ["settings.org.view", "settings.org.create"] },
   { slug: "branches", label: "Филиалы", permissions: ["settings.branches.view", "settings.branches.create"] },
   { slug: "departments", label: "Подразделения", permissions: ["settings.departments.view", "settings.departments.create"] },
   { slug: "workplaces", label: "Рабочие места", permissions: ["settings.workplaces.view", "settings.workplaces.create"] },
@@ -214,7 +217,7 @@ function permissionByCode(code) {
 }
 
 function nameById(items, id) {
-  return items.find((item) => item.id === id)?.name || id || no;
+  return items.find((item) => String(item.id) === String(id))?.name || id || no;
 }
 
 function categoryTypeLabel(value) {
@@ -523,6 +526,47 @@ function userPhotoField(item) {
       </label>
     </div>
   `;
+}
+
+function userBookingBlockRow(block = {}) {
+  return `
+    <div class="user-booking-block-row" data-user-booking-block>
+      <label><span>Дата с</span><input type="date" data-booking-block-date-from value="${escapeHtml(block.date_from || "")}"></label>
+      <label><span>Дата по</span><input type="date" data-booking-block-date-to value="${escapeHtml(block.date_to || block.date_from || "")}"></label>
+      <label><span>Время с</span><input type="time" data-booking-block-time-from value="${escapeHtml(block.time_from || "")}"></label>
+      <label><span>Время по</span><input type="time" data-booking-block-time-to value="${escapeHtml(block.time_to || "")}"></label>
+      <button type="button" class="ghost danger" data-remove-user-booking-block>Удалить</button>
+    </div>
+  `;
+}
+
+function userBookingBlocksField(item) {
+  const blocks = (Array.isArray(item.booking_blocks) ? item.booking_blocks : [])
+    .filter((block) => block.organization_id == null || String(block.organization_id) === String(cache.organizationId));
+  return `
+    <div class="user-profile-section">
+      <h5>Перекрыть запись</h5>
+      <p class="user-booking-block-hint">Время можно не указывать: тогда запись будет перекрыта на весь выбранный день или период.</p>
+      <div class="user-booking-blocks" data-user-booking-blocks>
+        ${blocks.map((block) => userBookingBlockRow(block)).join("")}
+      </div>
+      <button type="button" class="ghost user-booking-block-add" data-add-user-booking-block>Добавить период</button>
+    </div>
+  `;
+}
+
+function userBookingBlocksPayload(form) {
+  return [...form.querySelectorAll("[data-user-booking-block]")].map((row) => {
+    const dateFrom = row.querySelector("[data-booking-block-date-from]")?.value || "";
+    const dateTo = row.querySelector("[data-booking-block-date-to]")?.value || dateFrom;
+    const timeFrom = row.querySelector("[data-booking-block-time-from]")?.value || "";
+    const timeTo = row.querySelector("[data-booking-block-time-to]")?.value || "";
+    if (!dateFrom) throw new Error("Заполните дату перекрытия записи.");
+    if (dateTo < dateFrom) throw new Error("Дата окончания перекрытия не может быть раньше даты начала.");
+    if (Boolean(timeFrom) !== Boolean(timeTo)) throw new Error("Укажите оба значения времени или оставьте оба поля пустыми.");
+    if (timeFrom && timeTo && timeTo <= timeFrom) throw new Error("Время окончания перекрытия должно быть позже времени начала.");
+    return { organization_id: Number(cache.organizationId), date_from: dateFrom, date_to: dateTo, time_from: timeFrom, time_to: timeTo };
+  });
 }
 
 function serviceStaffRow(user, pair = {}, item = {}, enabled = false) {
@@ -1101,7 +1145,33 @@ function clientEventDetailsHtml(item) {
   return fields.join(" · ") || no;
 }
 
+function reviewEventDetailsHtml(item) {
+  const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+  const clientId = item.client_id || payload.client_id;
+  const clientName = payload.client_name || (clientId ? `#${clientId}` : no);
+  const masterName = userShortNameById(payload.employee_id);
+  return `Клиент: ${clientEventButton(clientId, clientName)} · Мастер: ${escapeHtml(masterName)}`;
+}
+
+function openReviewTextModal(item) {
+  const payload = item?.payload && typeof item.payload === "object" ? item.payload : {};
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="modal-backdrop" data-settings-modal>
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3>Отзыв</h3>
+          <button type="button" class="ghost" data-close-modal>Закрыть</button>
+        </div>
+        <div class="modal-grid">
+          ${readonly("Текст отзыва", payload.text)}
+        </div>
+      </div>
+    </div>
+  `);
+}
+
 function eventDetailsHtml(item) {
+  if (item.entity_type === "client_review") return reviewEventDetailsHtml(item);
   if (item.entity_type === "client_visit") return eventVisitDetailsHtml(item);
   if (item.entity_type === "client" || item.client_id || item.payload?.client_id) return clientEventDetailsHtml(item);
   return escapeHtml(eventDetails(item));
@@ -1267,8 +1337,70 @@ function syncVatFields(scope) {
   if (!checkbox.checked) rate.value = "";
 }
 
+function departmentBranchIds(item) {
+  return [...new Set((item?.branch_ids?.length ? item.branch_ids : [item?.branch_id]).filter(Boolean).map(String))];
+}
+
+function branchPhotoField(item) {
+  const photoUrl = item?.id && item.photo_file_id
+    ? `/organizations/branches/${item.id}/photo?v=${encodeURIComponent(item.updated_at || item.photo_file_id)}`
+    : "";
+  return `
+    <div class="achievement-photo-field modal-full">
+      <label class="photo-upload-control">
+        <input name="branch_photo_file" type="file" accept="image/*" hidden>
+        <span class="photo-upload-button">${photoUrl ? "Заменить фото" : "Добавить фото"}</span>
+      </label>
+      ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Фото филиала" class="achievement-photo-preview">` : ""}
+    </div>
+  `;
+}
+
+function organizationPhotoField(item) {
+  const photoUrl = item?.id && item.photo_file_id
+    ? `/organizations/${item.id}/photo?v=${encodeURIComponent(item.updated_at || item.photo_file_id)}`
+    : "";
+  return `
+    <div class="achievement-photo-field modal-full">
+      <label class="photo-upload-control">
+        <input name="organization_photo_file" type="file" accept="image/*" hidden>
+        <span class="photo-upload-button">${photoUrl ? "\u0417\u0430\u043c\u0435\u043d\u0438\u0442\u044c \u0444\u043e\u0442\u043e" : "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0444\u043e\u0442\u043e"}</span>
+      </label>
+      ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="\u0424\u043e\u0442\u043e \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438" class="achievement-photo-preview">` : ""}
+    </div>
+  `;
+}
+
+function departmentBranchEditFields(item) {
+  const selected = departmentBranchIds(item);
+  const branches = cache.branches || [];
+  const summary = selected.map((id) => nameById(branches, id)).join(", ") || "Выберите филиалы";
+  return `
+    <div class="branch-multiselect modal-full" data-department-edit-branch-select>
+      <span>Филиалы</span>
+      <details class="branch-multiselect-dropdown">
+        <summary><span data-department-edit-branch-summary>${escapeHtml(summary)}</span></summary>
+        <div class="branch-multiselect-options">
+          <label class="checkbox"><input type="checkbox" data-department-edit-branches-all ${selected.length === branches.length ? "checked" : ""}> Выбрать все филиалы</label>
+          ${branches.map((branch) => `<label class="checkbox"><input type="checkbox" name="department_branch_ids" value="${escapeHtml(branch.id)}" ${selected.includes(String(branch.id)) ? "checked" : ""}> ${escapeHtml(branch.name)}</label>`).join("")}
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+function syncDepartmentBranchEditForm(scope) {
+  const form = scope.closest("[data-entity-edit]") || scope;
+  const checkboxes = [...form.querySelectorAll('[name="department_branch_ids"]')];
+  const selected = checkboxes.filter((input) => input.checked);
+  const all = form.querySelector("[data-department-edit-branches-all]");
+  const summary = form.querySelector("[data-department-edit-branch-summary]");
+  if (all) all.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+  if (summary) summary.textContent = selected.map((input) => nameById(cache.branches || [], input.value)).join(", ") || "Выберите филиалы";
+}
+
 function workplaceDepartmentOptions(branchId = "", selectedDepartmentId = "") {
-  const filteredDepartments = cache.departments.filter((item) => String(item.branch_id) === String(branchId));
+  const filteredDepartments = cache.departments.filter((item) => departmentBranchIds(item).includes(String(branchId)));
   const options = [
     `<option value="">${escapeHtml(branchId ? "Выберите подразделение" : "Сначала выберите филиал")}</option>`,
     ...filteredDepartments.map((item) => {
@@ -1354,6 +1486,7 @@ function activeSettingsTab(ctx, tabSlug = "") {
 
 export async function loadSettingsData(orgId) {
   const [
+    organizations,
     branches,
     brands,
     legalEntities,
@@ -1372,6 +1505,7 @@ export async function loadSettingsData(orgId) {
     auditLogs,
     events,
   ] = await Promise.all([
+    api.organizations().catch(() => []),
     api.branches(orgId).catch(() => []),
     api.brands(orgId).catch(() => []),
     api.legalEntities(orgId).catch(() => []),
@@ -1405,6 +1539,7 @@ export async function loadSettingsData(orgId) {
     ...actorUsers.filter(Boolean).filter((user) => !userIds.has(String(user.id))),
   ];
   return {
+    organizations,
     branches,
     brands,
     legalEntities,
@@ -1514,6 +1649,9 @@ function auditEntityCell(item) {
 
 function eventNameCell(item) {
   const label = humanizeCode(item.event_type || item.event_name || item.name);
+  if (item.entity_type === "client_review") {
+    return `<button type="button" class="ghost" data-open-event-review="${escapeHtml(item.id)}">Отзыв</button>`;
+  }
   if (item.entity_type !== "client_visit") return escapeHtml(label);
   const visitWord = "Визит";
   if (!label.startsWith(visitWord)) {
@@ -1587,6 +1725,39 @@ function eventVisitId(item) {
   return item?.entity_id || payload.id || payload.visit_id;
 }
 
+function visitPublicComment(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("__"))
+    .join("\n")
+    .trim();
+}
+
+function visitLegacyItems(comment, type) {
+  const prefix = `__${type}:`;
+  const line = String(comment || "").split(/\r?\n/).find((value) => value.startsWith(prefix)) || "";
+  const value = line.slice(prefix.length).split("__", 1)[0];
+  return value.split(",").map((item) => item.trim()).filter(Boolean).map((label) => ({ label }));
+}
+
+function visitItemName(id, fallback = "") {
+  const item = (cache.productItems || []).find((candidate) => String(candidate.id) === String(id));
+  return item?.title || item?.name || fallback || `#${id}`;
+}
+
+function visitItemsReadonly(label, items, idField) {
+  const value = (items || []).map((item) => {
+    const quantity = Number(item.quantity || 1);
+    const amount = item.total_amount ?? item.price;
+    return [
+      visitItemName(item[idField], item.label),
+      quantity > 1 ? `\u00d7 ${quantity}` : "",
+      amount !== undefined && amount !== null ? `\u2014 ${amount}` : "",
+    ].filter(Boolean).join(" ");
+  }).join(", ");
+  return readonly(label, value);
+}
+
 function visitPhotoAlbumField(visit, visitId, stage, label) {
   const photos = Array.isArray(visit?.[`photos_${stage}`]) ? visit[`photos_${stage}`] : [];
   return `<div class="visit-photo-album modal-full" data-visit-photo-album data-visit-photo-stage="${stage}" data-existing-images-count="${photos.length}">
@@ -1600,6 +1771,8 @@ function eventVisitModal() {
   if (!selectedEventVisit) return "";
   const visit = eventVisitPayload(selectedEventVisit);
   const visitId = eventVisitId(selectedEventVisit);
+  const visitServices = visit.services?.length ? visit.services : visitLegacyItems(visit.comment, "services");
+  const visitProducts = visit.products?.length ? visit.products : visitLegacyItems(visit.comment, "products");
   return `
     <div class="modal-backdrop" data-event-visit-modal>
       <div class="modal-card">
@@ -1629,9 +1802,12 @@ function eventVisitModal() {
           <label><span>Оплачено</span><input name="paid_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.paid_amount ?? "")}"></label>
           ${readonly("Задолженность", visit.debt_amount)}
           <label><span>Источник</span><input name="source" value="${escapeHtml(visit.source || "")}"></label>
-          <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visit.comment || "")}"></label>
+          <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visitPublicComment(visit.comment))}"></label>
+          ${visitItemsReadonly("\u0423\u0441\u043b\u0443\u0433\u0438", visitServices, "service_id")}
+          ${visitItemsReadonly("\u0422\u043e\u0432\u0430\u0440\u044b", visitProducts, "product_id")}
           ${visitPhotoAlbumField(visit, visitId, "before", "Фото до")}
           ${visitPhotoAlbumField(visit, visitId, "after", "Фото после")}
+          ${visitPhotoAlbumField(visit, visitId, "comment", "Фото к комментарию")}
           <p data-message></p>
           <button class="primary">Сохранить визит</button>
         </form>
@@ -1691,7 +1867,7 @@ function userMemberships(user, branchMemberships = []) {
 
 function userDepartmentEditOptions(branchIds = [], selectedDepartmentId = "") {
   const selectedBranches = new Set((branchIds || []).map((id) => String(id)));
-  const departments = (cache.departments || []).filter((item) => !selectedBranches.size || selectedBranches.has(String(item.branch_id)));
+  const departments = (cache.departments || []).filter((item) => !selectedBranches.size || departmentBranchIds(item).some((id) => selectedBranches.has(id)));
   return [
     `<option value="">Не выбрано</option>`,
     ...departments.map((item) => `<option value="${escapeHtml(item.id)}" ${String(selectedDepartmentId) === String(item.id) ? "selected" : ""}>${escapeHtml(`${nameById(cache.branches || [], item.branch_id)} - ${item.name}`)}</option>`),
@@ -1770,6 +1946,9 @@ function userRoleIds(user, memberships = [], branchMemberships = []) {
 function userMatchesFilters(user, memberships = [], branchMemberships = []) {
   const branches = userMemberships(user, branchMemberships);
   const roleIds = userRoleIds(user, memberships, branchMemberships).map((item) => String(item));
+  const searchQuery = userSearchQuery.trim().toLowerCase();
+  const fullName = [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ").toLowerCase();
+  if (searchQuery && !fullName.includes(searchQuery)) return false;
   if (userHideInactive && !user.is_active) return false;
   if (userFilterBranchId && !branches.some((item) => String(item.branch_id) === String(userFilterBranchId))) return false;
   if (userFilterRoleId && !roleIds.includes(String(userFilterRoleId))) return false;
@@ -1780,12 +1959,15 @@ function userMatchesFilters(user, memberships = [], branchMemberships = []) {
 
 function userFilterOptions(branches, roles, departments, workplaces) {
   const filteredDepartments = userFilterBranchId
-    ? departments.filter((item) => String(item.branch_id) === String(userFilterBranchId))
+    ? departments.filter((item) => departmentBranchIds(item).includes(String(userFilterBranchId)))
     : departments;
   const filteredWorkplaces = workplaces
     .filter((item) => !userFilterBranchId || String(item.branch_id) === String(userFilterBranchId))
     .filter((item) => !userFilterDepartmentId || String(item.department_id) === String(userFilterDepartmentId));
   return `
+    <form class="inline-form compact">
+      <label><span>Поиск сотрудника</span><input type="search" placeholder="Имя или фамилия" value="${escapeHtml(userSearchQuery)}" data-user-search></label>
+    </form>
     <form class="inline-form compact">
       <label><span>Филиал</span><select data-user-filter-branch>
         <option value="" ${!userFilterBranchId ? "selected" : ""}>Все филиалы</option>
@@ -1931,6 +2113,7 @@ function productItemCreateForm(categories, title) {
 
 function findEntity(type, id) {
   const source = {
+    org: cache.organizations,
     brand: cache.brands,
     legal: cache.legalEntities,
     category: cache.categories,
@@ -1949,6 +2132,10 @@ function findEntity(type, id) {
 }
 
 function modalFields(type, item) {
+  if (type === "org") return `
+    ${organizationPhotoField(item)}
+    <label class="organization-name-field"><span>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438</span><input name="name" value="${escapeHtml(item.name)}" required></label>
+  `;
   if (type === "brand") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
   `;
@@ -2014,6 +2201,7 @@ function modalFields(type, item) {
     </select></label>
   `;
   if (type === "branch") return `
+    ${branchPhotoField(item)}
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
     <label><span>Адрес</span><input name="address" value="${escapeHtml(item.address || "")}"></label>
     <label><span>Телефон</span><input name="phone" value="${escapeHtml(item.phone || "")}"></label>
@@ -2024,6 +2212,7 @@ function modalFields(type, item) {
   `;
   if (type === "department") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
+    ${departmentBranchEditFields(item)}
   `;
   if (type === "workplace") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
@@ -2062,9 +2251,11 @@ function modalFields(type, item) {
             <option value="true" ${item.is_active ? "selected" : ""}>Да</option>
             <option value="false" ${!item.is_active ? "selected" : ""}>Нет</option>
           </select></label>
+          ${selectField("\u0420\u043e\u043b\u044c", "role_id", cache.roles || [], userRoleIds(item, cache.memberships || [], cache.branchMemberships || [])[0], "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u043e\u043b\u044c")}
         </div>
         <div class="user-profile-access">${userBranchAccessFields(item)}</div>
       </div>
+      ${userBookingBlocksField(item)}
     </section>
   `;
   if (type === "role") return `
@@ -2112,6 +2303,7 @@ async function openEntityModal(type, item) {
     modalItem = { ...item, master_services: await api.masterServices(cache.organizationId, item.id) };
   }
   const titles = {
+    org: "\u041e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u044f",
     brand: "Бренд",
     legal: "Юридическое лицо",
     category: "Категория товаров и услуг",
@@ -2160,13 +2352,13 @@ async function openEntityModal(type, item) {
 
   document.body.insertAdjacentHTML("beforeend", `
     <div class="modal-backdrop" data-settings-modal>
-      <div class="modal-card${isServiceProfile ? " service-profile-modal" : ""}">
+      <div class="modal-card${isServiceProfile ? " service-profile-modal" : ""}${type === "org" ? " organization-profile-modal" : ""}">
         <div class="modal-head">
           <h3>${escapeHtml(modalTitle)}${modalTitleId}</h3>
           <button type="button" class="ghost" data-close-modal>Закрыть</button>
         </div>
         ${serviceProfileHeader}
-        <form class="modal-grid${type === "user" ? " user-profile-form" : ""}${isServiceProfile ? " service-profile-form" : ""}" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
+        <form class="modal-grid${type === "user" ? " user-profile-form" : ""}${isServiceProfile ? " service-profile-form" : ""}${type === "org" ? " organization-profile-form" : ""}" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
           ${modalFields(type, modalItem)}
           <p data-message></p>
           <button class="primary">Сохранить</button>
@@ -2191,7 +2383,7 @@ async function syncUserBranchAccess(userId, branchIds = [], departmentId = "", w
 
   for (const branchId of selected) {
     const membership = existing.find((item) => String(item.branch_id) === String(branchId));
-    const nextDepartmentId = department && String(department.branch_id) === String(branchId) ? Number(department.id) : null;
+    const nextDepartmentId = department && departmentBranchIds(department).includes(String(branchId)) ? Number(department.id) : null;
     const nextWorkplaceId = workplace && String(workplace.branch_id) === String(branchId) && (!nextDepartmentId || String(workplace.department_id) === String(nextDepartmentId)) ? Number(workplace.id) : null;
     if (membership) {
       if (String(membership.department_id || "") !== String(nextDepartmentId || "") || String(membership.workplace_id || "") !== String(nextWorkplaceId || "")) {
@@ -2212,6 +2404,10 @@ async function syncUserBranchAccess(userId, branchIds = [], departmentId = "", w
 }
 
 async function saveEntity(type, id, data, form = null) {
+  if (type === "org") return api.updateOrganization(id, { name: data.name }).then(async (organization) => {
+    const photo = form.elements.organization_photo_file?.files?.[0];
+    return photo ? api.uploadOrganizationPhoto(id, photo) : organization;
+  });
   if (type === "brand") return api.updateBrand(id, { name: data.name });
   if (type === "legal") return api.updateLegalEntity(id, {
     name: data.name,
@@ -2289,8 +2485,17 @@ async function saveEntity(type, id, data, form = null) {
     brand_id: numberOrNull(data.brand_id),
     legal_entity_id: numberOrNull(data.legal_entity_id),
     online_booking_enabled: data.online_booking_enabled === "on",
+  }).then(async (branch) => {
+    const photo = form.elements.branch_photo_file?.files?.[0];
+    return photo ? api.uploadBranchPhoto(id, photo) : branch;
   });
-  if (type === "department") return api.updateDepartment(id, { name: data.name });
+  if (type === "department") {
+    if (!data.branch_ids?.length) throw new Error("Выберите хотя бы один филиал.");
+    for (const branchId of data.branch_ids) {
+      if (!(cache.branches || []).some((branch) => String(branch.id) === String(branchId))) throw new Error("Выбранный филиал не найден.");
+    }
+    return api.updateDepartment(id, { name: data.name, branch_ids: data.branch_ids });
+  }
   if (type === "workplace") return api.updateWorkplace(id, {
     name: data.name,
     department_id: numberOrNull(data.department_id),
@@ -2305,6 +2510,11 @@ async function saveEntity(type, id, data, form = null) {
     telegram_id: bigintIdOrNull(data.telegram_id),
     max_id: bigintIdOrNull(data.max_id),
     ...(data.password ? { password: data.password } : {}),
+    booking_blocks: [
+      ...((cache.users.find((item) => String(item.id) === String(id))?.booking_blocks || [])
+        .filter((block) => block.organization_id != null && String(block.organization_id) !== String(cache.organizationId))),
+      ...(data.booking_blocks || []),
+    ],
     is_active: data.is_active === "true",
     is_blocked: data.is_blocked === "true",
   }).then(async (updated) => {
@@ -2380,6 +2590,7 @@ async function deleteEntity(type, id) {
 export async function settings(ctx, tabSlug = "") {
   const settingsData = await loadSettingsData(ctx.org.id);
   const {
+    organizations,
     branches,
     brands,
     legalEntities,
@@ -2398,7 +2609,7 @@ export async function settings(ctx, tabSlug = "") {
     events,
   } = settingsData;
   const filteredDepartments = departmentFilterBranchId
-    ? departments.filter((item) => String(item.branch_id) === String(departmentFilterBranchId))
+    ? departments.filter((item) => departmentBranchIds(item).includes(String(departmentFilterBranchId)))
     : departments;
   const filteredWorkplaces = workplaceFilterBranchId
     ? workplaces.filter((item) => String(item.branch_id) === String(workplaceFilterBranchId))
@@ -2449,6 +2660,17 @@ export async function settings(ctx, tabSlug = "") {
 
       ` : ""}
 
+      ${currentTab === "org" ? `
+      <div id="org" data-permission="settings.org.view">
+        ${section("\u041e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438", `
+          ${entityList(organizations, "\u041e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442", "org", (item) => item.name, () => "", {
+            deleteId: () => null,
+          })}
+        `, "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u044e, \u0447\u0442\u043e\u0431\u044b \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0435\u0451 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438\u043b\u0438 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u044e.")}
+      </div>
+
+      ` : ""}
+
       ${currentTab === "branches" ? `
       <div id="branches" data-permission="settings.branches.view">
         ${section("Филиалы", `
@@ -2475,15 +2697,24 @@ export async function settings(ctx, tabSlug = "") {
       <div id="departments" data-permission="settings.departments.view">
         ${section("Подразделения", `
           <form class="inline-form compact" data-department-create data-permission="settings.departments.create">
-            ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
-            <label><span>Название</span><input name="name" required></label>
-            <button class="primary" disabled>Добавить Подразделение</button>
+            <div class="branch-multiselect" data-department-branch-select>
+              <span>\u0424\u0438\u043b\u0438\u0430\u043b\u044b</span>
+              <details class="branch-multiselect-dropdown">
+                <summary><span data-department-branch-summary>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0438\u043b\u0438\u0430\u043b\u044b</span></summary>
+                <div class="branch-multiselect-options">
+                  <label class="checkbox"><input type="checkbox" data-department-branches-all> \u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0432\u0441\u0435 \u0444\u0438\u043b\u0438\u0430\u043b\u044b</label>
+                  ${branches.map((branch) => `<label class="checkbox"><input type="checkbox" name="branch_ids" value="${escapeHtml(branch.id)}" data-department-branch> ${escapeHtml(branch.name)}</label>`).join("")}
+                </div>
+              </details>
+            </div>
+            <label><span>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</span><input name="name" required></label>
+            <button class="primary" disabled>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043e\u0434\u0440\u0430\u0437\u0434\u0435\u043b\u0435\u043d\u0438\u0435</button>
             <p data-message></p>
           </form>
           <form class="inline-form compact">
             ${departmentFilterOptions(branches, departmentFilterBranchId)}
           </form>
-          ${entityList(filteredDepartments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${nameById(branches, item.branch_id)}`, {
+          ${entityList(filteredDepartments, "Подразделениеов пока нет", "department", (item) => item.name, (item) => `Филиал: ${departmentBranchIds(item).map((id) => nameById(branches, id)).join(", ")}`, {
             deleteLabel: "Удалить",
           })}
         `, "Подразделения — это отделы внутри филиала, например администрация или мастера.")}
@@ -2551,18 +2782,6 @@ export async function settings(ctx, tabSlug = "") {
             <p data-message></p>
           </form>
 
-          <form class="inline-form compact" data-user-access-create data-permission="settings.users.assign_roles">
-            ${selectField("Пользователь", "user_id", users.map((user) => ({ id: user.id, name: [user.last_name, user.first_name, user.middle_name, user.email, user.phone].filter(Boolean).join(" ") || `#${user.id}` })), "", "Выберите пользователя")}
-            ${selectField("Филиал", "branch_id", branches, "", "Выберите филиал")}
-            <label><span>Подразделение</span><select name="department_id" disabled>${workplaceDepartmentOptions()}</select></label>
-            <label><span>Роль</span><select name="role_id" disabled>
-              <option value="">Выберите роль</option>
-              ${roles.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
-            </select></label>
-            <button class="primary" disabled>Выдать доступ</button>
-            <p data-message></p>
-          </form>
-
           <div data-user-filtered-list>${userFilteredListMarkup()}</div>
         `, "Пользователи и доступ — это сотрудники и их роли в организации или филиалах.")}
       </div>
@@ -2584,9 +2803,15 @@ export async function settings(ctx, tabSlug = "") {
 export function bindSettings(root, ctx) {
   syncRequiredPanelForms(root);
 
-  const updateUserList = () => {
+  const updateUserList = (focusSearch = false) => {
     const list = root.querySelector("[data-user-filtered-list]");
-    if (list) list.innerHTML = userFilteredListMarkup();
+    if (!list) return;
+    list.innerHTML = userFilteredListMarkup();
+    if (focusSearch) {
+      const searchInput = list.querySelector("[data-user-search]");
+      searchInput?.focus();
+      searchInput?.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
   };
 
   const previewAchievementPhoto = (input) => {
@@ -2637,9 +2862,21 @@ export function bindSettings(root, ctx) {
   };
 
   root.addEventListener("input", (event) => {
+    if (event.target.matches("[data-user-search]")) {
+      userSearchQuery = event.target.value || "";
+      userPage = 1;
+      updateUserList(true);
+      return;
+    }
     if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
       syncRequiredPanelForms(root);
     }
+  });
+
+  root.addEventListener("click", (event) => {
+    root.querySelectorAll("[data-department-branch-select] details[open]").forEach((details) => {
+      if (!details.contains(event.target)) details.removeAttribute("open");
+    });
   });
 
   root.addEventListener("change", (event) => {
@@ -2695,6 +2932,16 @@ export function bindSettings(root, ctx) {
       userPage = 1;
       updateUserList();
       return;
+    }
+    if (event.target.matches("[data-department-branches-all]")) {
+      const form = event.target.closest("[data-department-create]");
+      form?.querySelectorAll("[data-department-branch]").forEach((input) => { input.checked = event.target.checked; });
+    }
+    if (event.target.matches("[data-department-branch]")) {
+      const form = event.target.closest("[data-department-create]");
+      const branches = [...(form?.querySelectorAll("[data-department-branch]") || [])];
+      const all = form?.querySelector("[data-department-branches-all]");
+      if (all) all.checked = branches.length > 0 && branches.every((input) => input.checked);
     }
     if (event.target.matches("[data-audit-page-size]")) {
       const value = Number(event.target.value);
@@ -2759,6 +3006,8 @@ export function bindSettings(root, ctx) {
     const form = event.target.closest("[data-settings] form");
     if (!form) return;
     event.preventDefault();
+    if (form.dataset.submitting === "true") return;
+    form.dataset.submitting = "true";
     setMessage(form, "");
 
     try {
@@ -2779,6 +3028,7 @@ export function bindSettings(root, ctx) {
         await Promise.all([
           form.elements.visit_before_photos?.files?.length ? api.uploadVisitPhotos(form.dataset.visitId, "before", form.elements.visit_before_photos.files) : null,
           form.elements.visit_after_photos?.files?.length ? api.uploadVisitPhotos(form.dataset.visitId, "after", form.elements.visit_after_photos.files) : null,
+          form.elements.visit_comment_photos?.files?.length ? api.uploadVisitPhotos(form.dataset.visitId, "comment", form.elements.visit_comment_photos.files) : null,
         ].filter(Boolean));
         selectedEventVisit = null;
         form.closest("[data-event-visit-modal]")?.remove();
@@ -2835,9 +3085,11 @@ export function bindSettings(root, ctx) {
           online_booking_enabled: data.online_booking_enabled === "on",
         });
       } else if (form.matches("[data-department-create]")) {
-        await api.createDepartment({
+        const branchIds = new FormData(form).getAll("branch_ids").map(Number).filter(Boolean);
+        if (!branchIds.length) throw new Error("\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b \u043e\u0434\u0438\u043d \u0444\u0438\u043b\u0438\u0430\u043b.");
+        await api.createDepartments({
           organization_id: ctx.org.id,
-          branch_id: Number(data.branch_id),
+          branch_ids: branchIds,
           name: data.name,
         });
       } else if (form.matches("[data-workplace-create]")) {
@@ -2894,6 +3146,8 @@ export function bindSettings(root, ctx) {
       ctx.reload();
     } catch (error) {
       setMessage(form, error.message);
+    } finally {
+      delete form.dataset.submitting;
     }
   });
 
@@ -2903,7 +3157,36 @@ export function bindSettings(root, ctx) {
 
     const openClientButton = event.target.closest("[data-open-settings-client]");
     if (openClientButton) {
-      ctx.navigate(openClientUrl(ctx, openClientButton.dataset.openSettingsClient));
+      event.preventDefault();
+      event.stopPropagation();
+      openClientButton.disabled = true;
+      try {
+        await openExternalClientCard(ctx, openClientButton.dataset.openSettingsClient, {
+          branches: cache.branches,
+          departments: cache.departments,
+          workplaces: cache.workplaces,
+          users: cache.users,
+          memberships: cache.memberships,
+          branchMemberships: cache.branchMemberships,
+          roles: cache.roles,
+          segments: cache.segments,
+          productCategories: cache.categories,
+          productItems: cache.productItems,
+        });
+        openClientButton.disabled = false;
+      } catch (error) {
+        openClientButton.disabled = false;
+        alert(error.message);
+      }
+      return;
+    }
+
+    const openReviewButton = event.target.closest("[data-open-event-review]");
+    if (openReviewButton) {
+      const reviewEvent = (cache.events || []).find(
+        (item) => String(item.id) === String(openReviewButton.dataset.openEventReview),
+      );
+      if (reviewEvent) openReviewTextModal(reviewEvent);
       return;
     }
 
@@ -2915,17 +3198,29 @@ export function bindSettings(root, ctx) {
         : (cache.events || []).find((item) => String(item.id) === visitRef) || null;
       const visitId = eventVisitId(selectedEventVisit);
       if (visitId) {
-        const visit = await api.clientVisit(visitId).catch(() => null);
-        if (visit) selectedEventVisit = { ...selectedEventVisit, payload: visit };
+        const eventPayload = eventVisitPayload(selectedEventVisit);
+        const details = await api.clientVisitDetails(visitId).catch(() => null);
+        if (details?.visit) {
+          selectedEventVisit = {
+            ...selectedEventVisit,
+            payload: {
+              ...eventPayload,
+              ...details.visit,
+              services: details.services || [],
+              products: details.products || [],
+            },
+          };
+        }
       }
-      ctx.reload();
+      root.querySelector("[data-event-visit-modal]")?.remove();
+      root.insertAdjacentHTML("beforeend", eventVisitModal());
       return;
     }
 
     const closeVisitButton = event.target.closest("[data-close-event-visit]");
     if (closeVisitButton) {
       selectedEventVisit = null;
-      ctx.reload();
+      closeVisitButton.closest("[data-event-visit-modal]")?.remove();
       return;
     }
 
@@ -2986,6 +3281,17 @@ export function bindSettings(root, ctx) {
     if (handleAchievementConditionClick(event)) return;
     if (handleProductAmountClick(event)) return;
 
+    const addBookingBlock = event.target.closest("[data-add-user-booking-block]");
+    if (addBookingBlock) {
+      addBookingBlock.closest(".user-profile-section")?.querySelector("[data-user-booking-blocks]")?.insertAdjacentHTML("beforeend", userBookingBlockRow());
+      return;
+    }
+    const removeBookingBlock = event.target.closest("[data-remove-user-booking-block]");
+    if (removeBookingBlock) {
+      removeBookingBlock.closest("[data-user-booking-block]")?.remove();
+      return;
+    }
+
     const removeVisitPhoto = event.target.closest("[data-remove-visit-photo]");
     if (removeVisitPhoto) {
       const album = removeVisitPhoto.closest("[data-visit-photo-album]");
@@ -3024,7 +3330,7 @@ export function bindSettings(root, ctx) {
   document.addEventListener("mousedown", (event) => {
     if (event.target.matches("[data-event-visit-modal]")) {
       selectedEventVisit = null;
-      ctx.reload();
+      event.target.remove();
       return;
     }
     if (!event.target.closest("[data-branch-achievement-select]")) {
@@ -3044,6 +3350,11 @@ export function bindSettings(root, ctx) {
     }
     if (!event.target.closest("[data-user-branch-select]")) {
       document.querySelectorAll("[data-user-branch-select] details[open]").forEach((item) => {
+        item.removeAttribute("open");
+      });
+    }
+    if (!event.target.closest("[data-department-edit-branch-select]")) {
+      document.querySelectorAll("[data-department-edit-branch-select] details[open]").forEach((item) => {
         item.removeAttribute("open");
       });
     }
@@ -3067,6 +3378,10 @@ export function bindSettings(root, ctx) {
       }
       if (form.dataset.type === "user") {
         payload.user_branch_ids = new FormData(form).getAll("user_branch_ids");
+        payload.booking_blocks = userBookingBlocksPayload(form);
+      }
+      if (form.dataset.type === "department") {
+        payload.branch_ids = new FormData(form).getAll("department_branch_ids").map(Number).filter(Boolean);
       }
       await saveEntity(form.dataset.type, form.dataset.id, payload, form);
       form.closest("[data-settings-modal]")?.remove();
@@ -3099,6 +3414,14 @@ export function bindSettings(root, ctx) {
       previewAchievementPhoto(event.target);
       return;
     }
+    if (event.target.matches('[data-entity-edit][data-type="branch"] [name="branch_photo_file"]')) {
+      previewAchievementPhoto(event.target);
+      return;
+    }
+    if (event.target.matches('[data-entity-edit][data-type="org"] [name="organization_photo_file"]')) {
+      previewAchievementPhoto(event.target);
+      return;
+    }
     if (event.target.matches('[data-entity-edit][data-type="user"] [name="user_photo_file"]')) {
       previewAchievementPhoto(event.target);
       return;
@@ -3113,6 +3436,14 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.matches('[name="user_branch_ids"]')) {
       syncUserBranchEditForm(event.target);
+    }
+    if (event.target.matches("[data-department-edit-branches-all]")) {
+      const form = event.target.closest("[data-entity-edit]");
+      form?.querySelectorAll('[name="department_branch_ids"]').forEach((input) => { input.checked = event.target.checked; });
+      syncDepartmentBranchEditForm(form);
+    }
+    if (event.target.matches('[name="department_branch_ids"]')) {
+      syncDepartmentBranchEditForm(event.target);
     }
     if (event.target.closest("[data-entity-edit][data-type='user']") && event.target.matches('[name="department_id"]')) {
       syncUserBranchEditForm(event.target);

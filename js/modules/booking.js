@@ -173,6 +173,20 @@ function statusSelect(event) {
   </select>`;
 }
 
+function statusKey(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return STATUS_OPTIONS.some(([status]) => status === normalized) ? normalized : "";
+}
+
+function statusLabel(value) {
+  const key = statusKey(value);
+  return STATUS_OPTIONS.find(([status]) => status === key)?.[1] || "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
+}
+
+function eventStatus(event) {
+  return statusKey(event?.visit_status || event?.status || event?.state) || "scheduled";
+}
+
 function durationLabel(seconds) {
   const totalMinutes = Math.max(Math.round(Number(seconds || 0) / 60), 0);
   const hours = Math.floor(totalMinutes / 60);
@@ -249,9 +263,72 @@ function eventCard(event, minHour, minuteHeight) {
   </article>`;
 }
 
+function compactEventClusters(events, minHour, minuteHeight) {
+  const groups = new Map();
+  events.forEach((event) => {
+    const key = String(event.start || "");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(event);
+  });
+  const clusters = [...groups.values()]
+    .map((items) => {
+      const startMinute = minutesOfDay(items[0].start);
+      return {
+        items,
+        top: Math.max((startMinute - minHour * 60) * minuteHeight, 12),
+      };
+    })
+    .sort((left, right) => left.top - right.top);
+  const laneLastTops = [];
+  return clusters.map(({ items, top }) => {
+    const first = items[0];
+    let lane = laneLastTops.findIndex((lastTop) => top - lastTop >= 26);
+    if (lane === -1) lane = laneLastTops.length;
+    laneLastTops[lane] = top;
+    const left = 10 + lane * 28;
+    return `<div class="booking-event-cluster" style="top:${top}px;left:${left}px">
+      <button type="button" class="booking-event-indicator" aria-label="${escapeHtml(`${clock(first.start)}: записей ${items.length}`)}">
+        <span>${items.length}</span>
+      </button>
+      <div class="booking-event-submenu" role="menu">
+        <strong>${escapeHtml(clock(first.start))}</strong>
+        ${items.map((item) => {
+          const visitStatus = eventStatus(item);
+          return `<button type="button" class="booking-event-submenu-item booking-event-submenu-item-${escapeHtml(visitStatus)}" data-booking-visit-id="${escapeHtml(item.id)}" role="menuitem">
+          <span><b>Филиал:</b> ${escapeHtml(item.branch_name || "Не указан")}</span>
+          <span><b>Мастер:</b> ${escapeHtml(item.employee_name || "Не указан")}</span>
+          <span><b>Клиент:</b> ${escapeHtml(item.client_name || "Не указан")}</span>
+          <span><b>\u0421\u0442\u0430\u0442\u0443\u0441:</b> ${escapeHtml(statusLabel(visitStatus))}</span>
+        </button>`;
+        }).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function bookingVisitCommentParts(value) {
+  const meta = [];
+  const comment = [];
+  String(value || "").split("\n").forEach((line) => {
+    if (line.startsWith("__")) meta.push(line);
+    else comment.push(line);
+  });
+  return { meta: meta.join("\n"), comment: comment.join("\n").trim() };
+}
+
+function bookingVisitCommentAlbum(visit) {
+  const photos = Array.isArray(visit?.photos_comment) ? visit.photos_comment : [];
+  return `<div class="visit-photo-album modal-full" data-visit-photo-album data-visit-photo-stage="comment" data-existing-images-count="${photos.length}">
+    <div class="service-image-album-head"><strong>Фото к комментарию</strong><small>До 10 изображений</small></div>
+    <label class="photo-upload-control"><input name="visit_comment_photos" type="file" accept="image/*" multiple hidden><span class="photo-upload-button">Добавить изображения</span></label>
+    <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview" data-visit-photo-id="${escapeHtml(photo.id)}"><img src="/crm-api/client-history/visits/${escapeHtml(visit.id)}/photos/comment/${escapeHtml(photo.id)}" alt="Фото к комментарию"><button type="button" class="ghost" data-remove-booking-visit-photo data-photo-id="${escapeHtml(photo.id)}">Удалить</button></figure>`).join("")}</div>
+  </div>`;
+}
+
 function bookingVisitModal(visit) {
   const branches = bookingState.calendarData?.branches || [];
   const masters = bookingState.calendarData?.masters || [];
+  const commentParts = bookingVisitCommentParts(visit.comment);
   const branchOptions = branches.map((branch) => `<option value="${escapeHtml(branch.id)}" ${String(branch.id) === String(visit.branch_id) ? "selected" : ""}>${escapeHtml(branch.name)}</option>`).join("");
   const masterOptions = masters.map((master) => `<option value="${escapeHtml(master.id)}" ${String(master.id) === String(visit.employee_id) ? "selected" : ""}>${escapeHtml(master.name)}</option>`).join("");
   return `<div class="modal-backdrop" data-booking-visit-modal>
@@ -267,7 +344,9 @@ function bookingVisitModal(visit) {
         <label><span>Скидка</span><input name="discount_amount" type="number" min="0" step="0.01" value="${escapeHtml(visit.discount_amount ?? "")}"></label>
         <label><span>Оплачено</span><input name="paid_amount" type="number" min="0" step="0.01" value="${escapeHtml(visit.paid_amount ?? "")}"></label>
         <label><span>Источник</span><input name="source" value="${escapeHtml(visit.source || "")}"></label>
-        <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visit.comment || "")}"></label>
+        <label><span>Комментарий</span><input name="comment" value="${escapeHtml(commentParts.comment)}"></label>
+        <input name="comment_meta" type="hidden" value="${escapeHtml(commentParts.meta)}">
+        ${bookingVisitCommentAlbum(visit)}
         <p data-message></p><button class="primary">Сохранить визит</button>
       </form>
     </div>
@@ -277,12 +356,11 @@ function bookingVisitModal(visit) {
 function dayColumn(day, data, minHour, maxHour, minuteHeight) {
   const dateKey = localIsoDate(day);
   const events = data.events.filter((event) => event.start.slice(0, 10) === dateKey);
-  const intervals = data.working_intervals.filter((item) => item.date === dateKey);
+  const compactMode = !bookingState.branchId && !bookingState.employeeId;
   return `<section class="booking-day">
     <header><span>${DAY_NAMES[day.getDay()]}</span><strong>${day.getDate()} ${MONTH_NAMES[day.getMonth()]}</strong></header>
-    <div class="booking-day-hours">${intervals.length ? [...new Set(intervals.map((item) => `${item.from}–${item.to}`))].join(", ") : "Нет рабочего времени"}</div>
     <div class="booking-day-body" style="height:${(maxHour - minHour) * 60 * minuteHeight}px">
-      ${events.map((event) => eventCard(event, minHour, minuteHeight)).join("")}
+      ${compactMode ? compactEventClusters(events, minHour, minuteHeight) : events.map((event) => eventCard(event, minHour, minuteHeight)).join("")}
     </div>
   </section>`;
 }
@@ -384,6 +462,19 @@ export async function booking(ctx) {
 
 export function bindBooking(root, ctx) {
   root.addEventListener("click", async (event) => {
+    const removeVisitPhoto = event.target.closest("[data-remove-booking-visit-photo]");
+    if (removeVisitPhoto) {
+      const form = removeVisitPhoto.closest("[data-booking-visit-form]");
+      const album = removeVisitPhoto.closest("[data-visit-photo-album]");
+      try {
+        await api.deleteVisitPhoto(form?.dataset.visitId, "comment", removeVisitPhoto.dataset.photoId);
+        removeVisitPhoto.closest(".service-image-preview")?.remove();
+        if (album) album.dataset.existingImagesCount = String(Math.max(Number(album.dataset.existingImagesCount || 1) - 1, 0));
+      } catch (error) {
+        alert(error.message);
+      }
+      return;
+    }
     const copyPhoneButton = event.target.closest("[data-copy-booking-phone]");
     if (copyPhoneButton) {
       await navigator.clipboard.writeText(copyPhoneButton.dataset.copyBookingPhone);
@@ -526,6 +617,8 @@ export function bindBooking(root, ctx) {
     const data = new FormData(form);
     const message = form.querySelector("[data-message]");
     try {
+      const comment = String(data.get("comment") || "").trim();
+      const commentMeta = String(data.get("comment_meta") || "").trim();
       await api.updateClientVisit(form.dataset.visitId, {
         visit_at: new Date(data.get("visit_at")).toISOString(),
         branch_id: data.get("branch_id") ? Number(data.get("branch_id")) : null,
@@ -535,8 +628,11 @@ export function bindBooking(root, ctx) {
         discount_amount: Number(data.get("discount_amount") || 0),
         paid_amount: Number(data.get("paid_amount") || 0),
         source: String(data.get("source") || "") || null,
-        comment: String(data.get("comment") || "") || null,
+        comment: [commentMeta, comment].filter(Boolean).join("\n") || null,
       });
+      if (form.elements.visit_comment_photos?.files?.length) {
+        await api.uploadVisitPhotos(form.dataset.visitId, "comment", form.elements.visit_comment_photos.files);
+      }
       root.querySelector("[data-booking-visit-modal]")?.remove();
       ctx.reload();
     } catch (error) {
@@ -545,6 +641,21 @@ export function bindBooking(root, ctx) {
   });
 
   root.addEventListener("change", async (event) => {
+    if (event.target.matches('[name="visit_comment_photos"]')) {
+      const album = event.target.closest("[data-visit-photo-album]");
+      const previews = album?.querySelector("[data-visit-photo-previews]");
+      const files = [...(event.target.files || [])];
+      const existing = Number(album?.dataset.existingImagesCount || 0);
+      if (!album || !previews || !files.length) return;
+      if (existing + files.length > 10) {
+        event.target.value = "";
+        alert("Можно добавить не более 10 фотографий в альбом.");
+        return;
+      }
+      previews.querySelectorAll("[data-visit-photo-pending]").forEach((preview) => preview.remove());
+      previews.insertAdjacentHTML("beforeend", files.map((file) => `<figure class="service-image-preview" data-visit-photo-pending><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр фотографии визита"></figure>`).join(""));
+      return;
+    }
     if (event.target.matches("[data-booking-period]")) {
       bookingState.period = event.target.value;
       bookingState.dateFrom = "";
