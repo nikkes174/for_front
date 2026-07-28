@@ -24,7 +24,7 @@ function isPhoneInput(element) {
 function isPhoneLikeLoginInput(element) {
   return element instanceof HTMLInputElement
     && element.dataset.loginPhoneInput !== undefined
-    && !String(element.value || "").includes("@");
+    && /^[+\d()\s-]+$/.test(String(element.value || "").trim());
 }
 
 document.addEventListener("input", (event) => {

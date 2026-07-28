@@ -76,7 +76,7 @@ function authHtml() {
           <button type="button" class="${isRegister ? "primary" : "ghost"}" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
         </div>
         ${isRegister ? '<label><span>\u0418\u043c\u044f</span><input name="name" required></label>' : ""}
-        <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${!isRegister && loginContext.is_client_domain ? 'type="tel" inputmode="tel" autocomplete="tel" data-phone-input' : !isRegister ? 'inputmode="tel" autocomplete="username" data-login-phone-input' : ""} required></label>
+        <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${isRegister ? 'type="email" autocomplete="email"' : 'type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input'} required></label>
         ${isRegister ? '<label><span>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" data-phone-input></label>' : ""}
         <label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" ${isRegister ? "required" : ""}></label>
         ${isRegister ? '<label><span>\u041f\u043e\u0432\u0442\u043e\u0440 \u043f\u0430\u0440\u043e\u043b\u044f</span><input name="confirm" type="password" required></label>' : ""}
