@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
+import { branchDateTimeToUtc, dateTimeInputInTimezone, formatDateTimeInTimezone } from "../timezone.js";
 import { openExternalClientCard } from "./clients.js";
 
 
@@ -925,19 +926,17 @@ function formatDateTime(value) {
   });
 }
 
-function formatVisitDateTime(value) {
-  if (!value) return no;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ru-RU");
+function branchTimezone(branchId) {
+  return (cache.branches || []).find((branch) => String(branch.id) === String(branchId))?.timezone || DEFAULT_TIMEZONE;
 }
 
-function dateTimeInput(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+function formatVisitDateTime(value, branchId) {
+  if (!value) return no;
+  return formatDateTimeInTimezone(value, branchTimezone(branchId));
+}
+
+function dateTimeInput(value, branchId) {
+  return dateTimeInputInTimezone(value, branchTimezone(branchId));
 }
 
 function timezoneOffsetLabel(timezone) {
@@ -1082,7 +1081,7 @@ function eventVisitDetails(item) {
   const fields = [];
   addDetail(fields, `Клиент: ${payload.full_name || (item.client_id ? `#${item.client_id}` : no)}`);
   addDetail(fields, `Статус: ${visitStatusLabel(payload.visit_status)}`);
-  addDetail(fields, `Дата визита: ${formatVisitDateTime(payload.visit_at)}`);
+  addDetail(fields, `Дата визита: ${formatVisitDateTime(payload.visit_at, branchId)}`);
   if (branchId) {
     addDetail(fields, `Филиал: ${branchLabel(branchId)}`);
   }
@@ -1108,7 +1107,7 @@ function eventVisitDetailsHtml(item) {
   const fields = [
     `Клиент: ${clientEventButton(clientId, payload.full_name || (clientId ? `#${clientId}` : no))}`,
     `Статус: ${escapeHtml(visitStatusLabel(payload.visit_status))}`,
-    `Дата визита: ${escapeHtml(formatVisitDateTime(payload.visit_at))}`,
+    `Дата визита: ${escapeHtml(formatVisitDateTime(payload.visit_at, branchId))}`,
   ];
   if (branchId) {
     fields.push(`Филиал: ${escapeHtml(branchLabel(branchId))}`);
@@ -1116,7 +1115,7 @@ function eventVisitDetailsHtml(item) {
   if (payload.employee_name) {
     fields.push(`Мастер: ${escapeHtml(payload.employee_name)}`);
   } else if (payload.employee_id) {
-    fields.push(`Мастер: #${escapeHtml(payload.employee_id)}`);
+    fields.push(`Мастер: ${escapeHtml(userLabelById(payload.employee_id))}`);
   }
   if (Array.isArray(payload.service_titles) && payload.service_titles.length) {
     fields.push(`Услуги: ${escapeHtml(payload.service_titles.join(", "))}`);
@@ -1527,9 +1526,29 @@ export async function loadSettingsData(orgId) {
   const rolePermissions = Object.fromEntries(await Promise.all(
     roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
   ));
+  const missingEventClientIds = [...new Set(events
+    .filter((item) => item.entity_type === "client_visit" && !item.payload?.full_name)
+    .map((item) => item.client_id || item.payload?.client_id)
+    .filter(Boolean)
+    .map((id) => String(id)))];
+  const eventClients = await Promise.all(missingEventClientIds.map((id) => api.client(id, orgId).catch(() => null)));
+  const eventClientNames = new Map(eventClients.filter(Boolean).map((client) => [
+    String(client.id),
+    client.full_name || [client.last_name, client.first_name, client.middle_name].filter(Boolean).join(" "),
+  ]));
+  events.forEach((item) => {
+    const clientId = item.client_id || item.payload?.client_id;
+    const fullName = clientId ? eventClientNames.get(String(clientId)) : "";
+    if (fullName && item.entity_type === "client_visit" && !item.payload?.full_name) {
+      item.payload = { ...(item.payload || {}), full_name: fullName };
+    }
+  });
   const userIds = new Set(users.map((user) => String(user.id)));
   const missingActorIds = [...new Set(events
-    .map((item) => item.actor_id || item.payload?.actor_id)
+    .map((item) => {
+      const actorType = String(item.actor_type || item.payload?.actor_type || "").toLowerCase();
+      return actorType && actorType !== "user" ? null : item.actor_id || item.payload?.actor_id;
+    })
     .filter(Boolean)
     .map((id) => String(id))
     .filter((id) => !userIds.has(id)))];
@@ -1733,6 +1752,19 @@ function visitPublicComment(value) {
     .trim();
 }
 
+function visitCommentMeta(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim().startsWith("__") && !line.trim().startsWith("__service_cost:") && !line.trim().startsWith("__product_cost:"))
+    .join("\n")
+    .trim();
+}
+
+function visitCommentCost(value, key) {
+  const line = String(value || "").split(/\r?\n/).find((item) => item.startsWith(key));
+  return Number(line?.slice(key.length).trim() || 0);
+}
+
 function visitLegacyItems(comment, type) {
   const prefix = `__${type}:`;
   const line = String(comment || "").split(/\r?\n/).find((value) => value.startsWith(prefix)) || "";
@@ -1773,6 +1805,9 @@ function eventVisitModal() {
   const visitId = eventVisitId(selectedEventVisit);
   const visitServices = visit.services?.length ? visit.services : visitLegacyItems(visit.comment, "services");
   const visitProducts = visit.products?.length ? visit.products : visitLegacyItems(visit.comment, "products");
+  const serviceCost = visitCommentCost(visit.comment, "__service_cost:");
+  const productCost = visitCommentCost(visit.comment, "__product_cost:");
+  const totalCost = serviceCost + productCost || Number(visit.total_cost || 0);
   return `
     <div class="modal-backdrop" data-event-visit-modal>
       <div class="modal-card">
@@ -1781,7 +1816,7 @@ function eventVisitModal() {
           <button type="button" class="ghost" data-close-event-visit>Закрыть</button>
         </div>
         <form class="modal-grid" data-event-visit-edit data-visit-id="${escapeHtml(visitId || "")}">
-          <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at))}"></label>
+          <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at, visit.branch_id))}"></label>
           ${selectField("Филиал", "branch_id", cache.branches || [], visit.branch_id, "Выберите филиал")}
           ${selectField(
             "Сотрудник",
@@ -1797,12 +1832,15 @@ function eventVisitModal() {
             <option value="cancelled" ${visit.visit_status === "cancelled" ? "selected" : ""}>Отменен</option>
             <option value="no_show" ${visit.visit_status === "no_show" ? "selected" : ""}>Не пришел</option>
           </select></label>
-          <label><span>Стоимость</span><input name="total_cost" type="number" step="0.01" min="0" value="${escapeHtml(visit.total_cost ?? "")}"></label>
-          <label><span>Скидка</span><input name="discount_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.discount_amount ?? "")}"></label>
-          <label><span>Оплачено</span><input name="paid_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.paid_amount ?? "")}"></label>
+          <label><span>Стоимость услуг</span><input name="service_cost" type="number" step="0.01" min="0" value="${escapeHtml(serviceCost)}"></label>
+          <label><span>Стоимость товаров</span><input name="product_cost" type="number" step="0.01" min="0" value="${escapeHtml(productCost)}"></label>
+          <label><span>Общая стоимость</span><input name="total_cost" type="number" step="0.01" min="0" value="${escapeHtml(totalCost)}" readonly></label>
+          <label><span>Скидка</span><div class="visit-item-picker"><input name="discount_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.discount_amount ?? "")}"><select name="discount_type"><option value="amount" selected>₽</option><option value="percent">%</option></select></div></label>
+          <label><span>Оплачено</span><input name="paid_amount" type="number" step="0.01" min="0" value="${escapeHtml(visit.paid_amount ?? "")}" readonly></label>
           ${readonly("Задолженность", visit.debt_amount)}
           <label><span>Источник</span><input name="source" value="${escapeHtml(visit.source || "")}"></label>
           <label><span>Комментарий</span><input name="comment" value="${escapeHtml(visitPublicComment(visit.comment))}"></label>
+          <input name="comment_meta" type="hidden" value="${escapeHtml(visitCommentMeta(visit.comment))}">
           ${visitItemsReadonly("\u0423\u0441\u043b\u0443\u0433\u0438", visitServices, "service_id")}
           ${visitItemsReadonly("\u0422\u043e\u0432\u0430\u0440\u044b", visitProducts, "product_id")}
           ${visitPhotoAlbumField(visit, visitId, "before", "Фото до")}
@@ -3015,15 +3053,15 @@ export function bindSettings(root, ctx) {
         if (!form.dataset.visitId) throw new Error("ID визита не найден.");
         const data = formData(form);
         await api.updateClientVisit(form.dataset.visitId, {
-          visit_at: data.visit_at ? new Date(data.visit_at).toISOString() : undefined,
+          visit_at: data.visit_at ? branchDateTimeToUtc(data.visit_at, branchTimezone(data.branch_id)) : undefined,
           branch_id: numberOrNull(data.branch_id),
           employee_id: numberOrNull(data.employee_id),
           visit_status: optional(data.visit_status),
-          total_cost: Number(data.total_cost || 0),
-          discount_amount: Number(data.discount_amount || 0),
-          paid_amount: Number(data.paid_amount || 0),
+          total_cost: Number(data.service_cost || 0) + Number(data.product_cost || 0),
+          discount_amount: data.discount_type === "percent" ? (Number(data.service_cost || 0) + Number(data.product_cost || 0)) * Number(data.discount_amount || 0) / 100 : Number(data.discount_amount || 0),
+          paid_amount: Math.max(0, Number(data.service_cost || 0) + Number(data.product_cost || 0) - (data.discount_type === "percent" ? (Number(data.service_cost || 0) + Number(data.product_cost || 0)) * Number(data.discount_amount || 0) / 100 : Number(data.discount_amount || 0))),
           source: optional(data.source),
-          comment: optional(data.comment),
+          comment: [data.comment_meta, `__service_cost:${Number(data.service_cost || 0)}`, `__product_cost:${Number(data.product_cost || 0)}`, optional(data.comment)].filter(Boolean).join("\n") || null,
         });
         await Promise.all([
           form.elements.visit_before_photos?.files?.length ? api.uploadVisitPhotos(form.dataset.visitId, "before", form.elements.visit_before_photos.files) : null,
@@ -3197,19 +3235,29 @@ export function bindSettings(root, ctx) {
         ? (cache.auditLogs || []).find((item) => String(item.id) === visitRef.slice(6)) || null
         : (cache.events || []).find((item) => String(item.id) === visitRef) || null;
       const visitId = eventVisitId(selectedEventVisit);
-      if (visitId) {
-        const eventPayload = eventVisitPayload(selectedEventVisit);
-        const details = await api.clientVisitDetails(visitId).catch(() => null);
-        if (details?.visit) {
-          selectedEventVisit = {
-            ...selectedEventVisit,
-            payload: {
-              ...eventPayload,
-              ...details.visit,
-              services: details.services || [],
-              products: details.products || [],
-            },
-          };
+      const eventPayload = eventVisitPayload(selectedEventVisit);
+      const clientId = selectedEventVisit?.client_id || eventPayload.client_id;
+      if (visitId && clientId) {
+        try {
+          await openExternalClientCard(ctx, clientId, {
+            branches: cache.branches,
+            departments: cache.departments,
+            workplaces: cache.workplaces,
+            users: cache.users,
+            memberships: cache.memberships,
+            branchMemberships: cache.branchMemberships,
+            roles: cache.roles,
+            segments: cache.segments,
+            productCategories: cache.categories,
+            productItems: cache.productItems,
+            selectedVisitId: visitId,
+            visitOnly: true,
+          });
+          selectedEventVisit = null;
+          return;
+        } catch (error) {
+          alert(error.message);
+          return;
         }
       }
       root.querySelector("[data-event-visit-modal]")?.remove();
@@ -3430,7 +3478,7 @@ export function bindSettings(root, ctx) {
       previewServiceImages(event.target);
       return;
     }
-    if (event.target.matches('[data-event-visit-edit] [name="visit_before_photos"], [data-event-visit-edit] [name="visit_after_photos"]')) {
+    if (event.target.matches('[data-event-visit-edit] [name="visit_before_photos"], [data-event-visit-edit] [name="visit_after_photos"], [data-event-visit-edit] [name="visit_comment_photos"]')) {
       previewVisitPhotos(event.target);
       return;
     }

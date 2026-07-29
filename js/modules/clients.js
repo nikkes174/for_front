@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { escapeHtml, formData, normalizePhone, numberOrNull, optional, rows, selectField, setMessage } from "../dom.js";
+import { branchDateTimeToUtc, dateTimeInputInTimezone, formatDateTimeInTimezone } from "../timezone.js";
 
 const CLIENTS_PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_CLIENTS_PAGE_SIZE = 10;
@@ -408,20 +409,20 @@ function visitStatusLabel(status) {
   return "Статус не указан";
 }
 
-function dateTime(value) {
-  return value ? new Date(value).toLocaleString("ru-RU") : "";
+function branchTimezone(branchId) {
+  return state.branches.find((branch) => String(branch.id) === String(branchId))?.timezone || "Europe/Moscow";
+}
+
+function dateTime(value, branchId = null) {
+  return branchId ? formatDateTimeInTimezone(value, branchTimezone(branchId)) : (value ? new Date(value).toLocaleString("ru-RU") : "");
 }
 
 function date(value) {
   return value ? new Date(value).toLocaleDateString("ru-RU") : "";
 }
 
-function dateTimeInput(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+function dateTimeInput(value, branchId) {
+  return dateTimeInputInTimezone(value, branchTimezone(branchId));
 }
 
 function money(value) {
@@ -491,7 +492,7 @@ function bonusOperationDetails(item, visits) {
     .find((entry) => String(entry.id) === String(item.target_id));
   if (!visit) return [reason, `\u0412\u0438\u0437\u0438\u0442 #${item.target_id}`, ...details].join(" \u00b7 ");
   const master = state.users.find((user) => String(user.id) === String(visit.employee_id));
-  return [reason, dateTime(visit.visit_at), master ? `\u041c\u0430\u0441\u0442\u0435\u0440: ${displayUser(master)}` : `\u041c\u0430\u0441\u0442\u0435\u0440 #${visit.employee_id || "-"}`, ...details]
+  return [reason, dateTime(visit.visit_at, visit.branch_id), master ? `\u041c\u0430\u0441\u0442\u0435\u0440: ${displayUser(master)}` : `\u041c\u0430\u0441\u0442\u0435\u0440 #${visit.employee_id || "-"}`, ...details]
     .filter(Boolean)
     .join(" \u00b7 ");
 }
@@ -758,7 +759,7 @@ function visitEditDraftDefaults(visit) {
   const parsed = parseVisitComment(source.comment);
   const splitCosts = visitSplitCosts(visit);
   return {
-    visit_at: dateTimeInput(source.visit_at),
+    visit_at: dateTimeInput(source.visit_at, source.branch_id),
     branch_id: source.branch_id ? String(source.branch_id) : "",
     employee_id: source.employee_id ? String(source.employee_id) : "",
     visit_status: source.visit_status || "completed",
@@ -1107,7 +1108,7 @@ async function loadClientDetails(client, orgId, { force = false } = {}) {
 
     const manualActorIds = [...new Set((bonusHistory || [])
       .map((item) => item.usage_restrictions?.manual_operation?.actor_id)
-      .filter((actorId) => actorId != null && !state.users.some((user) => String(user.id) === String(actorId))))];
+      .filter((actorId) => actorId != null && String(actorId) !== String(client.id) && !state.users.some((user) => String(user.id) === String(actorId))))];
     if (manualActorIds.length) {
       const missingActors = await Promise.all(manualActorIds.map((actorId) => api.user(actorId).catch(() => null)));
       state.users = [...state.users, ...missingActors.filter(Boolean)];
@@ -1188,16 +1189,26 @@ async function prepareExternalClientCard(clientId, orgId, resources = {}) {
 
 export async function openExternalClientCard(ctx, clientId, resources = {}) {
   await prepareExternalClientCard(clientId, ctx.org.id, resources);
+  if (resources.selectedVisitId) {
+    state.selectedVisit = (state.selectedClient?.visits || []).find(
+      (item) => String((item.visit || item).id) === String(resources.selectedVisitId),
+    ) || await api.clientVisitDetails(resources.selectedVisitId).catch(() => null);
+    state.selectedVisitDraft = {};
+  }
   const host = document.createElement("div");
   host.dataset.externalClientCardHost = "";
-  host.innerHTML = modal(state.selectedClient);
+  if (resources.visitOnly && state.selectedVisit) host.dataset.externalVisitOnly = "";
+  host.innerHTML = resources.visitOnly && state.selectedVisit
+    ? editableVisitModal(state.selectedClient)
+    : modal(state.selectedClient);
   document.body.append(host);
-  host.querySelectorAll("[data-client-modal] [data-permission]").forEach((node) => {
+  host.querySelectorAll("[data-permission]").forEach((node) => {
     if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();
   });
   bindClients(host, ctx);
   const observer = new MutationObserver(() => {
-    if (host.querySelector("[data-client-modal]")) return;
+    const modalSelector = resources.visitOnly ? "[data-visit-modal]" : "[data-client-modal]";
+    if (host.querySelector(modalSelector)) return;
     observer.disconnect();
     host.remove();
   });
@@ -1295,7 +1306,7 @@ function modal(client) {
             ${rows(pageVisits, "Истории визитов пока нет.", (item) => {
               const visit = item.visit || item;
               return `<tr>
-                <td><button type="button" class="ghost" data-open-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at) || "Дата не указана")}</b><small>${escapeHtml(visitStatusLabel(visit.visit_status))}</small></button></td>
+                <td><button type="button" class="ghost" data-open-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at, visit.branch_id) || "Дата не указана")}</b><small>${escapeHtml(visitStatusLabel(visit.visit_status))}</small></button></td>
                 <td>${escapeHtml(visitStatusLabel(visit.visit_status))}</td>
                 <td><button type="button" class="ghost" data-delete-visit="${escapeHtml(visit.id)}">Удалить</button></td>
               </tr>`;
@@ -1365,7 +1376,7 @@ function visitModal(client) {
           <button type="button" class="ghost" data-close-visit>Закрыть</button>
         </div>
         <div class="modal-grid">
-          ${readonly("Дата и время", dateTime(visit.visit_at))}
+          ${readonly("Дата и время", dateTime(visit.visit_at, visit.branch_id))}
           ${readonly("Филиал", visit.branch_id)}
           ${readonly("Айди сотрудника", visit.employee_id)}
           ${readonly("Услуги", parsed.serviceNames || selected.service_ids?.join(", "))}
@@ -1392,6 +1403,14 @@ function editableVisitModal(client) {
   const branches = state.branches;
   const draft = { ...visitEditDraftDefaults(selected), ...state.selectedVisitDraft };
   const masters = masterOptions(draft.branch_id, draft.department_id, draft.workplace_id);
+  const visitPhotoAlbum = (stage, label) => {
+    const photos = Array.isArray(visit[`photos_${stage}`]) ? visit[`photos_${stage}`] : [];
+    return `<div class="visit-photo-album modal-full" data-client-visit-photo-album data-visit-photo-stage="${stage}" data-existing-images-count="${photos.length}">
+      <div class="service-image-album-head"><strong>${escapeHtml(label)}</strong><small>До 10 изображений</small></div>
+      <label class="photo-upload-control"><input name="visit_${stage}_photos" type="file" accept="image/*" multiple hidden><span class="photo-upload-button">Добавить изображения</span></label>
+      <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview"><img src="/crm-api/client-history/visits/${escapeHtml(visit.id)}/photos/${stage}/${escapeHtml(photo.id)}" alt="${escapeHtml(label)}"><button type="button" class="ghost" data-remove-client-visit-photo data-photo-id="${escapeHtml(photo.id)}">Удалить</button></figure>`).join("")}</div>
+    </div>`;
+  };
   return `
     <div class="modal-backdrop" data-visit-modal>
       <div class="modal-card">
@@ -1404,6 +1423,7 @@ function editableVisitModal(client) {
           <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(draft.visit_at)}"></label>
           ${selectField("Филиал", "branch_id", branches, draft.branch_id, "Выберите филиал")}
           ${selectField("Мастер", "employee_id", masters, draft.employee_id, "Выберите мастера")}
+          ${readonly("Клиент", [client.last_name, client.first_name, client.middle_name].filter(Boolean).join(" ") || `#${client.id}`)}
           <label><span>Статус</span><select name="visit_status">
             <option value="completed" ${draft.visit_status === "completed" ? "selected" : ""}>Завершен</option>
             <option value="scheduled" ${draft.visit_status === "scheduled" ? "selected" : ""}>Запланирован</option>
@@ -1420,6 +1440,9 @@ function editableVisitModal(client) {
           <label><span>Источник</span><input name="source" value="${escapeHtml(draft.source)}"></label>
           <label><span>Комментарий</span><input name="comment" value="${escapeHtml(draft.comment)}"></label>
           ${readonly("Задолженность", money(visit.debt_amount))}
+          ${visitPhotoAlbum("before", "Фото до")}
+          ${visitPhotoAlbum("after", "Фото после")}
+          ${visitPhotoAlbum("comment", "Фото к комментарию")}
           <p data-message></p>
           <button class="primary">Сохранить визит</button>
         </form>
@@ -1631,6 +1654,17 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.matches('[name^="visit_"][name$="_photos"]')) {
+      const album = event.target.closest("[data-client-visit-photo-album]");
+      const previews = album?.querySelector("[data-visit-photo-previews]");
+      const files = [...(event.target.files || [])];
+      const existing = Number(album?.dataset.existingImagesCount || 0);
+      if (!album || !previews || !files.length) return;
+      if (existing + files.length > 10) { event.target.value = ""; alert("Можно добавить не более 10 фотографий в альбом."); return; }
+      previews.querySelectorAll("[data-visit-photo-pending]").forEach((preview) => preview.remove());
+      previews.insertAdjacentHTML("beforeend", files.map((file) => `<figure class="service-image-preview" data-visit-photo-pending><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр фотографии визита"></figure>`).join(""));
+      return;
+    }
     if (event.target.matches("[data-visit-item-search]")) {
       const form = event.target.closest("[data-visit-create], [data-visit-edit]");
       if (form && addVisitSelectedItem(form, event.target.dataset.visitItemName)) {
@@ -1835,7 +1869,7 @@ export function bindClients(root, ctx) {
         await api.createClientVisit(clean({
           organization_id: ctx.org.id,
           client_id: state.selectedClient.id,
-          visit_at: new Date(data.visit_at).toISOString(),
+          visit_at: branchDateTimeToUtc(data.visit_at, branchTimezone(data.branch_id)),
           branch_id: numberOrNull(data.branch_id),
           employee_id: numberOrNull(data.employee_id),
           visit_status: data.visit_status,
@@ -1845,17 +1879,17 @@ export function bindClients(root, ctx) {
           source: optional(data.source),
           comment: optional(buildVisitComment(data)),
         }));
-
-        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true });
+        showClientToast("\u0412\u0438\u0437\u0438\u0442 \u0441\u043e\u0437\u0434\u0430\u043d");
+        state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true })
+          .catch(() => state.selectedClient);
         state.visitDraft = {};
         state.visitErrors = {};
-        successToastMessage = "\u0412\u0438\u0437\u0438\u0442 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d";
       } else if (form.matches("[data-visit-edit]") && state.selectedClient && state.selectedVisit) {
         data.total_cost = String(calculateVisitTotalCost(data));
         data.paid_amount = calculatePaidAmount(data.total_cost, data.discount_amount, data.discount_type);
         const currentVisit = state.selectedVisit.visit || state.selectedVisit;
         await api.updateClientVisit(currentVisit.id, clean({
-          visit_at: data.visit_at ? new Date(data.visit_at).toISOString() : undefined,
+          visit_at: data.visit_at ? branchDateTimeToUtc(data.visit_at, branchTimezone(data.branch_id)) : undefined,
           branch_id: numberOrNull(data.branch_id),
           employee_id: numberOrNull(data.employee_id),
           visit_status: optional(data.visit_status),
@@ -1866,11 +1900,24 @@ export function bindClients(root, ctx) {
           comment: optional(buildVisitComment(data)),
         }));
 
+        await Promise.all([
+          form.elements.visit_before_photos?.files?.length ? api.uploadVisitPhotos(currentVisit.id, "before", form.elements.visit_before_photos.files) : null,
+          form.elements.visit_after_photos?.files?.length ? api.uploadVisitPhotos(currentVisit.id, "after", form.elements.visit_after_photos.files) : null,
+          form.elements.visit_comment_photos?.files?.length ? api.uploadVisitPhotos(currentVisit.id, "comment", form.elements.visit_comment_photos.files) : null,
+        ].filter(Boolean));
         state.selectedClient = await loadClientDetails(state.selectedClient, ctx.org.id, { force: true });
         state.selectedVisit = (state.selectedClient.visits || []).find((item) => String((item.visit || item).id) === String(currentVisit.id)) || null;
         state.selectedVisitDraft = {};
       }
       if (successToastMessage) showClientToast(successToastMessage);
+      const externalVisitHost = form.closest("[data-external-visit-only]");
+      if (externalVisitHost) {
+        externalVisitHost.innerHTML = editableVisitModal(state.selectedClient);
+        externalVisitHost.querySelectorAll("[data-permission]").forEach((node) => {
+          if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();
+        });
+        return;
+      }
       if (form.closest("[data-client-modal]")) {
         refreshSelectedClientModal(root, ctx);
         return;
@@ -1882,6 +1929,19 @@ export function bindClients(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const removeVisitPhoto = event.target.closest("[data-remove-client-visit-photo]");
+    if (removeVisitPhoto) {
+      const form = removeVisitPhoto.closest("[data-visit-edit]");
+      const album = removeVisitPhoto.closest("[data-client-visit-photo-album]");
+      try {
+        await api.deleteVisitPhoto(form && state.selectedVisit ? (state.selectedVisit.visit || state.selectedVisit).id : null, album?.dataset.visitPhotoStage, removeVisitPhoto.dataset.photoId);
+        removeVisitPhoto.closest(".service-image-preview")?.remove();
+        if (album) album.dataset.existingImagesCount = String(Math.max(Number(album.dataset.existingImagesCount || 1) - 1, 0));
+      } catch (error) {
+        alert(error.message);
+      }
+      return;
+    }
     const visitPageButton = event.target.closest("[data-client-visits-page]");
     if (visitPageButton) {
       state.visitPage = Number(visitPageButton.dataset.clientVisitsPage) || 1;

@@ -1,5 +1,7 @@
 import { api } from "../api.js";
 import { escapeHtml } from "../dom.js";
+import { branchDateTimeToUtc, clockInTimezone, dateTimeInputInTimezone, minutesOfDayInTimezone } from "../timezone.js";
+import { openExternalClientCard } from "./clients.js";
 
 const DAY_NAMES = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const MONTH_NAMES = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
@@ -11,8 +13,8 @@ const STATUS_OPTIONS = [
 ];
 const bookingState = {
   weekStart: null,
-  viewBy: "masters",
-  period: "week",
+  viewBy: "branches",
+  period: "day",
   calendarData: null,
   dateFrom: "",
   dateTo: "",
@@ -23,6 +25,8 @@ const bookingState = {
   employeeId: "",
   publicBookingUrl: "",
   publicBookingOrganizationId: null,
+  defaultsOrganizationId: null,
+  defaultBranchInitialized: false,
 };
 let bookingHoverCloseTimer = null;
 
@@ -60,21 +64,20 @@ function addDays(value, days) {
   return date;
 }
 
-function minutesOfDay(value) {
-  const date = new Date(value);
-  return date.getHours() * 60 + date.getMinutes();
+function branchTimezone(branchId) {
+  return bookingState.calendarData?.branches?.find((branch) => String(branch.id) === String(branchId))?.timezone || "Europe/Moscow";
 }
 
-function clock(value) {
-  const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+function minutesOfDay(value, branchId) {
+  return minutesOfDayInTimezone(value, branchTimezone(branchId));
 }
 
-function dateTimeInput(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const part = (number) => String(number).padStart(2, "0");
-  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}T${part(date.getHours())}:${part(date.getMinutes())}`;
+function clock(value, branchId) {
+  return clockInTimezone(value, branchTimezone(branchId));
+}
+
+function dateTimeInput(value, branchId) {
+  return dateTimeInputInTimezone(value, branchTimezone(branchId));
 }
 
 function calendarMinuteHeight() {
@@ -225,7 +228,7 @@ function bookingHoverCard(event) {
     <fieldset class="booking-hover-payments"><legend>Оплата</legend>
       ${["Наличные", "Карта", "Сертификат", "QR-код"].map((label) => `<label><input type="checkbox" name="booking_payment_method" value="${label}" ${paymentOption(event, label)}><span>${label}</span></label>`).join("")}
     </fieldset>
-    <div><b>Детали</b><p>${clock(event.start)}–${clock(event.end)}</p><p>${durationLabel(event.duration_seconds)}</p></div>
+    <div><b>Детали</b><p>${clock(event.start, event.branch_id)}–${clock(event.end, event.branch_id)}</p><p>${durationLabel(event.duration_seconds)}</p></div>
     <label><span>Статус</span>${statusSelect(event)}</label>
     <button type="button" class="primary booking-hover-save" data-save-booking-hover>Сохранить</button>
   </aside>`;
@@ -249,14 +252,14 @@ function scheduleBookingHoverClose(root) {
 }
 
 function eventCard(event, minHour, minuteHeight) {
-  const startMinute = minutesOfDay(event.start);
-  const endMinute = minutesOfDay(event.end);
+  const startMinute = minutesOfDay(event.start, event.branch_id);
+  const endMinute = minutesOfDay(event.end, event.branch_id);
   const top = Math.max(startMinute - minHour * 60, 0) * minuteHeight;
   const height = Math.max((endMinute - startMinute) * minuteHeight, 1);
   const breakMinutes = Math.round(Number(event.technical_break_seconds || 0) / 60);
   return `<article class="booking-event booking-event-${escapeHtml(event.visit_status)}" data-booking-visit-id="${escapeHtml(event.id)}" role="button" tabindex="0" style="top:${top}px;height:${height}px">
     <button type="button" class="booking-event-point" data-booking-hover-trigger data-hover-visit-id="${escapeHtml(event.id)}" aria-label="Детали визита"><img src="/fronted/icons/point.svg" alt=""></button>
-    <div class="booking-event-time">${clock(event.start)}–${clock(event.end)}</div>
+    <div class="booking-event-time">${clock(event.start, event.branch_id)}–${clock(event.end, event.branch_id)}</div>
     <strong>${escapeHtml(event.service_names?.join(", ") || "Визит")}</strong>
     <span>${escapeHtml(event.client_name)}</span>
     ${event.client_phone ? `<small>${escapeHtml(event.client_phone)}</small>` : ""}
@@ -272,7 +275,7 @@ function compactEventClusters(events, minHour, minuteHeight) {
   });
   const clusters = [...groups.values()]
     .map((items) => {
-      const startMinute = minutesOfDay(items[0].start);
+      const startMinute = minutesOfDay(items[0].start, items[0].branch_id);
       return {
         items,
         top: Math.max((startMinute - minHour * 60) * minuteHeight, 12),
@@ -287,11 +290,11 @@ function compactEventClusters(events, minHour, minuteHeight) {
     laneLastTops[lane] = top;
     const left = 10 + lane * 28;
     return `<div class="booking-event-cluster" style="top:${top}px;left:${left}px">
-      <button type="button" class="booking-event-indicator" aria-label="${escapeHtml(`${clock(first.start)}: записей ${items.length}`)}">
+      <button type="button" class="booking-event-indicator" aria-label="${escapeHtml(`${clock(first.start, first.branch_id)}: записей ${items.length}`)}">
         <span>${items.length}</span>
       </button>
       <div class="booking-event-submenu" role="menu">
-        <strong>${escapeHtml(clock(first.start))}</strong>
+        <strong>${escapeHtml(clock(first.start, first.branch_id))}</strong>
         ${items.map((item) => {
           const visitStatus = eventStatus(item);
           return `<button type="button" class="booking-event-submenu-item booking-event-submenu-item-${escapeHtml(visitStatus)}" data-booking-visit-id="${escapeHtml(item.id)}" role="menuitem">
@@ -335,7 +338,7 @@ function bookingVisitModal(visit) {
     <div class="modal-card">
       <div class="modal-head"><h3>Редактирование визита</h3><button type="button" class="ghost" data-close-booking-visit>Закрыть</button></div>
       <form class="modal-grid" data-booking-visit-form data-visit-id="${escapeHtml(visit.id)}">
-        <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at))}" required></label>
+        <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at, visit.branch_id))}" required></label>
         <label><span>Филиал</span><select name="branch_id"><option value="">Выберите филиал</option>${branchOptions}</select></label>
         <label><span>Сотрудник</span><select name="employee_id"><option value="">Выберите сотрудника</option>${masterOptions}</select></label>
         <label><span>Клиент</span><input value="${escapeHtml(visit.full_name || visit.client_name || "")}" readonly></label>
@@ -396,6 +399,14 @@ function filterOptions(data) {
 }
 
 export async function booking(ctx) {
+  if (bookingState.defaultsOrganizationId !== ctx.org.id) {
+    bookingState.defaultsOrganizationId = ctx.org.id;
+    bookingState.viewBy = "branches";
+    bookingState.period = "day";
+    bookingState.branchId = "";
+    bookingState.employeeId = "";
+    bookingState.defaultBranchInitialized = false;
+  }
   bookingState.weekStart ||= weekStart();
   const start = bookingState.weekStart;
   const defaultRange = bookingState.period === "day"
@@ -415,6 +426,14 @@ export async function booking(ctx) {
     bookingState.employeeId,
   );
   bookingState.calendarData = data;
+  if (!bookingState.defaultBranchInitialized) {
+    bookingState.defaultBranchInitialized = true;
+    const firstBranch = data.branches?.[0];
+    if (firstBranch?.id) {
+      bookingState.branchId = String(firstBranch.id);
+      return booking(ctx);
+    }
+  }
   if (bookingState.publicBookingOrganizationId !== ctx.org.id || !bookingState.publicBookingUrl) {
     const response = await fetch(`/public-api/online-booking-url/${encodeURIComponent(ctx.org.id)}`, {
       credentials: "include",
@@ -483,6 +502,7 @@ export function bindBooking(root, ctx) {
     const copyOnlineBookingLink = event.target.closest("[data-copy-online-booking-link]");
     if (copyOnlineBookingLink) {
       await navigator.clipboard.writeText(copyOnlineBookingLink.dataset.copyOnlineBookingLink);
+      showBookingToast("Ссылка скопирована");
       return;
     }
     const saveHoverButton = event.target.closest("[data-save-booking-hover]");
@@ -516,7 +536,32 @@ export function bindBooking(root, ctx) {
       if (visitCard) {
         try {
           const visit = await api.clientVisit(visitCard.dataset.bookingVisitId);
-          root.insertAdjacentHTML("beforeend", bookingVisitModal(visit));
+          const [branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems] = await Promise.all([
+            api.branches(ctx.org.id).catch(() => []),
+            api.departments(ctx.org.id).catch(() => []),
+            api.workplaces(ctx.org.id).catch(() => []),
+            api.users(ctx.org.id, 500).catch(() => []),
+            api.memberships(ctx.org.id).catch(() => []),
+            api.branchMemberships(ctx.org.id).catch(() => []),
+            api.roles(ctx.org.id).catch(() => []),
+            api.clientSegments(ctx.org.id).catch(() => []),
+            api.productCategories(ctx.org.id).catch(() => []),
+            api.productItems(ctx.org.id).catch(() => []),
+          ]);
+          await openExternalClientCard(ctx, visit.client_id, {
+            branches,
+            departments,
+            workplaces,
+            users,
+            memberships,
+            branchMemberships,
+            roles,
+            segments,
+            productCategories,
+            productItems,
+            selectedVisitId: visit.id,
+            visitOnly: true,
+          });
         } catch (error) {
           alert(error.message);
         }
@@ -620,7 +665,7 @@ export function bindBooking(root, ctx) {
       const comment = String(data.get("comment") || "").trim();
       const commentMeta = String(data.get("comment_meta") || "").trim();
       await api.updateClientVisit(form.dataset.visitId, {
-        visit_at: new Date(data.get("visit_at")).toISOString(),
+        visit_at: branchDateTimeToUtc(data.get("visit_at"), branchTimezone(data.get("branch_id"))),
         branch_id: data.get("branch_id") ? Number(data.get("branch_id")) : null,
         employee_id: data.get("employee_id") ? Number(data.get("employee_id")) : null,
         visit_status: data.get("visit_status"),

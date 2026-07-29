@@ -132,10 +132,19 @@
             <div class="cabinet-employee-reviews-list" data-employee-reviews-list></div>
           </section>
         </div>
+        <div class="cabinet-panel cabinet-employee-reviews-page cabinet-branch-reviews-page" data-cabinet-view="branch_reviews" hidden>
+          <button type="button" class="cabinet-employee-reviews-back" data-branch-reviews-back>&#8249; &#1053;&#1072;&#1079;&#1072;&#1076; &#1082; &#1079;&#1072;&#1087;&#1080;&#1089;&#1080;</button>
+          <section class="cabinet-branch-reviews-profile" data-branch-reviews-profile></section>
+          <section class="cabinet-employee-reviews-card">
+            <h1>&#1054;&#1090;&#1079;&#1099;&#1074;&#1099; &#1086; &#1092;&#1080;&#1083;&#1080;&#1072;&#1083;&#1077;</h1>
+            <div class="cabinet-employee-reviews-list" data-branch-reviews-list></div>
+          </section>
+        </div>
         <div class="cabinet-panel cabinet-create-review-page" data-cabinet-view="create_review" hidden>
           <button type="button" class="cabinet-employee-reviews-back" data-visit-review-back>&#8249; &#1053;&#1072;&#1079;&#1072;&#1076; &#1082; &#1074;&#1080;&#1079;&#1080;&#1090;&#1072;&#1084;</button>
           <form class="cabinet-create-review-form" data-visit-review-form>
             <input type="hidden" name="employee_id">
+            <input type="hidden" name="branch_id">
             <input type="hidden" name="visit_id">
             <h1>&#1054;&#1089;&#1090;&#1072;&#1074;&#1080;&#1090;&#1100; &#1086;&#1090;&#1079;&#1099;&#1074;</h1>
             <p data-visit-review-master></p>
@@ -238,6 +247,9 @@
       let currentCardSections = defaultCardSections;
       let currentClient = null;
       let cabinetData = null;
+      const allCabinetSections = ["profile", "visits", "loyalty", "achievements", "referrals"];
+      const loadedCabinetSections = new Set();
+      let cabinetSectionsPromise = null;
       let selectedVisit = null;
       let visitsPage = 1;
       let visitsExpanded = false;
@@ -250,9 +262,13 @@
       let clientBookingOptions = null;
       let publicBookingAnonymous = false;
       let publicBookingClientId = null;
+      let publicBookingVisitClientName = "";
       let clientBookingMasterPreviews = null;
       let clientBookingMastersRequestId = 0;
       let clientBookingMastersLoadingKey = "";
+      let clientBookingCompatibility = null;
+      let clientBookingCompatibilityRequestId = 0;
+      let clientBookingSelectedStart = "";
       let clientBookingCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       const SESSION_TOKEN_KEY = "loyalty.sessionToken";
       const CABINET_NOTIFICATIONS_SEEN_KEY = "cabinetNotificationsSeenAt";
@@ -638,17 +654,21 @@
         return Number.isFinite(amount) ? amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 }) : String(value || 0);
       }
 
-      function dateTime(value) {
-        if (!value) return "";
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ru-RU");
+      function cabinetBranchTimezone(branchId) {
+        return clientBookingOptions?.branches?.find((branch) => String(branch.id) === String(branchId))?.timezone || "Europe/Moscow";
       }
 
-      function visitDateTime(value) {
+      function dateTime(value, branchId = null) {
+        if (!value) return "";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ru-RU", branchId ? { timeZone: cabinetBranchTimezone(branchId) } : undefined);
+      }
+
+      function visitDateTime(value, branchId) {
         if (!value) return "";
         const date = new Date(value);
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ru-RU", {
-          year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+          timeZone: cabinetBranchTimezone(branchId), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
         });
       }
 
@@ -762,7 +782,7 @@
         const visitId = String(visit.id || item.id || "");
         return `
           <article class="cabinet-visit-card">
-            <div class="cabinet-visit-card-head"><b>${escapeHtml(visitDateTime(visit.visit_at || visit.created_at) || "Дата не указана")}</b><span>${escapeHtml(visitStatus(visit.visit_status || visit.attendance_title || visit.source))}</span></div>
+            <div class="cabinet-visit-card-head"><b>${escapeHtml(visitDateTime(visit.visit_at || visit.created_at, visit.branch_id) || "Дата не указана")}</b><span>${escapeHtml(visitStatus(visit.visit_status || visit.attendance_title || visit.source))}</span></div>
             <div class="cabinet-visit-details">
               <div><span>Филиал</span><b>${escapeHtml(visitBranchName(visit))}</b></div>
               <div><span>Мастер</span><b>${escapeHtml(visitPersonName(visit))}</b></div>
@@ -772,7 +792,7 @@
               ${parsed.comment ? `<div><span>Комментарий</span><b class="cabinet-visit-comment">${escapeHtml(parsed.comment)}</b></div>` : ""}
               ${visitCommentPhotos(visit)}
             </div>
-            ${visitIsCompleted(visit) && employeeId ? (reviewedVisitIds.has(visitId) ? '<span class="cabinet-visit-review-done">\u041e\u0442\u0437\u044b\u0432 \u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d</span>' : `<button type="button" class="cabinet-visit-review-button" data-visit-review data-visit-id="${escapeHtml(visitId)}" data-employee-id="${escapeHtml(employeeId)}" data-employee-name="${escapeHtml(visitPersonName(visit))}">\u041e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0442\u0437\u044b\u0432</button>`) : ""}
+            ${visitIsCompleted(visit) && employeeId ? (reviewedVisitIds.has(visitId) ? '<span class="cabinet-visit-review-done">\u041e\u0442\u0437\u044b\u0432 \u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d</span>' : `<button type="button" class="cabinet-visit-review-button" data-visit-review data-visit-id="${escapeHtml(visitId)}" data-branch-id="${escapeHtml(visit.branch_id || "")}" data-employee-id="${escapeHtml(employeeId)}" data-employee-name="${escapeHtml(visitPersonName(visit))}">\u041e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043e\u0442\u0437\u044b\u0432</button>`) : ""}
           </article>
         `;
       }
@@ -802,7 +822,7 @@
                 <button type="button" class="ghost" data-cabinet-close-visit>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
               </div>
               <div class="modal-grid">
-                <div class="readonly-field"><span>\u0414\u0430\u0442\u0430 \u0438 \u0432\u0440\u0435\u043c\u044f</span><b>${escapeHtml(dateTime(visit.visit_at || visit.created_at) || "-")}</b></div>
+                <div class="readonly-field"><span>\u0414\u0430\u0442\u0430 \u0438 \u0432\u0440\u0435\u043c\u044f</span><b>${escapeHtml(dateTime(visit.visit_at || visit.created_at, visit.branch_id) || "-")}</b></div>
                 <div class="readonly-field"><span>\u0421\u0442\u0430\u0442\u0443\u0441 \u0432\u0438\u0437\u0438\u0442\u0430</span><b>${escapeHtml(visitStatus(visit.visit_status || visit.attendance_title))}</b></div>
                 <div class="readonly-field"><span>\u0424\u0438\u043b\u0438\u0430\u043b</span><b>${escapeHtml(visit.branch_id || "-")}</b></div>
                 <div class="readonly-field"><span>\u041c\u0430\u0441\u0442\u0435\u0440</span><b>${escapeHtml(visit.employee_id || "-")}</b></div>
@@ -931,23 +951,16 @@
           return;
         }
         meta.hidden = false;
-        meta.innerHTML = `<span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 13.4299C13.7231 13.4299 15.12 12.0331 15.12 10.3099C15.12 8.58681 13.7231 7.18994 12 7.18994C10.2769 7.18994 8.88 8.58681 8.88 10.3099C8.88 12.0331 10.2769 13.4299 12 13.4299Z" stroke="#292D32" stroke-width="1.5"/><path d="M3.62001 8.49C5.59001 -0.169998 18.42 -0.159997 20.38 8.5C21.53 13.58 18.37 17.88 15.6 20.54C13.59 22.48 10.41 22.48 8.39001 20.54C5.63001 17.88 2.47001 13.57 3.62001 8.49Z" stroke="#292D32" stroke-width="1.5"/></svg>${escapeHtml(branch.address || "Адрес не указан")}</span><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22 12C22 17.52 17.52 22 12 22C6.48 22 2 17.52 2 12C2 6.48 6.48 2 12 2C17.52 2 22 6.48 22 12Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.71 15.18L12.61 13.33C12.07 13.01 11.63 12.24 11.63 11.61V7.51001" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>${escapeHtml(bookingScheduleLabel(branch.work_schedule))}</span><button type="button" class="cabinet-branch-reviews-trigger" data-cabinet-branch-reviews-toggle aria-expanded="false"><span class="cabinet-branch-reviews-summary"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F5B301" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.73 3.51001L15.49 7.03001C15.73 7.52002 16.37 7.99001 16.91 8.08001L20.1 8.61001C22.14 8.95001 22.62 10.43 21.15 11.89L18.67 14.37C18.25 14.79 18.02 15.6 18.15 16.18L18.86 19.25C19.42 21.68 18.13 22.62 15.98 21.35L12.99 19.58C12.45 19.26 11.56 19.26 11.01 19.58L8.01997 21.35C5.87997 22.62 4.57997 21.67 5.13997 19.25L5.84997 16.18C5.97997 15.6 5.74997 14.79 5.32997 14.37L2.84997 11.89C1.38997 10.43 1.85997 8.95001 3.89997 8.61001L7.08997 8.08001C7.61997 7.99001 8.25997 7.52002 8.49997 7.03001L10.26 3.51001C11.22 1.60001 12.78 1.60001 13.73 3.51001Z" stroke="#F5B301" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-cabinet-branch-reviews-count>… отзывов</span></span><svg class="cabinet-branch-reviews-chevron" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="cabinet-branch-reviews-panel"><div class="cabinet-branch-reviews-content" data-cabinet-branch-reviews-list><p class="cabinet-history-empty">Загружаем отзывы…</p></div></div>`;
-        const organizationId = cabinetData?.organization_id || cabinetData?.client?.organization_id || currentClient?.organization_id;
+        meta.innerHTML = `<span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 13.4299C13.7231 13.4299 15.12 12.0331 15.12 10.3099C15.12 8.58681 13.7231 7.18994 12 7.18994C10.2769 7.18994 8.88 8.58681 8.88 10.3099C8.88 12.0331 10.2769 13.4299 12 13.4299Z" stroke="#292D32" stroke-width="1.5"/><path d="M3.62001 8.49C5.59001 -0.169998 18.42 -0.159997 20.38 8.5C21.53 13.58 18.37 17.88 15.6 20.54C13.59 22.48 10.41 22.48 8.39001 20.54C5.63001 17.88 2.47001 13.57 3.62001 8.49Z" stroke="#292D32" stroke-width="1.5"/></svg>${escapeHtml(branch.address || "Адрес не указан")}</span><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22 12C22 17.52 17.52 22 12 22C6.48 22 2 17.52 2 12C2 6.48 6.48 2 12 2C17.52 2 22 6.48 22 12Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.71 15.18L12.61 13.33C12.07 13.01 11.63 12.24 11.63 11.61V7.51001" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>${escapeHtml(bookingScheduleLabel(branch.work_schedule))}</span><button type="button" class="cabinet-branch-reviews-trigger" data-cabinet-branch-reviews-open><span class="cabinet-branch-reviews-summary"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F5B301" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13.73 3.51001L15.49 7.03001C15.73 7.52002 16.37 7.99001 16.91 8.08001L20.1 8.61001C22.14 8.95001 22.62 10.43 21.15 11.89L18.67 14.37C18.25 14.79 18.02 15.6 18.15 16.18L18.86 19.25C19.42 21.68 18.13 22.62 15.98 21.35L12.99 19.58C12.45 19.26 11.56 19.26 11.01 19.58L8.01997 21.35C5.87997 22.62 4.57997 21.67 5.13997 19.25L5.84997 16.18C5.97997 15.6 5.74997 14.79 5.32997 14.37L2.84997 11.89C1.38997 10.43 1.85997 8.95001 3.89997 8.61001L7.08997 8.08001C7.61997 7.99001 8.25997 7.52002 8.49997 7.03001L10.26 3.51001C11.22 1.60001 12.78 1.60001 13.73 3.51001Z" stroke="#F5B301" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-cabinet-branch-reviews-count>… отзывов</span></span></button>`;
+        const organizationId = clientBookingOptions?.organization_id || publicBookingOrganizationId || cabinetData?.organization_id || cabinetData?.client?.organization_id || currentClient?.organization_id;
         if (!organizationId) return;
         try {
-          const [reviews, rating] = await Promise.all([
-            requestJson(`/crm-api/client-reviews?organization_id=${encodeURIComponent(organizationId)}&branch_id=${encodeURIComponent(branchId)}&limit=200`, { cache: "no-store" }),
-            requestJson(`/crm-api/client-reviews/ratings/branch/${encodeURIComponent(branchId)}?organization_id=${encodeURIComponent(organizationId)}`, { cache: "no-store" }),
-          ]);
+          const rating = await requestJson(`/crm-api/client-reviews/ratings/branch/${encodeURIComponent(branchId)}?organization_id=${encodeURIComponent(organizationId)}`, { cache: "no-store" });
           if (requestId !== branchReviewsRequestId) return;
-          meta.querySelector("[data-cabinet-branch-reviews-count]").textContent = reviewsCountLabel(rating?.reviews_count ?? reviews.length);
-          meta.querySelector("[data-cabinet-branch-reviews-list]").innerHTML = reviews.length
-            ? reviews.map((review) => `<article class="cabinet-branch-review"><div><b>${escapeHtml(review.client_name || "Клиент")}</b><span class="cabinet-review-stars" aria-label="Оценка ${escapeHtml(review.rating)} из 5">${reviewStars(review.rating)}</span></div><p>${escapeHtml(review.text)}</p></article>`).join("")
-            : '<p class="cabinet-history-empty">Отзывов пока нет.</p>';
+          meta.querySelector("[data-cabinet-branch-reviews-count]").textContent = reviewsCountLabel(rating?.reviews_count || 0);
         } catch {
           if (requestId !== branchReviewsRequestId) return;
           meta.querySelector("[data-cabinet-branch-reviews-count]").textContent = reviewsCountLabel(0);
-          meta.querySelector("[data-cabinet-branch-reviews-list]").innerHTML = '<p class="cabinet-history-empty">Не удалось загрузить отзывы.</p>';
         }
       }
 
@@ -976,6 +989,22 @@
         return `${year}-${month}-${day}`;
       }
 
+      function isSelectedMasterBookingDateBlocked(iso) {
+        const masterId = clientBookingForm.elements.master_id.value;
+        const master = (clientBookingOptions?.masters || []).find((item) => String(item.id) === String(masterId));
+        return (master?.booking_blocks || []).some((block) =>
+          !block.time_from && !block.time_to
+          && String(block.date_from || "") <= iso
+          && iso <= String(block.date_to || block.date_from || "")
+        );
+      }
+
+      function showSelectedMasterDateUnavailable() {
+        clientBookingForm.querySelector("[data-client-booking-submit]").disabled = true;
+        clientBookingSlots.disabled = false;
+        clientBookingSlots.innerHTML = '<legend>Свободное время</legend><div class="cabinet-booking-no-slots"><b>На данное число записи к выбранному мастеру нет</b><small>Выберите другую доступную дату.</small></div>';
+      }
+
       function renderClientBookingCalendar() {
         const input = clientBookingForm.elements.booking_date;
         const minDate = input.min ? new Date(`${input.min}T00:00:00`) : new Date();
@@ -992,9 +1021,10 @@
           const iso = bookingDateIso(date);
           const outside = date.getMonth() !== monthStart.getMonth();
           const disabled = date < minDate || date > maxDate;
-          const selected = selectedDate && iso === bookingDateIso(selectedDate);
+          const masterBlocked = isSelectedMasterBookingDateBlocked(iso);
+          const selected = !masterBlocked && selectedDate && iso === bookingDateIso(selectedDate);
           const today = iso === bookingDateIso(new Date());
-          return `<button type="button" data-booking-date="${iso}" ${disabled ? "disabled" : ""} class="${outside ? "outside" : ""}${selected ? " selected" : ""}${today ? " today" : ""}">${date.getDate()}</button>`;
+          return `<button type="button" data-booking-date="${iso}" ${disabled ? "disabled" : ""} ${masterBlocked ? 'data-booking-date-blocked="true" aria-disabled="true" title="На данное число записи к выбранному мастеру нет"' : ""} class="${outside ? "outside" : ""}${selected ? " selected" : ""}${today ? " today" : ""}${masterBlocked ? " master-blocked" : ""}">${date.getDate()}</button>`;
         }).join("");
         const previousMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
         const nextMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
@@ -1032,12 +1062,13 @@
         clientBookingForm.querySelector("[data-booking-master-summary]").textContent =
           selectedMaster?.name || "Выбрать специалиста";
         const dateValue = clientBookingForm.elements.booking_date.value;
-        const selectedTime = clientBookingForm.querySelector('[name="starts_at"]:checked')?.value;
+        const selectedSlot = clientBookingForm.querySelector('[name="starts_at"]:checked');
+        const selectedTime = selectedSlot?.nextElementSibling?.textContent?.trim() || "";
         const dateLabel = dateValue
           ? new Date(`${dateValue}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })
           : "";
         clientBookingForm.querySelector("[data-booking-date-summary]").textContent =
-          dateLabel ? `${dateLabel}${selectedTime ? `, ${new Date(selectedTime).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : ""}` : "Выбрать дату и время";
+          dateLabel ? `${dateLabel}${selectedTime ? `, ${selectedTime}` : ""}` : "Выбрать дату и время";
       }
 
       function visitServiceTitle(item) {
@@ -1060,9 +1091,14 @@
       function renderClientBookingServices() {
         const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
         const selectedIds = new Set(selectedBookingServiceIds());
+        const compatibleServiceIds = clientBookingSelectedStart && clientBookingCompatibility
+          ? new Set(clientBookingCompatibility.service_ids.map(Number))
+          : null;
         const query = String(clientBookingForm.querySelector("[data-client-booking-service-search]")?.value || "").trim().toLocaleLowerCase("ru");
         const services = (clientBookingOptions?.services || []).filter((item) =>
-          item.branch_ids.includes(branchId) && (!query || String(item.title || "").toLocaleLowerCase("ru").includes(query))
+          item.branch_ids.includes(branchId)
+          && (!compatibleServiceIds || compatibleServiceIds.has(Number(item.id)))
+          && (!query || String(item.title || "").toLocaleLowerCase("ru").includes(query))
         );
         const groups = new Map();
         services.forEach((item) => {
@@ -1094,8 +1130,13 @@
       function renderClientBookingMasters() {
         const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
         const serviceIds = selectedBookingServiceIds();
+        const compatibleMasterIds = clientBookingSelectedStart && clientBookingCompatibility
+          ? new Set(clientBookingCompatibility.master_ids.map(Number))
+          : null;
         const availableMasters = (clientBookingOptions?.masters || []).filter((item) =>
-          item.branch_ids.includes(branchId) && (!serviceIds.length || serviceIds.every((id) => item.service_ids.includes(id)))
+          item.branch_ids.includes(branchId)
+          && (!serviceIds.length || serviceIds.every((id) => item.service_ids.includes(id)))
+          && (!compatibleMasterIds || compatibleMasterIds.has(Number(item.id)))
         );
         const masterInput = clientBookingForm.elements.master_id;
         if (!availableMasters.some((item) => String(item.id) === masterInput.value)) masterInput.value = "";
@@ -1151,15 +1192,6 @@
           renderClientBookingMasters();
           return;
         }
-        if (publicBookingOrganizationId) {
-          clientBookingMasterPreviews = (clientBookingOptions?.masters || []).map((master) => ({
-            ...master,
-            nearest_slots: [],
-          }));
-          clientBookingMastersLoadingKey = "";
-          renderClientBookingMasters();
-          return;
-        }
         clientBookingMasterPreviews = null;
         renderClientBookingMasters();
         const params = new URLSearchParams({
@@ -1168,19 +1200,19 @@
           days: "14",
         });
         try {
-          const result = await requestJson(`/booking-api/client-booking/masters?${params}`, { cache: "no-store" });
+          if (publicBookingOrganizationId) params.set("organization_id", String(publicBookingOrganizationId));
+          const mastersPath = publicBookingOrganizationId ? "public-booking/masters" : "client-booking/masters";
+          const result = await requestJson(`/booking-api/${mastersPath}?${params}`, { cache: "no-store" });
           const masters = result.masters || [];
           if (requestId !== clientBookingMastersRequestId) return;
           clientBookingMastersLoadingKey = "";
           clientBookingMasterPreviews = masters;
-          const mastersById = new Map(masters.map((master) => [Number(master.id), master]));
-          (clientBookingOptions?.masters || []).forEach((master) => {
-            const preview = mastersById.get(Number(master.id));
-            if (preview) {
-              master.rating = preview.rating;
-              master.reviews_count = preview.reviews_count;
-            }
-          });
+          if (clientBookingOptions) {
+            clientBookingOptions.masters = masters.map((master) => ({
+              ...master,
+              branch_ids: Array.isArray(master.branch_ids) && master.branch_ids.length ? master.branch_ids : [branchId],
+            }));
+          }
           renderClientBookingMasters();
         } catch (error) {
           if (requestId !== clientBookingMastersRequestId) return;
@@ -1197,24 +1229,36 @@
         const masterId = Number(clientBookingForm.elements.master_id.value || 0);
         const bookingDate = clientBookingForm.elements.booking_date.value;
         clientBookingForm.querySelector("[data-client-booking-submit]").disabled = true;
-        if (!branchId || !serviceIds.length || !masterId || !bookingDate) {
-          clientBookingSlots.disabled = true;
-          clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Выберите услугу, специалиста и дату.</p>';
+        if (masterId && bookingDate && isSelectedMasterBookingDateBlocked(bookingDate)) {
+          clientBookingForm.elements.booking_date.value = "";
+          renderClientBookingCalendar();
+          updateClientBookingSummaries();
+          showSelectedMasterDateUnavailable();
           return;
         }
+        if (!branchId || !bookingDate) {
+          clientBookingSlots.disabled = true;
+          clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Выберите филиал и дату.</p>';
+          return;
+        }
+        const requestId = ++clientBookingCompatibilityRequestId;
         clientBookingSlots.disabled = false;
         clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Загружаем свободное время…</p>';
         const params = new URLSearchParams({
           branch_id: String(branchId),
           service_ids: serviceIds.join(","),
-          master_id: String(masterId),
-          date_from: bookingDate,
-          days: "1",
+          booking_date: bookingDate,
         });
+        if (masterId) params.set("master_id", String(masterId));
+        if (clientBookingSelectedStart) params.set("starts_at", clientBookingSelectedStart);
         try {
           if (publicBookingOrganizationId) params.set("organization_id", String(publicBookingOrganizationId));
-          const slotsPath = publicBookingOrganizationId ? "public-booking/slots" : "client-booking/slots";
-          const result = await requestJson(`/booking-api/${slotsPath}?${params}`);
+          const compatibilityPath = publicBookingOrganizationId ? "public-booking/compatibility" : "client-booking/compatibility";
+          const result = await requestJson(`/booking-api/${compatibilityPath}?${params}`);
+          if (requestId !== clientBookingCompatibilityRequestId) return;
+          clientBookingCompatibility = result;
+          renderClientBookingServices();
+          renderClientBookingMasters();
           const slotGroups = [
             ["Утро", result.slots.filter((slot) => Number(slot.time.slice(0, 2)) < 12)],
             ["День", result.slots.filter((slot) => {
@@ -1227,7 +1271,7 @@
             <section class="cabinet-booking-slot-group">
               <h3>${title}</h3>
               <div class="cabinet-booking-slot-grid">${slots.map((slot) => `
-                <label class="cabinet-booking-slot"><input type="radio" name="starts_at" value="${escapeHtml(slot.start)}" /><span>${escapeHtml(slot.time)}</span></label>
+                <label class="cabinet-booking-slot"><input type="radio" name="starts_at" value="${escapeHtml(slot.start)}" ${slot.start === clientBookingSelectedStart ? "checked" : ""} /><span>${escapeHtml(slot.time)}</span></label>
               `).join("")}</div>
             </section>
           `).join("") : `<div class="cabinet-booking-no-slots">
@@ -1236,12 +1280,14 @@
             <small>Выберите другую доступную дату.</small>
           </div>`}`;
         } catch (error) {
+          if (requestId !== clientBookingCompatibilityRequestId) return;
           clientBookingSlots.innerHTML = `<legend>Свободное время</legend><p class="cabinet-message error">${escapeHtml(error.message)}</p>`;
         }
       }
 
       async function loadClientBookingOptions() {
         renderClientBookingList();
+        if (clientBookingOptions) return;
         clientBookingOptions = null;
         clientBookingMessage.className = "cabinet-message";
         clientBookingMessage.textContent = "Загружаем варианты записи…";
@@ -1316,10 +1362,11 @@
         document.querySelector("[data-visit-review-submit]").disabled = !visitReviewRating;
       }
 
-      function openVisitReview(visitId, employeeId, employeeName) {
+      function openVisitReview(visitId, branchId, employeeId, employeeName) {
         const reviewForm = document.querySelector("[data-visit-review-form]");
         visitReviewRating = 0;
         reviewForm.reset();
+        reviewForm.elements.branch_id.value = branchId;
         reviewForm.elements.employee_id.value = employeeId;
         reviewForm.elements.visit_id.value = visitId;
         reviewForm.querySelector("[data-visit-review-master]").textContent = `Ваш отзыв будет опубликован для мастера ${employeeName || ""}.`;
@@ -1358,13 +1405,94 @@
         }
       }
 
+      async function openBranchReviews(branch) {
+        const profile = document.querySelector("[data-branch-reviews-profile]");
+        const list = document.querySelector("[data-branch-reviews-list]");
+        const sourceLogo = clientBookingForm.querySelector("[data-client-booking-logo]");
+        const sourceMeta = clientBookingForm.querySelector("[data-client-booking-branch-meta]");
+        const detailsMarkup = Array.from(sourceMeta?.children || []).slice(0, 2).map((item) => item.outerHTML).join("");
+        profile.innerHTML = `<span class="cabinet-booking-logo cabinet-branch-reviews-logo">${sourceLogo?.innerHTML || "<span>L</span>"}</span><div class="cabinet-branch-reviews-info"><small>Онлайн-запись</small><h1>${escapeHtml(branch.name || "Филиал")}</h1><div class="cabinet-branch-reviews-details">${detailsMarkup}</div></div>`;
+        list.innerHTML = '<p class="cabinet-history-empty">Загружаем отзывы…</p>';
+        setCabinetTab("branch_reviews");
+        const organizationId = clientBookingOptions?.organization_id || publicBookingOrganizationId || cabinetData?.organization_id || cabinetData?.client?.organization_id || currentClient?.organization_id;
+        try {
+          const reviews = await requestJson(`/crm-api/client-reviews?organization_id=${encodeURIComponent(organizationId)}&branch_id=${encodeURIComponent(branch.id)}&limit=200`, { cache: "no-store" });
+          list.innerHTML = reviews.length
+            ? reviews.map((review) => `<article class="cabinet-employee-review"><header><div><b>${escapeHtml(review.client_name || "Клиент")}</b><span><span class="cabinet-review-stars">${reviewStars(review.rating)}</span><small>${escapeHtml(reviewDateLabel(review.created_at || review.date))}</small></span></div></header>${review.text ? `<p>${escapeHtml(review.text)}</p>` : ""}</article>`).join("")
+            : '<p class="cabinet-history-empty">Отзывов пока нет.</p>';
+        } catch {
+          list.innerHTML = '<p class="cabinet-history-empty">Не удалось загрузить отзывы.</p>';
+        }
+      }
+
+      function cabinetTabFromHash() {
+        if (location.hash === "#my-booking") return "client_booking";
+        if (location.hash === "#achievements") return "achievements";
+        return "profile";
+      }
+
+      function cabinetSectionsForTab(tab) {
+        if (tab === "client_booking") return ["visits"];
+        if (tab === "achievements") return ["achievements"];
+        return allCabinetSections;
+      }
+
+      async function loadCabinetSections(sections, force = false) {
+        const requested = sections.filter((section) => force || !loadedCabinetSections.has(section));
+        if (!requested.length) return cabinetData;
+        if (cabinetSectionsPromise) await cabinetSectionsPromise;
+        const stillMissing = requested.filter((section) => force || !loadedCabinetSections.has(section));
+        if (!stillMissing.length) return cabinetData;
+        cabinetSectionsPromise = (async () => {
+          const result = await requestJson(`/auth/cabinet?include=${encodeURIComponent(stillMissing.join(","))}`, { cache: "no-store" });
+          const sectionFields = {
+            profile: ["profile", "metric"],
+            visits: ["visits"],
+            loyalty: ["bonus_types", "bonus_balances", "client_level"],
+            achievements: ["achievements", "organization_achievements"],
+            referrals: ["referral_link", "referral_invites_count"],
+          };
+          const baseFields = ["client", "organization_id", "registration_fields", "card_sections"];
+          cabinetData ||= {};
+          baseFields.forEach((field) => {
+            if (Object.prototype.hasOwnProperty.call(result, field)) cabinetData[field] = result[field];
+          });
+          stillMissing.forEach((section) => {
+            (sectionFields[section] || []).forEach((field) => {
+              if (Object.prototype.hasOwnProperty.call(result, field)) cabinetData[field] = result[field];
+            });
+            loadedCabinetSections.add(section);
+          });
+          currentClient = cabinetData.client || currentClient;
+          return cabinetData;
+        })();
+        try {
+          return await cabinetSectionsPromise;
+        } finally {
+          cabinetSectionsPromise = null;
+        }
+      }
+
       function setCabinetTab(tab) {
         document.querySelectorAll("[data-cabinet-tab]").forEach((link) => link.classList.toggle("active", link.dataset.cabinetTab === tab));
         document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
           view.hidden = view.dataset.cabinetView !== tab;
         });
-        if (tab === "achievements") renderAchievements();
-        if (tab === "client_booking") loadClientBookingOptions();
+        if (tab === "achievements") {
+          if (loadedCabinetSections.has("achievements")) renderAchievements();
+          else loadCabinetSections(["achievements"]).then(renderAchievements).catch(() => renderAchievements());
+        }
+        if (tab === "client_booking") {
+          if (loadedCabinetSections.has("visits")) loadClientBookingOptions();
+          else loadCabinetSections(["visits"]).then(loadClientBookingOptions).catch(loadClientBookingOptions);
+        }
+        if (tab === "profile" && !allCabinetSections.every((section) => loadedCabinetSections.has(section))) {
+          loadCabinetSections(allCabinetSections).then(() => {
+            applyRegistrationFields(cabinetData?.registration_fields);
+            fillCurrentUserCabinet(currentClient || {});
+            renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
+          }).catch(() => {});
+        }
       }
 
       function openCabinetMenu() {
@@ -1476,9 +1604,7 @@
           document.body.classList.add("cabinet-public-booking-mode");
           const result = await currentUser().catch(() => null);
           if (result) {
-            const cabinetResponse = await fetch("/auth/cabinet");
-            cabinetData = cabinetResponse.ok ? await cabinetResponse.json() : null;
-            currentClient = cabinetData?.client || null;
+            await loadCabinetSections(["visits"]);
           }
           const sessionOrganizationId = Number(cabinetData?.organization_id || currentClient?.organization_id || 0);
           publicBookingAnonymous = !result || sessionOrganizationId !== publicBookingOrganizationId;
@@ -1493,9 +1619,8 @@
           try {
             const result = await currentUser();
             if (!result) throw new Error();
-            const cabinetResponse = await fetch("/auth/cabinet");
-            cabinetData = cabinetResponse.ok ? await cabinetResponse.json() : null;
-            currentClient = cabinetData?.client || null;
+            const initialTab = cabinetTabFromHash();
+            await loadCabinetSections(cabinetSectionsForTab(initialTab));
             applyRegistrationFields(cabinetData?.registration_fields);
             fillCurrentUserCabinet(currentClient || result);
             renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
@@ -1505,6 +1630,7 @@
             exposeSessionForPwaInstall();
             setMessage("", "");
             submitButton.disabled = false;
+            setCabinetTab(initialTab);
           } catch {
             setMessage("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430. \u0412\u043e\u0439\u0434\u0438\u0442\u0435 \u0441\u043d\u043e\u0432\u0430.", "error");
             submitButton.disabled = true;
@@ -1518,6 +1644,7 @@
           const link = await response.json();
           if (link.session_token) localStorage.setItem(SESSION_TOKEN_KEY, link.session_token);
           cabinetData = link;
+          allCabinetSections.forEach((section) => loadedCabinetSections.add(section));
           currentClient = link.client || link.profile || null;
           setRegistrationMode(!link.client_id);
           applyRegistrationFields(link.registration_fields);
@@ -1528,6 +1655,7 @@
           await refreshNotificationsList().catch(() => null);
           exposeSessionForPwaInstall();
           submitButton.disabled = false;
+          setCabinetTab("profile");
         } catch {
           const text = "\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043b\u044c\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0430.";
           alert(text);
@@ -1558,6 +1686,11 @@
           return;
         }
 
+        if (event.target.closest("[data-branch-reviews-back]")) {
+          setCabinetTab("client_booking");
+          return;
+        }
+
         if (event.target.closest("[data-visit-review-back]")) {
           setCabinetTab("profile");
           return;
@@ -1565,7 +1698,7 @@
 
         const visitReviewButton = event.target.closest("[data-visit-review]");
         if (visitReviewButton) {
-          openVisitReview(visitReviewButton.dataset.visitId, visitReviewButton.dataset.employeeId, visitReviewButton.dataset.employeeName);
+          openVisitReview(visitReviewButton.dataset.visitId, visitReviewButton.dataset.branchId, visitReviewButton.dataset.employeeId, visitReviewButton.dataset.employeeName);
           return;
         }
 
@@ -1597,11 +1730,11 @@
           return;
         }
 
-        const branchReviewsToggle = event.target.closest("[data-cabinet-branch-reviews-toggle]");
-        if (branchReviewsToggle) {
-          const isExpanded = branchReviewsToggle.getAttribute("aria-expanded") !== "true";
-          branchReviewsToggle.setAttribute("aria-expanded", String(isExpanded));
-          branchReviewsToggle.closest("[data-cabinet-booking-branch-meta]")?.classList.toggle("reviews-expanded", isExpanded);
+        const branchReviewsOpen = event.target.closest("[data-cabinet-branch-reviews-open]");
+        if (branchReviewsOpen) {
+          const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
+          const branch = clientBookingOptions?.branches?.find((item) => Number(item.id) === branchId);
+          if (branch) await openBranchReviews(branch);
           return;
         }
 
@@ -1701,6 +1834,7 @@
         const submit = reviewForm.querySelector("[data-visit-review-submit]");
         const organizationId = clientBookingOptions?.organization_id || cabinetData?.organization_id || currentClient?.organization_id;
         const clientId = clientBookingOptions?.client_id || cabinetData?.client_id || currentClient?.id;
+        const branchId = Number(reviewForm.elements.branch_id.value || 0);
         const employeeId = Number(reviewForm.elements.employee_id.value || 0);
         const visitId = String(reviewForm.elements.visit_id.value || "");
         const text = reviewForm.elements.text.value.trim();
@@ -1713,6 +1847,12 @@
             method: "POST",
             body: JSON.stringify({ organization_id: Number(organizationId), client_id: Number(clientId), employee_id: employeeId, rating: visitReviewRating, text }),
           });
+          if (branchId) {
+            await requestJson("/crm-api/client-reviews", {
+              method: "POST",
+              body: JSON.stringify({ organization_id: Number(organizationId), client_id: Number(clientId), branch_id: branchId, visit_id: Number(visitId), rating: visitReviewRating, text }),
+            });
+          }
           reviewedVisitIds.add(visitId);
           sessionStorage.setItem("cabinet.reviewedVisitIds", JSON.stringify([...reviewedVisitIds]));
           const updateMaster = (master) => {
@@ -1742,6 +1882,8 @@
         clientBookingMessage.textContent = "";
         if (event.target.name === "branch_id") {
           openServiceCategoryId = null;
+          clientBookingCompatibility = null;
+          clientBookingSelectedStart = "";
           renderClientBookingBranchMeta();
           clientBookingForm.querySelectorAll('[name="service_ids"]').forEach((input) => { input.checked = false; });
           clientBookingForm.querySelector("[data-client-booking-service-search]").value = "";
@@ -1765,6 +1907,7 @@
         if (event.target.name === "master_choice") {
           clientBookingForm.elements.master_id.value = event.target.value;
           renderClientBookingMasters();
+          renderClientBookingCalendar();
           await loadClientBookingSlots();
           updateClientBookingSummaries();
           return;
@@ -1775,7 +1918,10 @@
           return;
         }
         if (event.target.name === "starts_at") {
-          clientBookingForm.querySelector("[data-client-booking-submit]").disabled = false;
+          clientBookingSelectedStart = event.target.value;
+          await loadClientBookingSlots();
+          clientBookingForm.querySelector("[data-client-booking-submit]").disabled =
+            !selectedBookingServiceIds().length || !clientBookingForm.elements.master_id.value;
           updateClientBookingSummaries();
         }
       });
@@ -1800,6 +1946,7 @@
           event.preventDefault();
           clientBookingForm.elements.master_id.value = "";
           renderClientBookingMasters();
+          renderClientBookingCalendar();
           await loadClientBookingSlots();
           updateClientBookingSummaries();
           return;
@@ -1826,6 +1973,7 @@
         }
         const nearestSlot = event.target.closest("[data-booking-nearest-slot]");
         if (nearestSlot) {
+          clientBookingSelectedStart = nearestSlot.dataset.start;
           clientBookingForm.elements.master_id.value = nearestSlot.dataset.masterId;
           clientBookingForm.elements.booking_date.value = nearestSlot.dataset.start.slice(0, 10);
           clientBookingCalendarMonth = new Date(`${nearestSlot.dataset.start.slice(0, 7)}-01T00:00:00`);
@@ -1844,7 +1992,13 @@
           return;
         }
         const dateButton = event.target.closest("[data-booking-date]");
+        if (dateButton?.dataset.bookingDateBlocked === "true") {
+          showSelectedMasterDateUnavailable();
+          return;
+        }
         if (dateButton && !dateButton.disabled) {
+          clientBookingSelectedStart = "";
+          clientBookingCompatibility = null;
           clientBookingForm.elements.booking_date.value = dateButton.dataset.bookingDate;
           renderClientBookingCalendar();
           updateClientBookingSummaries();
@@ -1889,17 +2043,19 @@
               master_id: Number(clientBookingForm.elements.master_id.value),
               starts_at: startsAt,
               client_id: publicBookingClientId,
+              visit_client_name: publicBookingVisitClientName || null,
             }),
           });
+          const visitCreatedToast = showBookingSuccessToast("\u0412\u0438\u0437\u0438\u0442 \u0441\u043e\u0437\u0434\u0430\u043d");
           if (publicBookingOrganizationId) {
             setBookingLoader(false);
-            await showBookingSuccessToast();
+            await visitCreatedToast;
             location.href = "/cabinet.html#my-booking";
             return;
           }
-          cabinetData = await requestJson("/auth/cabinet", { cache: "no-store" });
+          await loadCabinetSections(["visits"], true);
           renderClientBookingList();
-          clientBookingMessage.textContent = "Запись успешно создана.";
+          clientBookingMessage.textContent = "\u0412\u0438\u0437\u0438\u0442 \u0441\u043e\u0437\u0434\u0430\u043d.";
           await loadClientBookingSlots();
         } catch (error) {
           clientBookingMessage.className = "cabinet-message error";
@@ -1929,6 +2085,7 @@
           if (!response.ok) throw new Error(result.detail || "Не удалось зарегистрировать клиента.");
           if (result.session_token) localStorage.setItem(SESSION_TOKEN_KEY, result.session_token);
           publicBookingClientId = Number(result.client_id) || null;
+          publicBookingVisitClientName = [data.last_name, data.first_name].filter(Boolean).join(" ").trim();
           publicBookingAnonymous = false;
           publicBookingRegistration.hidden = true;
           clientBookingForm.requestSubmit();
@@ -1944,7 +2101,6 @@
         publicBookingRegistration.hidden = true;
       });
 
-      if (!publicBookingOrganizationId) setCabinetTab("profile");
       consumeLink();
 
       form.addEventListener("submit", async (event) => {
