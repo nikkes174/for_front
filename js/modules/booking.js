@@ -285,12 +285,16 @@ function compactEventClusters(events, minHour, minuteHeight) {
   const laneLastTops = [];
   return clusters.map(({ items, top }) => {
     const first = items[0];
-    let lane = laneLastTops.findIndex((lastTop) => top - lastTop >= 26);
+    let lane = laneLastTops.findIndex((lastTop) => top - lastTop >= 36);
     if (lane === -1) lane = laneLastTops.length;
     laneLastTops[lane] = top;
-    const left = 10 + lane * 28;
+    const left = 10 + lane * 38;
     return `<div class="booking-event-cluster" style="top:${top}px;left:${left}px">
       <button type="button" class="booking-event-indicator" aria-label="${escapeHtml(`${clock(first.start, first.branch_id)}: записей ${items.length}`)}">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 4.5C4 4.5 6 3.5 9 3.5C11.3431 3.5 12.6569 5 15 5C16.6162 5 17.8059 4.78678 18.6184 4.55725C19.2067 4.39105 19.5008 4.30796 19.6375 4.34703C19.778 4.38722 19.8484 4.44044 19.9253 4.56478C20 4.68565 20 4.95537 20 5.49481V12.7156C20 13.116 20 13.3162 19.8922 13.585C19.8188 13.768 19.5974 14.0681 19.4441 14.1922C19.2191 14.3745 19.0859 14.4156 18.8195 14.4978C18.0072 14.7486 16.755 15 15 15C12.6569 15 11.3431 13.5 9 13.5C6 13.5 4 14.5 4 14.5V4.5Z" fill="currentColor"/>
+          <path d="M4 21V2.50806" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
         <span>${items.length}</span>
       </button>
       <div class="booking-event-submenu" role="menu">

@@ -1395,13 +1395,18 @@
 
 .cabinet-booking-service {
   display: block;
+  position: relative;
   padding: 13px 4px 16px;
   border-top: 1px solid #f2f4f7;
-  cursor: pointer;
 }
 
 .cabinet-booking-service:has(input:checked) {
   background: #f9fafb;
+}
+
+.cabinet-booking-service-choice {
+  display: block;
+  cursor: pointer;
 }
 
 .cabinet-booking-service-content {
@@ -1435,21 +1440,13 @@
   font-size: 16px;
 }
 
-.cabinet-booking-service-gallery-open {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 14px;
-  background: #f2f4f7;
-  cursor: zoom-in;
-}
 .cabinet-booking-service-photo {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  max-width: none;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 14px;
   object-fit: cover;
 }
 body.service-gallery-open { overflow: hidden; }
@@ -1514,10 +1511,59 @@ body.service-gallery-open { overflow: hidden; }
   .cabinet-service-lightbox-arrow { width: 40px; height: 40px; }
 }
 
-.cabinet-booking-service input {
-  width: 20px;
-  height: 20px;
-  accent-color: #111827;
+.cabinet-booking-service-checkbox {
+  position: relative;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.cabinet-booking-service-checkbox input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.cabinet-booking-service-checkbox-frame {
+  display: grid;
+  place-items: center;
+  border: 2px solid #475467;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.cabinet-booking-service-checkbox-frame svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: #111827;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  transform: scale(.75);
+  transition: stroke-dashoffset .25s ease, transform .25s cubic-bezier(.16, 1, .3, 1);
+}
+
+.cabinet-booking-service-checkbox input:checked + .cabinet-booking-service-checkbox-frame {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgb(17 24 39 / 15%), inset 0 0 0 2px rgb(255 255 255 / 12%);
+}
+
+.cabinet-booking-service-checkbox input:checked + .cabinet-booking-service-checkbox-frame svg {
+  stroke-dashoffset: 0;
+  transform: scale(1.05);
+}
+
+.cabinet-booking-service-checkbox input:focus-visible + .cabinet-booking-service-checkbox-frame {
+  outline: 2px solid #111827;
+  outline-offset: 3px;
 }
 
 .cabinet-booking-master-list {
@@ -2087,6 +2133,17 @@ body.service-gallery-open { overflow: hidden; }
   background: #f2f4f7;
   color: #344054;
   cursor: pointer;
+}
+
+.cabinet-booking-slot span b {
+  font: inherit;
+}
+
+.cabinet-booking-slot span small {
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: .72;
+  text-align: center;
 }
 
 .cabinet-booking-slot input:checked + span {

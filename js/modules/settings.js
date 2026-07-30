@@ -477,13 +477,19 @@ function branchWorkScheduleFields(schedule = {}) {
   return `
     <label><span>Работа с</span><input name="work_schedule_from" type="time" value="${escapeHtml(schedule?.from || "")}"></label>
     <label><span>Работа до</span><input name="work_schedule_to" type="time" value="${escapeHtml(schedule?.to || "")}"></label>
+    <label><span>Обед с</span><input name="work_schedule_lunch_from" type="time" value="${escapeHtml(schedule?.lunch_from || "")}"></label>
+    <label><span>Обед до</span><input name="work_schedule_lunch_to" type="time" value="${escapeHtml(schedule?.lunch_to || "")}"></label>
   `;
 }
 
 function branchWorkSchedulePayload(data) {
   const from = optional(data.work_schedule_from);
   const to = optional(data.work_schedule_to);
-  return from || to ? { from, to } : null;
+  const lunchFrom = optional(data.work_schedule_lunch_from);
+  const lunchTo = optional(data.work_schedule_lunch_to);
+  return from || to || lunchFrom || lunchTo
+    ? { from, to, lunch_from: lunchFrom, lunch_to: lunchTo }
+    : null;
 }
 
 function productItemStaffFields(item) {

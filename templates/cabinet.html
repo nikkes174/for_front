@@ -55,46 +55,46 @@
               <span class="cabinet-booking-logo" data-client-booking-logo aria-hidden="true">L</span>
               <label>
                 <span>Онлайн-запись</span>
-                <select name="branch_id" required><option value="">Выберите филиал</option></select>
+                <select name="branch_id"><option value="">Все филиалы</option></select>
               </label>
               <div class="cabinet-booking-branch-meta" data-client-booking-branch-meta hidden></div>
             </div>
             <h1 class="cabinet-booking-title">Записаться на услугу</h1>
             <section class="cabinet-booking-step">
-              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="services" aria-expanded="false" disabled>
+              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="services" aria-expanded="false">
                 <span class="cabinet-booking-step-icon" aria-hidden="true"><img src="/fronted/icons/services.svg" alt="" /></span>
                 <span><small>Услуги</small><b data-booking-service-summary>Выбрать услуги</b></span>
                 <i aria-hidden="true">›</i>
               </button>
               <div class="cabinet-booking-step-panel" data-booking-step-panel="services" hidden>
                 <label class="cabinet-booking-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Найти услугу" autocomplete="off" data-client-booking-service-search></label>
-                <fieldset class="cabinet-booking-services" data-client-booking-services disabled>
+                <fieldset class="cabinet-booking-services" data-client-booking-services>
                   <legend>Услуги</legend>
-                  <p class="cabinet-history-empty">Сначала выберите филиал.</p>
+                  <p class="cabinet-history-empty">Загружаем услуги…</p>
                 </fieldset>
               </div>
             </section>
             <section class="cabinet-booking-step">
-              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="master" aria-expanded="false" disabled>
+              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="master" aria-expanded="false">
                 <span class="cabinet-booking-step-icon" aria-hidden="true"><img src="/fronted/icons/personal.svg" alt="" /></span>
                 <span><small>Специалист</small><b data-booking-master-summary>Выбрать специалиста</b></span>
                 <i aria-hidden="true">›</i>
               </button>
               <div class="cabinet-booking-step-panel" data-booking-step-panel="master" hidden>
-                <input type="hidden" name="master_id" disabled />
+                <input type="hidden" name="master_id" />
                 <div class="cabinet-booking-master-list" data-client-booking-masters>
-                  <p class="cabinet-history-empty">Сначала выберите филиал.</p>
+                  <p class="cabinet-history-empty">Выберите услугу или откройте список специалистов.</p>
                 </div>
               </div>
             </section>
             <section class="cabinet-booking-step">
-              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="datetime" aria-expanded="false" disabled>
+              <button type="button" class="cabinet-booking-step-trigger" data-booking-step-toggle="datetime" aria-expanded="false">
                 <span class="cabinet-booking-step-icon" aria-hidden="true"><img src="/fronted/icons/calendar.svg" alt="" /></span>
                 <span><small>Дата и время</small><b data-booking-date-summary>Выбрать дату и время</b></span>
                 <i aria-hidden="true">›</i>
               </button>
               <div class="cabinet-booking-step-panel" data-booking-step-panel="datetime" hidden>
-                <input name="booking_date" type="hidden" disabled />
+                <input name="booking_date" type="hidden" />
                 <div class="cabinet-booking-calendar">
                   <div class="cabinet-booking-calendar-head">
                     <b data-booking-calendar-title></b>
@@ -108,7 +108,7 @@
                   </div>
                   <div class="cabinet-booking-calendar-days" data-booking-calendar-days></div>
                 </div>
-                <fieldset class="cabinet-booking-slots" data-client-booking-slots disabled>
+                <fieldset class="cabinet-booking-slots" data-client-booking-slots>
                   <legend>Свободное время</legend>
                   <p class="cabinet-history-empty">Выберите услугу, специалиста и дату.</p>
                 </fieldset>
@@ -1078,10 +1078,16 @@
       }
 
       function renderClientBookingList() {
+        const now = Date.now();
         const visits = [...(cabinetData?.visits || [])].sort((left, right) => {
           const leftVisit = left.visit || left;
           const rightVisit = right.visit || right;
-          return new Date(rightVisit.visit_at) - new Date(leftVisit.visit_at);
+          const leftTime = new Date(leftVisit.visit_at).getTime();
+          const rightTime = new Date(rightVisit.visit_at).getTime();
+          const leftUpcoming = leftTime >= now;
+          const rightUpcoming = rightTime >= now;
+          if (leftUpcoming !== rightUpcoming) return leftUpcoming ? -1 : 1;
+          return leftUpcoming ? leftTime - rightTime : rightTime - leftTime;
         });
         clientBookingList.innerHTML = visits.length
           ? `<div class="cabinet-visit-list">${visits.map(visitHistoryItems).join("")}</div>`
@@ -1096,7 +1102,7 @@
           : null;
         const query = String(clientBookingForm.querySelector("[data-client-booking-service-search]")?.value || "").trim().toLocaleLowerCase("ru");
         const services = (clientBookingOptions?.services || []).filter((item) =>
-          item.branch_ids.includes(branchId)
+          (!branchId || item.branch_ids.includes(branchId))
           && (!compatibleServiceIds || compatibleServiceIds.has(Number(item.id)))
           && (!query || String(item.title || "").toLocaleLowerCase("ru").includes(query))
         );
@@ -1106,7 +1112,7 @@
           if (!groups.has(id)) groups.set(id, { title: item.category_title || "\u0423\u0441\u043b\u0443\u0433\u0438", items: [] });
           groups.get(id).items.push(item);
         });
-        clientBookingServices.disabled = !branchId;
+        clientBookingServices.disabled = false;
         clientBookingServices.innerHTML = `<legend>\u0423\u0441\u043b\u0443\u0433\u0438</legend>${services.length ? [...groups.entries()].map(([categoryId, group]) => `
           <section class="cabinet-booking-service-group ${openServiceCategoryId === categoryId ? "is-expanded" : ""}" data-booking-service-category="${escapeHtml(categoryId)}">
             <button type="button" class="cabinet-booking-category-trigger" data-booking-service-category-toggle="${escapeHtml(categoryId)}" aria-expanded="${openServiceCategoryId === categoryId}"><span>${escapeHtml(group.title)}</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -1114,13 +1120,13 @@
               const duration = bookingDurationLabel(item.duration);
               const price = bookingServicePriceLabel(item);
               const imageUrls = [...new Set((Array.isArray(item.image_urls) ? item.image_urls : [item.image_url]).filter(Boolean))];
-              const gallery = imageUrls.length ? `<button type="button" class="cabinet-booking-service-gallery-open" data-service-gallery-open data-service-gallery-images="${escapeHtml(JSON.stringify(imageUrls))}" data-service-gallery-title="${escapeHtml(item.title || "")}" aria-label="\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0433\u0430\u043b\u0435\u0440\u0435\u044e">
-                <img class="cabinet-booking-service-photo" src="${escapeHtml(imageUrls[0])}" alt="${escapeHtml(item.title || "")}" loading="lazy" decoding="async" fetchpriority="low" />
-              </button>` : "";
-              return `<label class="cabinet-booking-service">
-                ${gallery}
-                <span class="cabinet-booking-service-content"><span class="cabinet-booking-service-title"><b>${escapeHtml(item.title)}</b><input type="checkbox" name="service_ids" value="${escapeHtml(item.id)}" ${selectedIds.has(Number(item.id)) ? "checked" : ""} /></span>${duration ? `<small>${escapeHtml(duration)}</small>` : ""}${item.description ? `<span class="cabinet-booking-service-description">${escapeHtml(item.description)}</span>` : ""}${price ? `<strong>${escapeHtml(price)}</strong>` : ""}</span>
-              </label>`;
+              const photo = imageUrls.length ? `<img class="cabinet-booking-service-photo" src="${escapeHtml(imageUrls[0])}" alt="${escapeHtml(item.title || "")}" loading="lazy" decoding="async" fetchpriority="low" />` : "";
+              return `<article class="cabinet-booking-service">
+                <label class="cabinet-booking-service-choice">
+                  ${photo}
+                  <span class="cabinet-booking-service-content"><span class="cabinet-booking-service-title"><b>${escapeHtml(item.title)}</b><span class="cabinet-booking-service-checkbox"><input type="checkbox" name="service_ids" value="${escapeHtml(item.id)}" ${selectedIds.has(Number(item.id)) ? "checked" : ""} /><span class="cabinet-booking-service-checkbox-frame" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12.5 10 19.5 21 5" /></svg></span></span></span>${duration ? `<small>${escapeHtml(duration)}</small>` : ""}${item.description ? `<span class="cabinet-booking-service-description">${escapeHtml(item.description)}</span>` : ""}${price ? `<strong>${escapeHtml(price)}</strong>` : ""}</span>
+                </label>
+              </article>`;
             }).join("")}</div></div>
           </section>
         `).join("") : '<p class="cabinet-history-empty">\u041f\u043e\u0434\u0445\u043e\u0434\u044f\u0449\u0438\u0445 \u0443\u0441\u043b\u0443\u0433 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e.</p>'}`;
@@ -1134,25 +1140,24 @@
           ? new Set(clientBookingCompatibility.master_ids.map(Number))
           : null;
         const availableMasters = (clientBookingOptions?.masters || []).filter((item) =>
-          item.branch_ids.includes(branchId)
+          (!branchId || item.branch_ids.includes(branchId))
           && (!serviceIds.length || serviceIds.every((id) => item.service_ids.includes(id)))
           && (!compatibleMasterIds || compatibleMasterIds.has(Number(item.id)))
         );
         const masterInput = clientBookingForm.elements.master_id;
         if (!availableMasters.some((item) => String(item.id) === masterInput.value)) masterInput.value = "";
-        masterInput.disabled = !branchId;
-        clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = !branchId;
-        clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = !branchId;
-        clientBookingForm.elements.booking_date.disabled = !branchId;
+        masterInput.disabled = false;
+        clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = false;
+        clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = false;
+        clientBookingForm.elements.booking_date.disabled = false;
         const availableIds = new Set(availableMasters.map((item) => Number(item.id)));
         const mastersLoading = clientBookingMasterPreviews === null;
         const masters = mastersLoading
           ? []
           : clientBookingMasterPreviews.filter((item) => availableIds.has(Number(item.id)));
         const container = clientBookingForm.querySelector("[data-client-booking-masters]");
-        container.innerHTML = !branchId
-          ? '<p class="cabinet-history-empty">Сначала выберите филиал.</p>'
-          : mastersLoading ? '<p class="cabinet-history-empty">\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u043e\u0432\u2026</p>'
+        container.innerHTML = mastersLoading
+          ? '<p class="cabinet-history-empty">\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c \u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442\u043e\u0432\u2026</p>'
           : masters.length ? masters.map((item) => {
             const initials = String(item.name || "?").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
             const slots = item.nearest_slots;
@@ -1172,11 +1177,11 @@
               </div>
               <div class="cabinet-booking-master-nearest">
                 ${slots === null ? '<small>Ищем ближайшее время…</small>' : slots.length
-                  ? `<small>Ближайшее время для записи, ${escapeHtml(nearestDate)}:</small><span><button type="button" data-booking-nearest-slot data-master-id="${escapeHtml(item.id)}" data-start="${escapeHtml(slots[0].start)}">${escapeHtml(slots[0].time)}</button></span>`
+                  ? `<small>Ближайшее время для записи, ${escapeHtml(nearestDate)}${slots[0].branch_name ? ` · ${escapeHtml(slots[0].branch_name)}` : ""}:</small><span><button type="button" data-booking-nearest-slot data-master-id="${escapeHtml(item.id)}" data-branch-id="${escapeHtml(slots[0].branch_id || "")}" data-start="${escapeHtml(slots[0].start)}">${escapeHtml(slots[0].time)}</button></span>`
                   : '<small>На ближайшие дни свободного времени нет.</small>'}
               </div>
             </article>`;
-          }).join("") : '<p class="cabinet-history-empty">В этом филиале нет подходящих специалистов.</p>';
+          }).join("") : '<p class="cabinet-history-empty">Подходящих специалистов со свободным временем не найдено.</p>';
         updateClientBookingSummaries();
       }
 
@@ -1186,19 +1191,13 @@
         if (clientBookingMastersLoadingKey === loadingKey) return;
         clientBookingMastersLoadingKey = loadingKey;
         const requestId = ++clientBookingMastersRequestId;
-        if (!branchId) {
-          clientBookingMastersLoadingKey = "";
-          clientBookingMasterPreviews = [];
-          renderClientBookingMasters();
-          return;
-        }
         clientBookingMasterPreviews = null;
         renderClientBookingMasters();
         const params = new URLSearchParams({
-          branch_id: String(branchId),
           service_ids: selectedBookingServiceIds().join(","),
           days: "14",
         });
+        if (branchId) params.set("branch_id", String(branchId));
         try {
           if (publicBookingOrganizationId) params.set("organization_id", String(publicBookingOrganizationId));
           const mastersPath = publicBookingOrganizationId ? "public-booking/masters" : "client-booking/masters";
@@ -1210,7 +1209,7 @@
           if (clientBookingOptions) {
             clientBookingOptions.masters = masters.map((master) => ({
               ...master,
-              branch_ids: Array.isArray(master.branch_ids) && master.branch_ids.length ? master.branch_ids : [branchId],
+              branch_ids: Array.isArray(master.branch_ids) ? master.branch_ids : [],
             }));
           }
           renderClientBookingMasters();
@@ -1236,19 +1235,19 @@
           showSelectedMasterDateUnavailable();
           return;
         }
-        if (!branchId || !bookingDate) {
+        if (!bookingDate) {
           clientBookingSlots.disabled = true;
-          clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Выберите филиал и дату.</p>';
+          clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Выберите дату.</p>';
           return;
         }
         const requestId = ++clientBookingCompatibilityRequestId;
         clientBookingSlots.disabled = false;
         clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Загружаем свободное время…</p>';
         const params = new URLSearchParams({
-          branch_id: String(branchId),
           service_ids: serviceIds.join(","),
           booking_date: bookingDate,
         });
+        if (branchId) params.set("branch_id", String(branchId));
         if (masterId) params.set("master_id", String(masterId));
         if (clientBookingSelectedStart) params.set("starts_at", clientBookingSelectedStart);
         try {
@@ -1271,7 +1270,7 @@
             <section class="cabinet-booking-slot-group">
               <h3>${title}</h3>
               <div class="cabinet-booking-slot-grid">${slots.map((slot) => `
-                <label class="cabinet-booking-slot"><input type="radio" name="starts_at" value="${escapeHtml(slot.start)}" ${slot.start === clientBookingSelectedStart ? "checked" : ""} /><span>${escapeHtml(slot.time)}</span></label>
+                <label class="cabinet-booking-slot"><input type="radio" name="starts_at" value="${escapeHtml(slot.start)}" data-branch-id="${escapeHtml(slot.branch_id || "")}" ${slot.start === clientBookingSelectedStart ? "checked" : ""} /><span><b>${escapeHtml(slot.time)}</b>${!branchId && slot.branch_name ? `<small>${escapeHtml(slot.branch_name)}</small>` : ""}</span></label>
               `).join("")}</div>
             </section>
           `).join("") : `<div class="cabinet-booking-no-slots">
@@ -1297,11 +1296,9 @@
             : "/booking-api/client-booking/options";
           clientBookingOptions = await requestJson(optionsPath, { cache: "no-store" });
           const branchSelect = clientBookingForm.elements.branch_id;
-          branchSelect.innerHTML = `<option value="">Выберите филиал</option>${clientBookingOptions.branches.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}`;
+          branchSelect.innerHTML = `<option value="">Все филиалы</option>${clientBookingOptions.branches.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("")}`;
           renderClientBookingBranchMeta();
-          clientBookingForm.querySelector('[data-booking-step-toggle="services"]').disabled = true;
-          clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = true;
-          clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = true;
+          clientBookingForm.querySelectorAll("[data-booking-step-toggle]").forEach((trigger) => { trigger.disabled = false; });
           const today = new Date();
           const maxDate = new Date();
           maxDate.setDate(maxDate.getDate() + 30);
@@ -1309,6 +1306,8 @@
           clientBookingForm.elements.booking_date.max = maxDate.toISOString().slice(0, 10);
           clientBookingForm.elements.booking_date.value = today.toISOString().slice(0, 10);
           clientBookingCalendarMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          renderClientBookingServices();
+          renderClientBookingMasters();
           renderClientBookingCalendar();
           clientBookingMessage.textContent = "";
         } catch (error) {
@@ -1888,9 +1887,7 @@
           clientBookingForm.querySelectorAll('[name="service_ids"]').forEach((input) => { input.checked = false; });
           clientBookingForm.querySelector("[data-client-booking-service-search]").value = "";
           clientBookingForm.elements.master_id.value = "";
-          clientBookingForm.querySelector('[data-booking-step-toggle="services"]').disabled = !event.target.value;
-          clientBookingForm.querySelector('[data-booking-step-toggle="master"]').disabled = !event.target.value;
-          clientBookingForm.querySelector('[data-booking-step-toggle="datetime"]').disabled = !event.target.value;
+          clientBookingForm.querySelectorAll("[data-booking-step-toggle]").forEach((trigger) => { trigger.disabled = false; });
           renderClientBookingServices();
           renderClientBookingMasters();
           loadClientBookingMasters();
@@ -1898,9 +1895,16 @@
           return;
         }
         if (event.target.name === "service_ids") {
+          clientBookingForm.elements.master_id.value = "";
+          clientBookingSelectedStart = "";
+          clientBookingCompatibility = null;
+          clientBookingMasterPreviews = null;
+          clientBookingMastersLoadingKey = "";
+          clientBookingMastersRequestId += 1;
+          clientBookingCompatibilityRequestId += 1;
+          clientBookingForm.querySelector("[data-client-booking-submit]").disabled = true;
+          clientBookingSlots.innerHTML = '<legend>Свободное время</legend><p class="cabinet-history-empty">Откройте дату и время для загрузки свободных слотов.</p>';
           renderClientBookingMasters();
-          loadClientBookingMasters();
-          await loadClientBookingSlots();
           updateClientBookingSummaries();
           return;
         }
@@ -1919,6 +1923,10 @@
         }
         if (event.target.name === "starts_at") {
           clientBookingSelectedStart = event.target.value;
+          if (event.target.dataset.branchId) {
+            clientBookingForm.elements.branch_id.value = event.target.dataset.branchId;
+            renderClientBookingBranchMeta();
+          }
           await loadClientBookingSlots();
           clientBookingForm.querySelector("[data-client-booking-submit]").disabled =
             !selectedBookingServiceIds().length || !clientBookingForm.elements.master_id.value;
@@ -1969,11 +1977,16 @@
         if (trigger) {
           setClientBookingStep(trigger.dataset.bookingStepToggle);
           if (trigger.dataset.bookingStepToggle === "master" && clientBookingMasterPreviews === null) loadClientBookingMasters();
+          if (trigger.dataset.bookingStepToggle === "datetime") loadClientBookingSlots();
           return;
         }
         const nearestSlot = event.target.closest("[data-booking-nearest-slot]");
         if (nearestSlot) {
           clientBookingSelectedStart = nearestSlot.dataset.start;
+          if (nearestSlot.dataset.branchId) {
+            clientBookingForm.elements.branch_id.value = nearestSlot.dataset.branchId;
+            renderClientBookingBranchMeta();
+          }
           clientBookingForm.elements.master_id.value = nearestSlot.dataset.masterId;
           clientBookingForm.elements.booking_date.value = nearestSlot.dataset.start.slice(0, 10);
           clientBookingCalendarMonth = new Date(`${nearestSlot.dataset.start.slice(0, 7)}-01T00:00:00`);
@@ -2023,8 +2036,9 @@
       clientBookingForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const startsAt = clientBookingForm.querySelector('[name="starts_at"]:checked')?.value;
+        const branchId = Number(clientBookingForm.elements.branch_id.value || 0);
         const submit = clientBookingForm.querySelector("[data-client-booking-submit]");
-        if (!startsAt) return;
+        if (!startsAt || !branchId) return;
         if (publicBookingAnonymous) {
           publicBookingRegistration.hidden = false;
           publicBookingRegistrationForm.elements.first_name.focus();
@@ -2038,7 +2052,7 @@
           await requestJson("/booking-api/client-booking", {
             method: "POST",
             body: JSON.stringify({
-              branch_id: Number(clientBookingForm.elements.branch_id.value),
+              branch_id: branchId,
               service_ids: selectedBookingServiceIds(),
               master_id: Number(clientBookingForm.elements.master_id.value),
               starts_at: startsAt,
