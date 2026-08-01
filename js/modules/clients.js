@@ -65,6 +65,20 @@ function showClientToast(message) {
   }, 2600);
 }
 
+function showClientConfirm(message) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop client-confirm-backdrop";
+    backdrop.innerHTML = `<div class="modal-card client-confirm-card" role="dialog" aria-modal="true" aria-labelledby="client-confirm-title"><h3 id="client-confirm-title">Подтверждение</h3><p>${escapeHtml(message)}</p><div class="client-confirm-actions"><button type="button" class="client-confirm-cancel" data-client-confirm-cancel>Отмена</button><button type="button" class="client-delete-button" data-client-confirm-ok>Удалить</button></div></div>`;
+    const finish = (result) => { backdrop.remove(); resolve(result); };
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop || event.target.closest("[data-client-confirm-cancel]")) finish(false);
+      if (event.target.closest("[data-client-confirm-ok]")) finish(true);
+    });
+    document.body.append(backdrop);
+  });
+}
+
 const no = "Не указано";
 const notSpecified = "Не указано";
 const bonusTransactionTypes = {
@@ -232,7 +246,7 @@ function clientTable(items, ctx, search, pageSize, sort, direction) {
             <td>${escapeHtml(date(item.birth_date) || notSpecified)}</td>
             <td>${escapeHtml(statusLabel(item.status))}</td>
             <td>${escapeHtml(date(clientLastVisitAt(item)) || no)}</td>
-            <td><button type="button" class="ghost" data-delete-client="${escapeHtml(item.id)}">Удалить</button></td>
+            <td><button type="button" class="client-delete-icon-button" data-delete-client="${escapeHtml(item.id)}" aria-label="Удалить клиента" title="Удалить клиента"><img src="/fronted/icons/basket.svg" alt=""></button></td>
           </tr>
         `)}
       </tbody>
@@ -304,7 +318,7 @@ function clientAuthLinkForm(items) {
       <button class="primary">Сгенерировать ссылку</button>
       ${link ? `
         <label><span>Ссылка в личный кабинет</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
-        <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">Копировать</button>
+        <button type="button" class="ghost copy-icon-button" data-copy-auth-link="${escapeHtml(link)}" title="Копировать ссылку" aria-label="Копировать ссылку"><img src="/fronted/icons/copy.svg" alt=""></button>
       ` : ""}
       <p data-message></p>
     </form>
@@ -320,7 +334,7 @@ function clientRegistrationLinkBlock() {
       ${link ? `
         <div class="inline-form compact">
           <label><span>\u041e\u0431\u0449\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
-          <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button>
+          <button type="button" class="ghost copy-icon-button" data-copy-auth-link="${escapeHtml(link)}" title="Копировать ссылку" aria-label="Копировать ссылку"><img src="/fronted/icons/copy.svg" alt=""></button>
         </div>
       ` : `<p class="empty">\u0421\u0441\u044b\u043b\u043a\u0430 \u0435\u0449\u0451 \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d\u0430.</p>`}
     </div>
@@ -335,7 +349,7 @@ function selectedClientAuthLinkForm() {
       <button class="primary">\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443</button>
       ${link ? `
         <label><span>\u0421\u0441\u044b\u043b\u043a\u0430 \u0432 \u043b\u0438\u0447\u043d\u044b\u0439 \u043a\u0430\u0431\u0438\u043d\u0435\u0442, \u0430\u043a\u0442\u0438\u0432\u043d\u0430 5 \u043c\u0438\u043d\u0443\u0442</span><input value="${escapeHtml(link)}" readonly data-generated-auth-link></label>
-        <button type="button" class="ghost" data-copy-auth-link="${escapeHtml(link)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button>
+        <button type="button" class="ghost copy-icon-button" data-copy-auth-link="${escapeHtml(link)}" title="Копировать ссылку" aria-label="Копировать ссылку"><img src="/fronted/icons/copy.svg" alt=""></button>
       ` : ""}
       <p data-message></p>
     </form>
@@ -353,7 +367,7 @@ function selectedClientReferralLinkBlock(source) {
   );
   url.searchParams.set("referral_code", source.referral_code);
   const referralLink = url.toString();
-  return `<div class="client-referral-link-block"><h4>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</h4><div class="inline-form compact"><label><span>\u0421\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost" data-copy-auth-link="${escapeHtml(referralLink)}">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button><label class="checkbox"><input type="checkbox" data-client-referral-active="${escapeHtml(source.id)}" ${source.is_active ? "checked" : ""}> \u0410\u043a\u0442\u0438\u0432\u043d\u0430</label><label class="checkbox"><input type="checkbox" data-client-referral-one-time="${escapeHtml(source.id)}" ${source.one_time_accrual !== false ? "checked" : ""}> \u0420\u0430\u0437\u043e\u0432\u043e\u0435 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u0435</label></div></div>`;
+  return `<div class="client-referral-link-block"><h4>\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430</h4><div class="inline-form compact"><label><span>\u0421\u0441\u044b\u043b\u043a\u0430</span><input value="${escapeHtml(referralLink)}" readonly></label><button type="button" class="ghost copy-icon-button" data-copy-auth-link="${escapeHtml(referralLink)}" title="Копировать ссылку" aria-label="Копировать ссылку"><img src="/fronted/icons/copy.svg" alt=""></button><label class="checkbox"><input type="checkbox" data-client-referral-active="${escapeHtml(source.id)}" ${source.is_active ? "checked" : ""}> \u0410\u043a\u0442\u0438\u0432\u043d\u0430</label><label class="checkbox"><input type="checkbox" data-client-referral-one-time="${escapeHtml(source.id)}" ${source.one_time_accrual !== false ? "checked" : ""}> \u0420\u0430\u0437\u043e\u0432\u043e\u0435 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d\u0438\u0435</label></div></div>`;
 }
 
 function enabledRegistrationFields(orgId) {
@@ -603,6 +617,16 @@ function visitData(item) {
   return item?.visit || item || {};
 }
 
+function visitStatus(item) {
+  const source = visitData(item);
+  const value = String(
+    source.visit_status || source.status || item?.visit_status || item?.status || "",
+  ).trim().toLowerCase();
+  return ["scheduled", "completed", "cancelled", "no_show"].includes(value)
+    ? value
+    : "scheduled";
+}
+
 function visitAmount(visit, field) {
   return Number(visitData(visit)[field] || 0);
 }
@@ -733,7 +757,7 @@ function visitSelectedItemsMarkup(name, branchId, type, value = "") {
   return visitSelectedItems(value).map((selected) => {
     const item = items.find((candidate) => String(candidate.title || "").trim().toLowerCase() === selected.name.toLowerCase());
     const stock = type === "product" ? productStock(branchId, item) : null;
-    return `<div class="visit-selected-item"><span>${escapeHtml(selected.name)}</span>${type === "product" ? `<input type="number" min="1" value="${escapeHtml(selected.quantity)}" data-visit-item-quantity data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Количество">` : ""}<button type="button" class="ghost" data-visit-remove-item data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Удалить">×</button></div>`;
+    return `<div class="visit-selected-item"><span>${escapeHtml(selected.name)}</span>${type === "product" ? `<input type="number" min="1" value="${escapeHtml(selected.quantity)}" data-visit-item-quantity data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Количество">` : ""}<button type="button" class="client-delete-icon-button" data-visit-remove-item data-visit-item-name="${escapeHtml(name)}" data-visit-item-title="${escapeHtml(selected.name)}" aria-label="Удалить товар или услугу" title="Удалить товар или услугу"><img src="/fronted/icons/basket.svg" alt=""></button></div>`;
   }).join("");
 }
 
@@ -762,7 +786,7 @@ function visitEditDraftDefaults(visit) {
     visit_at: dateTimeInput(source.visit_at, source.branch_id),
     branch_id: source.branch_id ? String(source.branch_id) : "",
     employee_id: source.employee_id ? String(source.employee_id) : "",
-    visit_status: source.visit_status || "completed",
+    visit_status: visitStatus(visit),
     service_cost: String(splitCosts.serviceCost),
     product_cost: String(splitCosts.productCost),
     total_cost: String(splitCosts.totalCost),
@@ -985,7 +1009,7 @@ function visitCreateFormMarkup() {
     ${visitProductInputField("Товары", "product_names", visitDraft.branch_id, "product", visitDraft.product_names, errors.product_names, "visit-create-products")}
     ${visitInputField("Источник", "source", visitDraft.source)}
     ${visitInputField("Комментарий", "comment", visitDraft.comment)}
-    <button class="primary" ${hasVisitItems ? "" : "disabled"}>Добавить визит</button>
+    <button class="primary visit-create-submit" ${hasVisitItems ? "" : "disabled"}>Добавить визит</button>
     <p data-message></p>
   `;
 }
@@ -1218,6 +1242,7 @@ export async function openExternalClientCard(ctx, clientId, resources = {}) {
 function refreshSelectedClientModal(root, ctx) {
   const pageContent = root.querySelector("[data-page-content]") || root;
   pageContent.querySelector("[data-client-modal]")?.remove();
+  document.querySelectorAll("[data-visit-modal]").forEach((node) => node.remove());
   pageContent.insertAdjacentHTML("beforeend", modal(state.selectedClient));
   pageContent.querySelectorAll("[data-client-modal] [data-permission]").forEach((node) => {
     if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();
@@ -1286,7 +1311,7 @@ function modal(client) {
           ${readonly("Прибыль от клиента", metric ? money(metric.profit_amount) : "")}
           ${readonly("Стоимость привлечения", metric ? money(metric.acquisition_cost) : "")}
           <p data-message></p>
-          <button class="primary">Сохранить</button>
+          <button class="primary client-profile-save">Сохранить</button>
         </form>
         <div class="subpanel">
           <h3>\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u0441\u0441\u044b\u043b\u043a\u0438</h3>
@@ -1305,10 +1330,11 @@ function modal(client) {
             return `<table><tbody>
             ${rows(pageVisits, "Истории визитов пока нет.", (item) => {
               const visit = item.visit || item;
+              const visitStatusClass = visit.visit_status === "completed" ? "is-completed" : ["cancelled", "no_show"].includes(visit.visit_status) ? "is-cancelled" : "";
               return `<tr>
                 <td><button type="button" class="ghost" data-open-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at, visit.branch_id) || "Дата не указана")}</b><small>${escapeHtml(visitStatusLabel(visit.visit_status))}</small></button></td>
-                <td>${escapeHtml(visitStatusLabel(visit.visit_status))}</td>
-                <td><button type="button" class="ghost" data-delete-visit="${escapeHtml(visit.id)}">Удалить</button></td>
+                <td class="visit-history-status ${visitStatusClass}">${escapeHtml(visitStatusLabel(visit.visit_status))}</td>
+                <td><button type="button" class="client-delete-icon-button" data-delete-visit="${escapeHtml(visit.id)}" aria-label="Удалить визит" title="Удалить визит"><img src="/fronted/icons/basket.svg" alt=""></button></td>
               </tr>`;
             })}
           </tbody></table>
@@ -1524,7 +1550,7 @@ return `
         >
       </label>
 
-      <button class="primary">Найти</button>
+      <button class="primary client-search-submit">Найти</button>
 
       ${search
         ? `
@@ -1918,7 +1944,7 @@ export function bindClients(root, ctx) {
         });
         return;
       }
-      if (form.closest("[data-client-modal]")) {
+      if (form.closest("[data-client-modal]") || (form.matches("[data-visit-edit]") && root.querySelector("[data-client-modal]"))) {
         refreshSelectedClientModal(root, ctx);
         return;
       }
@@ -2035,7 +2061,7 @@ export function bindClients(root, ctx) {
       const link = copyAuthLinkButton.dataset.copyAuthLink;
       if (link) {
         await navigator.clipboard.writeText(link);
-        copyAuthLinkButton.textContent = "Скопировано";
+        showClientToast("Ссылка скопирована");
       }
       return;
     }
@@ -2057,7 +2083,7 @@ export function bindClients(root, ctx) {
 
     const deleteClientButton = event.target.closest("[data-delete-client]");
     if (deleteClientButton) {
-      if (!confirm("Удалить клиента?")) return;
+      if (!await showClientConfirm("Удалить клиента?")) return;
       await api.deleteClient(deleteClientButton.dataset.deleteClient);
       removeClient(deleteClientButton.dataset.deleteClient);
       if (state.selectedClient && String(state.selectedClient.id) === String(deleteClientButton.dataset.deleteClient)) {
@@ -2070,6 +2096,7 @@ export function bindClients(root, ctx) {
         state.selectedVisitDraft = {};
         state.clientAuthLink = null;
       }
+      showClientToast("Клиент удалён");
       ctx.reload();
       return;
     }
@@ -2095,7 +2122,7 @@ export function bindClients(root, ctx) {
     if (visitButton && state.selectedClient) {
       state.selectedVisit = (state.selectedClient.visits || []).find((item) => String((item.visit || item).id) === String(visitButton.dataset.openVisit));
       state.selectedVisitDraft = {};
-      root.querySelector("[data-visit-modal]")?.remove();
+      document.querySelectorAll("[data-visit-modal]").forEach((node) => node.remove());
       root.insertAdjacentHTML("beforeend", editableVisitModal(state.selectedClient));
       root.querySelectorAll("[data-visit-modal] [data-permission]").forEach((node) => {
         if (typeof ctx.can === "function" && !ctx.can(node.dataset.permission)) node.remove();

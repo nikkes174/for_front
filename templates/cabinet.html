@@ -12,23 +12,34 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</title>
     <link rel="stylesheet" href="/css/styles.css" />
-    <link rel="stylesheet" href="/css/cabinet.css?v=7-photo" />
+    <link rel="stylesheet" href="/css/cabinet.css?v=8-bottom-nav" />
   </head>
   <body>
     <main class="cabinet-shell">
       <section class="cabinet-content">
         <div class="cabinet-topbar">
-          <button type="button" class="cabinet-menu-button" data-cabinet-menu-open aria-label="Меню">
-            <span></span><span></span><span></span>
-          </button>
-          <button type="button" class="cabinet-notifications-button" data-cabinet-notifications-open aria-label="Уведомления">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          </button>
+          <strong class="cabinet-wordmark" data-cabinet-organization-name aria-label="Client cabinet">cabinet</strong>
         </div>
         <div class="cabinet-panel" data-cabinet-view="profile">
           <div class="cabinet-heading">
             <p>&#1051;&#1080;&#1095;&#1085;&#1099;&#1081; &#1082;&#1072;&#1073;&#1080;&#1085;&#1077;&#1090;</p>
-            <div class="cabinet-title-row"><h1 data-cabinet-title>&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</h1><button type="button" class="cabinet-edit-button" data-cabinet-edit aria-label="&#1048;&#1079;&#1084;&#1077;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;" title="&#1048;&#1079;&#1084;&#1077;&#1085;&#1080;&#1090;&#1100;">&#9998;</button></div>
+            <div class="cabinet-title-row">
+              <span class="cabinet-profile-avatar" data-cabinet-profile-avatar>
+                <span data-cabinet-profile-initials aria-hidden="true"></span>
+                <img data-cabinet-profile-photo alt="&#1060;&#1086;&#1090;&#1086; &#1082;&#1083;&#1080;&#1077;&#1085;&#1090;&#1072;" hidden>
+                <label class="cabinet-profile-photo-button" title="&#1047;&#1072;&#1075;&#1088;&#1091;&#1079;&#1080;&#1090;&#1100; &#1092;&#1086;&#1090;&#1086;">
+                  <input type="file" accept="image/*" data-cabinet-profile-photo-input hidden>
+                  <svg width="31" height="31" viewBox="0 0 31 31" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="1.77959" y="1.77959" width="27.2875" height="27.2875" rx="13.6437" fill="#4192EF"/>
+                    <rect x="1.77959" y="1.77959" width="27.2875" height="27.2875" rx="13.6437" stroke="white" stroke-width="3.55923"/>
+                    <rect x="14.2369" y="10.6777" width="2.37282" height="10.6777" rx="1.18641" fill="white"/>
+                    <rect x="20.7622" y="14.8301" width="2.37282" height="10.6777" rx="1.18641" transform="rotate(90 20.7622 14.8301)" fill="white"/>
+                  </svg>
+                </label>
+              </span>
+              <h1 data-cabinet-title>&#1052;&#1086;&#1080; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;</h1>
+              <button type="button" class="cabinet-edit-button" data-cabinet-edit aria-label="&#1048;&#1079;&#1084;&#1077;&#1085;&#1080;&#1090;&#1100; &#1076;&#1072;&#1085;&#1085;&#1099;&#1077;" title="&#1048;&#1079;&#1084;&#1077;&#1085;&#1080;&#1090;&#1100;">&#9998;</button>
+            </div>
           </div>
 
           <form class="profile-form" data-cabinet-form>
@@ -160,20 +171,13 @@
         </div>
       </section>
     </main>
-    <div class="modal-backdrop cabinet-menu-backdrop" data-cabinet-menu hidden>
-      <aside class="cabinet-drawer" aria-label="Меню личного кабинета">
-        <div class="cabinet-drawer-head">
-          <strong>Кабинет</strong>
-          <button type="button" class="cabinet-drawer-close" data-cabinet-menu-close aria-label="Закрыть">×</button>
-        </div>
-        <nav class="cabinet-drawer-nav">
-          <a class="cabinet-nav-link active" href="#my-data" data-cabinet-tab="profile"><img src="/fronted/icons/profile.svg" alt="" aria-hidden="true">Мои данные</a>
-          <a class="cabinet-nav-link active" href="#my-booking" data-cabinet-tab="client_booking"><img src="/fronted/icons/recorsd.svg" alt="" aria-hidden="true">Мои записи</a>
-          <a class="cabinet-nav-link" href="#achievements" data-cabinet-tab="achievements"><img src="/fronted/icons/achiv.svg" alt="" aria-hidden="true">Мои достижения</a>
-          <button type="button" class="cabinet-logout" data-cabinet-logout>Выход</button>
-        </nav>
-      </aside>
-    </div>
+    <nav class="cabinet-bottom-nav" aria-label="Навигация личного кабинета">
+      <a class="cabinet-bottom-nav-item cabinet-bottom-nav-item--profile active" href="#my-data" data-cabinet-tab="profile" aria-label="Profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="9" r="3"/><path d="M6.5 18c.9-2.4 3-3.7 5.5-3.7s4.6 1.3 5.5 3.7"/></svg></a>
+      <a class="cabinet-bottom-nav-item" href="#my-booking" data-cabinet-tab="client_booking" aria-label="Мои записи"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h3"/></svg></a>
+      <a class="cabinet-bottom-nav-item cabinet-bottom-nav-item--achievements" href="#achievements" data-cabinet-tab="achievements" aria-label="Achievements"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 3.4 3.2L12 5l4.6 5.2L20 7l-1.8 10H5.8L4 7Z"/><path d="M6 20h12"/></svg></a>
+      <button type="button" class="cabinet-bottom-nav-item cabinet-bottom-nav-item--notifications" data-cabinet-notifications-open aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 10a6 6 0 0 0-12 0c0 5.4-2 6-2 7h16c0-1-2-1.6-2-7Z"/><path d="M10 21h4"/></svg></button>
+      <button type="button" class="cabinet-bottom-nav-item cabinet-bottom-nav-item--logout" data-cabinet-logout aria-label="Выйти" title="Выйти"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/><path d="m15 8 4 4-4 4M19 12H9"/></svg></button>
+    </nav>
     <div class="modal-backdrop" data-public-booking-registration hidden>
       <form class="modal-card cabinet-public-registration" data-public-booking-registration-form>
         <div class="modal-head">
@@ -421,6 +425,23 @@
         });
         if (!response.ok) throw new Error("Не удалось обновить уведомления");
         return response.json();
+      }
+
+      const CABINET_ORGANIZATION_NAME_CACHE_PREFIX = "cabinet.organizationName:";
+
+      async function loadCabinetOrganizationName(organizationId) {
+        const id = Number(organizationId || 0);
+        const wordmark = document.querySelector("[data-cabinet-organization-name]");
+        if (!id || !wordmark) return;
+        const cacheKey = `${CABINET_ORGANIZATION_NAME_CACHE_PREFIX}${id}`;
+        const cachedName = localStorage.getItem(cacheKey);
+        if (cachedName) wordmark.textContent = cachedName;
+        if (cachedName) return;
+        const result = await requestJson(`/public-api/organizations/${encodeURIComponent(id)}/booking-reference`, { cache: "default" }).catch(() => null);
+        const name = String(result?.organization?.name || "").trim();
+        if (!name) return;
+        wordmark.textContent = name;
+        localStorage.setItem(cacheKey, name);
       }
 
       async function restoreStoredSession() {
@@ -1120,10 +1141,13 @@
               const duration = bookingDurationLabel(item.duration);
               const price = bookingServicePriceLabel(item);
               const imageUrls = [...new Set((Array.isArray(item.image_urls) ? item.image_urls : [item.image_url]).filter(Boolean))];
-              const photo = imageUrls.length ? `<img class="cabinet-booking-service-photo" src="${escapeHtml(imageUrls[0])}" alt="${escapeHtml(item.title || "")}" loading="lazy" decoding="async" fetchpriority="low" />` : "";
+              const photo = imageUrls.length ? `<div class="cabinet-booking-service-gallery" data-booking-service-gallery>
+                <button type="button" class="cabinet-booking-service-gallery-main" data-service-gallery-open data-service-gallery-images="${escapeHtml(JSON.stringify(imageUrls))}" data-service-gallery-title="${escapeHtml(item.title || "")}"><img src="${escapeHtml(imageUrls[0])}" alt="${escapeHtml(item.title || "")}" loading="lazy" decoding="async" fetchpriority="low" /></button>
+                ${imageUrls.length > 1 ? `<div class="cabinet-booking-service-thumbnails">${imageUrls.map((url, index) => `<button type="button" class="${index === 0 ? "active" : ""}" data-booking-service-thumbnail aria-label="Фото ${index + 1}"><img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" /></button>`).join("")}</div>` : ""}
+              </div>` : "";
               return `<article class="cabinet-booking-service">
+                ${photo}
                 <label class="cabinet-booking-service-choice">
-                  ${photo}
                   <span class="cabinet-booking-service-content"><span class="cabinet-booking-service-title"><b>${escapeHtml(item.title)}</b><span class="cabinet-booking-service-checkbox"><input type="checkbox" name="service_ids" value="${escapeHtml(item.id)}" ${selectedIds.has(Number(item.id)) ? "checked" : ""} /><span class="cabinet-booking-service-checkbox-frame" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12.5 10 19.5 21 5" /></svg></span></span></span>${duration ? `<small>${escapeHtml(duration)}</small>` : ""}${item.description ? `<span class="cabinet-booking-service-description">${escapeHtml(item.description)}</span>` : ""}${price ? `<strong>${escapeHtml(price)}</strong>` : ""}</span>
                 </label>
               </article>`;
@@ -1593,7 +1617,60 @@
           const control = form.elements[name];
           if (control) control.value = value;
         });
+        renderCabinetProfilePhoto(user);
       }
+
+      function renderCabinetProfilePhoto(user) {
+        const photo = document.querySelector("[data-cabinet-profile-photo]");
+        const initials = document.querySelector("[data-cabinet-profile-initials]");
+        if (!photo || !initials) return;
+        initials.textContent = [user?.first_name, user?.last_name]
+          .filter(Boolean)
+          .map((part) => String(part).trim().charAt(0))
+          .join("")
+          .slice(0, 2)
+          .toUpperCase() || "К";
+        if (user?.id && user?.photo_file_id) {
+          photo.src = `/crm-api/clients-core/clients/${encodeURIComponent(user.id)}/photo?v=${encodeURIComponent(user.updated_at || user.photo_file_id)}`;
+          photo.hidden = false;
+          initials.hidden = true;
+          return;
+        }
+        photo.removeAttribute("src");
+        photo.hidden = true;
+        initials.hidden = false;
+      }
+
+      document.querySelector("[data-cabinet-profile-photo-input]")?.addEventListener("change", async (event) => {
+        const input = event.currentTarget;
+        const file = input.files?.[0];
+        if (!file) return;
+        input.disabled = true;
+        try {
+          const data = new FormData();
+          data.append("file", file);
+          const response = await fetch("/auth/cabinet/photo", {
+            method: "POST",
+            credentials: "include",
+            body: data,
+          });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.detail || "Не удалось загрузить фото");
+          }
+          const updatedClient = await response.json();
+          currentClient = { ...(currentClient || {}), ...updatedClient };
+          cabinetData ||= {};
+          cabinetData.client = { ...(cabinetData.client || {}), ...updatedClient };
+          renderCabinetProfilePhoto(currentClient);
+          setMessage("Фото сохранено.", "success");
+        } catch (error) {
+          setMessage(error.message || "Не удалось загрузить фото.", "error");
+        } finally {
+          input.value = "";
+          input.disabled = false;
+        }
+      });
 
       async function consumeLink() {
         applyRegistrationFields([]);
@@ -1620,6 +1697,7 @@
             if (!result) throw new Error();
             const initialTab = cabinetTabFromHash();
             await loadCabinetSections(cabinetSectionsForTab(initialTab));
+            await loadCabinetOrganizationName(cabinetData?.organization_id || cabinetData?.client?.organization_id || currentClient?.organization_id);
             applyRegistrationFields(cabinetData?.registration_fields);
             fillCurrentUserCabinet(currentClient || result);
             renderHistorySections(cabinetData?.card_sections ?? defaultCardSections);
@@ -1935,6 +2013,17 @@
       });
 
       clientBookingForm.addEventListener("click", async (event) => {
+        const thumbnail = event.target.closest("[data-booking-service-thumbnail]");
+        if (thumbnail) {
+          event.preventDefault();
+          event.stopPropagation();
+          const gallery = thumbnail.closest("[data-booking-service-gallery]");
+          const mainImage = gallery?.querySelector(".cabinet-booking-service-gallery-main img");
+          const source = thumbnail.querySelector("img")?.src;
+          if (mainImage && source) mainImage.src = source;
+          gallery?.querySelectorAll("[data-booking-service-thumbnail]").forEach((item) => item.classList.toggle("active", item === thumbnail));
+          return;
+        }
         const galleryButton = event.target.closest("[data-service-gallery-open]");
         if (galleryButton) {
           event.preventDefault();

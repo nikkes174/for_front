@@ -282,18 +282,18 @@ function achievementConditionRow(condition = {}) {
         ${ACHIEVEMENT_PARAMETER_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}" ${condition.parameter === item.value ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
       </select></label>
       ${achievementConditionControls(condition)}
-      <button type="button" class="ghost" data-remove-achievement-condition>Удалить</button>
+      <button type="button" class="client-delete-icon-button" data-remove-achievement-condition aria-label="Delete" title="Delete"><img src="/fronted/icons/basket.svg" alt=""></button>
     </div>
   `;
 }
 
-function achievementConditionsFields(conditions = []) {
+function achievementConditionsFields(conditions = [], includeAddButton = true) {
   const rows = conditions.length ? conditions : [{}];
   return `
     <div class="achievement-builder modal-full">
       <div class="achievement-builder-head">
         <b>Условия</b>
-        <button type="button" class="ghost" data-add-achievement-condition>Добавить условие</button>
+        ${includeAddButton ? `<button type="button" class="ghost" data-add-achievement-condition>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435</button>` : ""}
       </div>
       <div class="achievement-conditions" data-achievement-conditions>
       ${rows.map((condition) => achievementConditionRow(condition)).join("")}
@@ -474,11 +474,16 @@ function categoryTypeById(categoryId) {
 }
 
 function branchWorkScheduleFields(schedule = {}) {
+  const slotInterval = Math.max(1, Number(schedule?.slot_interval_minutes) || 30);
+  const slotIntervalHours = Math.floor(slotInterval / 60);
+  const slotIntervalMinutes = slotInterval % 60;
   return `
     <label><span>Работа с</span><input name="work_schedule_from" type="time" value="${escapeHtml(schedule?.from || "")}"></label>
     <label><span>Работа до</span><input name="work_schedule_to" type="time" value="${escapeHtml(schedule?.to || "")}"></label>
     <label><span>Обед с</span><input name="work_schedule_lunch_from" type="time" value="${escapeHtml(schedule?.lunch_from || "")}"></label>
     <label><span>Обед до</span><input name="work_schedule_lunch_to" type="time" value="${escapeHtml(schedule?.lunch_to || "")}"></label>
+    <label><span>Шаг записи, часы</span><input name="work_schedule_slot_interval_hours" type="number" min="0" max="23" step="1" value="${slotIntervalHours}"></label>
+    <label><span>Шаг записи, минуты</span><input name="work_schedule_slot_interval_minutes" type="number" min="0" max="59" step="1" value="${slotIntervalMinutes}"></label>
   `;
 }
 
@@ -487,8 +492,11 @@ function branchWorkSchedulePayload(data) {
   const to = optional(data.work_schedule_to);
   const lunchFrom = optional(data.work_schedule_lunch_from);
   const lunchTo = optional(data.work_schedule_lunch_to);
-  return from || to || lunchFrom || lunchTo
-    ? { from, to, lunch_from: lunchFrom, lunch_to: lunchTo }
+  const slotIntervalHours = Math.max(0, Math.min(23, Number(data.work_schedule_slot_interval_hours) || 0));
+  const slotIntervalMinutePart = Math.max(0, Math.min(59, Number(data.work_schedule_slot_interval_minutes) || 0));
+  const slotIntervalMinutes = (slotIntervalHours * 60) + slotIntervalMinutePart;
+  return from || to || lunchFrom || lunchTo || slotIntervalMinutes
+    ? { from, to, lunch_from: lunchFrom, lunch_to: lunchTo, slot_interval_minutes: slotIntervalMinutes || 30 }
     : null;
 }
 
@@ -542,7 +550,7 @@ function userBookingBlockRow(block = {}) {
       <label><span>Дата по</span><input type="date" data-booking-block-date-to value="${escapeHtml(block.date_to || block.date_from || "")}"></label>
       <label><span>Время с</span><input type="time" data-booking-block-time-from value="${escapeHtml(block.time_from || "")}"></label>
       <label><span>Время по</span><input type="time" data-booking-block-time-to value="${escapeHtml(block.time_to || "")}"></label>
-      <button type="button" class="ghost danger" data-remove-user-booking-block>Удалить</button>
+      <button type="button" class="client-delete-icon-button" data-remove-user-booking-block aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>
     </div>
   `;
 }
@@ -652,7 +660,7 @@ function serviceImageAlbumField(item) {
       <span class="photo-upload-button">Добавить изображения</span>
     </label>
     <div class="service-image-previews" data-service-image-previews>
-      ${images.map((image) => `<figure class="service-image-preview" data-service-image-id="${escapeHtml(image.id || "")}"><img src="${escapeHtml(image.path)}" alt="Изображение услуги">${image.id ? `<button type="button" class="ghost" data-remove-service-image data-image-id="${escapeHtml(image.id)}">Удалить</button>` : ""}</figure>`).join("")}
+      ${images.map((image) => `<figure class="service-image-preview" data-service-image-id="${escapeHtml(image.id || "")}"><img src="${escapeHtml(image.path)}" alt="Изображение услуги">${image.id ? `<button type="button" class="client-delete-icon-button" data-remove-service-image data-image-id="${escapeHtml(image.id)}" aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>` : ""}</figure>`).join("")}
     </div>
   </div>`;
 }
@@ -662,7 +670,7 @@ function productItemActualAmountRow(item = {}) {
     <div class="achievement-condition-row" data-product-amount-row>
       <label><span>ID склада</span><input name="actual_amount_storage_id" type="number" step="1" min="0" value="${escapeHtml(item.storage_id ?? "")}"></label>
       <label><span>Количество</span><input name="actual_amount_value" type="number" step="0.01" min="0" value="${escapeHtml(item.amount ?? "")}"></label>
-      <button type="button" class="ghost" data-remove-product-amount>Удалить</button>
+      <button type="button" class="client-delete-icon-button" data-remove-product-amount aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>
     </div>
   `;
 }
@@ -673,11 +681,11 @@ function productItemActualAmountsFields(items = []) {
     <div class="achievement-builder modal-full">
       <div class="achievement-builder-head">
         <b>Остатки по складам</b>
-        <button type="button" class="ghost" data-add-product-amount>Добавить остаток</button>
       </div>
       <div class="achievement-conditions" data-product-amounts>
         ${rows.map((item) => productItemActualAmountRow(item)).join("")}
       </div>
+      <button type="button" class="ghost product-add-amount" data-add-product-amount>Добавить склад</button>
     </div>
   `;
 }
@@ -1623,6 +1631,7 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
           <p data-message></p>
         </form>
         ${entityList(scopedCategories, "Категорий пока нет", "category", (item) => item.name, (item) => categoryTypeLabel(item.type), {
+          deleteIcon: true,
           deleteLabel: "Удалить",
         })}
       `, categoriesHint)}
@@ -1630,11 +1639,13 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
 
     <div id="product-items" data-permission="settings.items.view">
       ${section(title, `
-        ${productItemCreateForm(scopedCategories, activeTab === "services" ? "услугу" : "товар")}
-        <form class="inline-form compact">
-          ${productItemCategoryFilterOptions(scopedCategories, selectedCategoryId, activeTab === "services" ? "data-service-filter-category" : "data-product-filter-category")}
-        </form>
+        ${productItemCreateForm(
+          scopedCategories,
+          activeTab === "services" ? "услугу" : "товар",
+          productItemCategoryFilterOptions(scopedCategories, selectedCategoryId, activeTab === "services" ? "data-service-filter-category" : "data-product-filter-category"),
+        )}
         ${entityList(scopedItems, activeTab === "services" ? "Услуг пока нет" : "Товаров пока нет", "productItem", (item) => item.title, productItemDetails, {
+          deleteIcon: true,
           deleteLabel: "Удалить",
         })}
       `, itemsHint)}
@@ -1651,11 +1662,13 @@ export function renderAchievementsPanel(achievementsList = cache.achievements ||
           <label><span>Клиент должен выполнить</span><select name="logic">
             ${ACHIEVEMENT_LOGIC_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
           </select></label>
-          ${achievementConditionsFields()}
-          <button class="primary" disabled>Добавить достижение</button>
+          ${achievementConditionsFields([], false)}
+          <button type="button" class="ghost achievement-add-condition" data-add-achievement-condition>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435</button>
+          <button class="primary achievement-create" disabled>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u0435</button>
           <p data-message></p>
         </form>
         ${entityList(achievementsList, "Достижений пока нет", "achievement", (item) => item.name, achievementDetails, {
+          deleteIcon: true,
           deleteLabel: "Удалить",
         })}
       `, "Достижения собираются из одного или нескольких параметров клиента.")}
@@ -1678,11 +1691,7 @@ function eventNameCell(item) {
     return `<button type="button" class="ghost" data-open-event-review="${escapeHtml(item.id)}">Отзыв</button>`;
   }
   if (item.entity_type !== "client_visit") return escapeHtml(label);
-  const visitWord = "Визит";
-  if (!label.startsWith(visitWord)) {
-    return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
-  }
-  return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${visitWord}</button>${escapeHtml(label.slice(visitWord.length))}`;
+  return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
 }
 
 function eventActionType(item) {
@@ -1692,8 +1701,14 @@ function eventActionType(item) {
     .toLowerCase();
   if (/cancel|cancelled|void|отмен/.test(value)) return "cancel";
   if (/create|created|register|создан/.test(value)) return "create";
-  if (/complete|completed|perform|paid|accrual|write_off|соверш|оплат|начисл/.test(value)) return "complete";
+  if (/complete|completed|perform|paid|accrual|write_off|соверш|заверш|оплат|начисл/.test(value)) return "complete";
   return "";
+}
+
+function eventRowClass(item) {
+  if (item.entity_type === "client_review") return "event-row-review";
+  const type = eventActionType(item);
+  return type ? `event-row-${type}` : "";
 }
 
 function eventsFilterPanel() {
@@ -1717,7 +1732,7 @@ function eventsContent() {
     ${eventsFilterPanel()}
     <table><thead><tr><th>\u0421\u043e\u0431\u044b\u0442\u0438\u0435</th><th>\u0414\u0435\u0442\u0430\u043b\u0438</th><th>\u0414\u0430\u0442\u0430 \u0438 \u0432\u0440\u0435\u043c\u044f</th></tr></thead><tbody>
       ${rows(pagedEventsData.pageItems, "\u0421\u043e\u0431\u044b\u0442\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442", (item) => `
-        <tr>
+        <tr class="${eventRowClass(item)}">
           <td>${eventNameCell(item)}</td>
           <td>${eventDetailsHtml(item)}</td>
           <td>${escapeHtml(formatDateTime(item.created_at))}</td>
@@ -1801,7 +1816,7 @@ function visitPhotoAlbumField(visit, visitId, stage, label) {
   return `<div class="visit-photo-album modal-full" data-visit-photo-album data-visit-photo-stage="${stage}" data-existing-images-count="${photos.length}">
     <div class="service-image-album-head"><strong>${escapeHtml(label)}</strong><small>До 10 изображений</small></div>
     <label class="photo-upload-control"><input name="visit_${stage}_photos" type="file" accept="image/*" multiple hidden><span class="photo-upload-button">Добавить изображения</span></label>
-    <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview" data-visit-photo-id="${escapeHtml(photo.id)}"><img src="/crm-api/client-history/visits/${escapeHtml(visitId)}/photos/${stage}/${escapeHtml(photo.id)}" alt="${escapeHtml(label)}"><button type="button" class="ghost" data-remove-visit-photo data-photo-id="${escapeHtml(photo.id)}">Удалить</button></figure>`).join("")}</div>
+    <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview" data-visit-photo-id="${escapeHtml(photo.id)}"><img src="/crm-api/client-history/visits/${escapeHtml(visitId)}/photos/${stage}/${escapeHtml(photo.id)}" alt="${escapeHtml(label)}"><button type="button" class="client-delete-icon-button" data-remove-visit-photo data-photo-id="${escapeHtml(photo.id)}" aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button></figure>`).join("")}</div>
   </div>`;
 }
 
@@ -1853,7 +1868,7 @@ function eventVisitModal() {
           ${visitPhotoAlbumField(visit, visitId, "after", "Фото после")}
           ${visitPhotoAlbumField(visit, visitId, "comment", "Фото к комментарию")}
           <p data-message></p>
-          <button class="primary">Сохранить визит</button>
+          <button class="primary">Save</button>
         </form>
       </div>
     </div>
@@ -1865,6 +1880,10 @@ function entityList(items, empty, type, title, subtitle = () => "", actions = {}
   const deleteType = actions.deleteType || type;
   const deleteId = actions.deleteId || ((item) => item.id);
   const deleteLabel = actions.deleteLabel || "Удалить";
+  const deleteIcon = actions.deleteIcon !== false;
+  const deleteControl = (itemDeleteId) => (itemDeleteId !== undefined && itemDeleteId !== null && itemDeleteId !== "") ? (deleteIcon
+    ? `<button type="button" class="client-delete-icon-button" data-delete-entity="${escapeHtml(deleteType)}" data-id="${escapeHtml(itemDeleteId)}" aria-label="Delete" title="Delete"><img src="/fronted/icons/basket.svg" alt=""></button>`
+    : `<button type="button" class="ghost" data-delete-entity="${escapeHtml(deleteType)}" data-id="${escapeHtml(itemDeleteId)}">${escapeHtml(deleteLabel)}</button>`) : "";
   return `
     <div class="entity-list">
       ${items.map((item) => {
@@ -1876,10 +1895,7 @@ function entityList(items, empty, type, title, subtitle = () => "", actions = {}
               <b>${escapeHtml(title(item))}</b>
               ${subtitleText ? `<span>${escapeHtml(subtitleText)}</span>` : ""}
             </button>
-            ${itemDeleteId !== undefined && itemDeleteId !== null && itemDeleteId !== ""
-              ? `<button type="button" class="ghost" data-delete-entity="${escapeHtml(deleteType)}" data-id="${escapeHtml(itemDeleteId)}">${escapeHtml(deleteLabel)}</button>`
-              : ""
-            }
+            ${deleteControl(itemDeleteId)}
           </div>
         `;
       }).join("")}
@@ -2088,7 +2104,7 @@ function userAccessTable(users, empty, memberships, branchMemberships, branches,
               <td>${escapeHtml(uniqueNames(userBranches.map((item) => nameById(workplaces, item.workplace_id))))}</td>
               <td>${escapeHtml(uniqueNames(roleIds.map((id) => nameById(roles, id))))}</td>
               <td>${escapeHtml(status)}</td>
-              <td><button type="button" class="ghost" data-delete-entity="userAccess" data-id="${escapeHtml(user.id)}">Удалить</button></td>
+              <td><button type="button" class="client-delete-icon-button" data-delete-entity="userAccess" data-id="${escapeHtml(user.id)}" aria-label="Delete" title="Delete"><img src="/fronted/icons/basket.svg" alt=""></button></td>
             </tr>
           `;
         }).join("")}
@@ -2139,9 +2155,10 @@ function productItemCategoryFilterOptions(categories, selected = "", attr = "dat
   `;
 }
 
-function productItemCreateForm(categories, title) {
+function productItemCreateForm(categories, title, categoryFilter = "") {
   return `
     <form class="inline-form compact" data-product-item-create data-permission="settings.items.create">
+      ${categoryFilter}
       ${selectField("Категория", "category_id", categories.map((category) => ({ id: category.id, name: category.name })), "", "Выберите категорию")}
       <label><span>Название</span><input name="title" required></label>
       <label><span>Цена</span><input name="price" type="number" step="0.01" min="0"></label>
@@ -2149,7 +2166,7 @@ function productItemCreateForm(categories, title) {
         <option value="true">Да</option>
         <option value="false">Нет</option>
       </select></label>
-      <button class="primary" disabled>Добавить ${escapeHtml(title)}</button>
+      <button class="primary product-create-submit" disabled>Добавить ${escapeHtml(title)}</button>
       <p data-message></p>
     </form>
   `;
@@ -2405,7 +2422,7 @@ async function openEntityModal(type, item) {
         <form class="modal-grid${type === "user" ? " user-profile-form" : ""}${isServiceProfile ? " service-profile-form" : ""}${type === "org" ? " organization-profile-form" : ""}" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
           ${modalFields(type, modalItem)}
           <p data-message></p>
-          <button class="primary">Сохранить</button>
+          <button class="primary${type === "achievement" ? " settings-achievement-save" : ""}">Сохранить</button>
         </form>
       </div>
     </div>

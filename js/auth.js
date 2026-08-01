@@ -1,5 +1,5 @@
 ﻿import { api } from "./api.js";
-import { ensureCss, formData, normalizePhone, render, root, setMessage } from "./dom.js";
+import { ensureCss, escapeHtml, formData, normalizePhone, render, root, setMessage } from "./dom.js";
 
 const params = new URLSearchParams(location.search);
 let mode = params.get("mode") === "register" || location.pathname === "/register" ? "register" : "login";
@@ -7,6 +7,7 @@ let twoFactor = null;
 let loginDraft = "";
 let twoFactorTarget = "/";
 let resetPasswordOpen = false;
+let codeMethodPopoverOpen = false;
 let loginContext = { is_client_domain: false };
 const SESSION_TOKEN_KEY = "loyalty.sessionToken";
 
@@ -65,6 +66,18 @@ function resetPasswordHtml() {
   `;
 }
 
+function codeMethodPopoverHtml() {
+  if (!codeMethodPopoverOpen) return "";
+  return `<div class="auth-code-popover" data-auth-code-popover role="dialog" aria-label="Способ получения кода">
+    <strong>Получить код</strong>
+    <p>Выберите один способ</p>
+    <label class="auth-code-method"><input type="radio" name="code_channel" value="max" checked><span>Через MAX</span></label>
+    <label class="auth-code-method"><input type="radio" name="code_channel" value="telegram"><span>Через Telegram</span></label>
+    <label class="auth-code-method disabled"><input type="radio" name="code_channel" value="sms" disabled><span>По СМС</span><small>Скоро</small></label>
+    <button type="button" class="primary" data-client-code-request>Продолжить</button>
+  </div>`;
+}
+
 function authHtml() {
   const isRegister = mode === "register";
   return `
@@ -76,13 +89,13 @@ function authHtml() {
           <button type="button" class="${isRegister ? "primary" : "ghost"}" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
         </div>
         ${isRegister ? '<label><span>\u0418\u043c\u044f</span><input name="name" required></label>' : ""}
-        <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${isRegister ? 'type="email" autocomplete="email"' : 'type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input'} required></label>
+        <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${isRegister ? 'type="email" autocomplete="email"' : `type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input value="${escapeHtml(loginDraft)}"`} required></label>
         ${isRegister ? '<label><span>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" data-phone-input></label>' : ""}
         <label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" ${isRegister ? "required" : ""}></label>
         ${isRegister ? '<label><span>\u041f\u043e\u0432\u0442\u043e\u0440 \u043f\u0430\u0440\u043e\u043b\u044f</span><input name="confirm" type="password" required></label>' : ""}
         <p data-message></p>
         <button class="primary">${isRegister ? "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442" : "\u0412\u043e\u0439\u0442\u0438"}</button>
-        ${!isRegister && loginContext.is_client_domain ? '<button type="button" class="ghost" data-client-max-login>\u0412\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 MAX</button>' : ""}
+        ${!isRegister && loginContext.is_client_domain ? `<div class="auth-code-popover-wrap"><button type="button" class="ghost" data-code-method-open aria-expanded="${codeMethodPopoverOpen}">Получить код</button>${codeMethodPopoverHtml()}</div>` : ""}
         ${!isRegister ? '<button type="button" class="ghost" data-reset-password-open>\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c</button>' : ""}
       </form>
       ${twoFactorHtml()}
@@ -147,17 +160,25 @@ root.addEventListener("click", async (event) => {
     return;
   }
 
-  const maxLogin = event.target.closest("[data-client-max-login]");
-  if (maxLogin) {
+  if (event.target.closest("[data-code-method-open]")) {
+    codeMethodPopoverOpen = !codeMethodPopoverOpen;
+    draw();
+    return;
+  }
+
+  const codeRequest = event.target.closest("[data-client-code-request]");
+  if (codeRequest) {
     if (!loginContext.is_client_domain) return;
-    const form = maxLogin.closest("[data-auth-form]");
+    const form = codeRequest.closest("[data-auth-form]");
     const data = formData(form);
     const phone = normalizePhone(data.login || loginDraft);
+    const channel = form.querySelector('[name="code_channel"]:checked')?.value || "max";
     setMessage(form, "");
     try {
       if (!phone) throw new Error("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
-      twoFactor = await api.startClientMaxAuth({ phone });
+      twoFactor = await api.startClientCodeAuth({ phone, channel });
       twoFactorTarget = sameHostUrl(twoFactor.redirect_url) || "/";
+      codeMethodPopoverOpen = false;
       draw();
     } catch (error) {
       setMessage(form, error.message);
@@ -169,6 +190,7 @@ root.addEventListener("click", async (event) => {
   if (!button) return;
   mode = button.dataset.mode;
   twoFactor = null;
+  codeMethodPopoverOpen = false;
   twoFactorTarget = "/";
   history.replaceState(null, "", `/auth.html?mode=${mode}`);
   draw();

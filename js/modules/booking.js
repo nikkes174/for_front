@@ -154,12 +154,15 @@ function calendarMarkup(data) {
   const minHour = 8;
   const maxHour = 24;
   const minuteHeight = calendarMinuteHeight();
+  const slotInterval = selectedBookingSlotInterval(data);
   const days = visibleCalendarDays(data);
+  const gridStartMinute = selectedBookingGridStart(data, days[0], minHour);
+  const gridOffset = ((gridStartMinute - minHour * 60) % slotInterval + slotInterval) % slotInterval;
   const dayCount = Math.max(days.length, 1);
   const calendarWidth = 58 + dayCount * 135;
   return `<div class="booking-calendar-viewport" data-booking-calendar aria-label="Календарь записей">
-    <div class="booking-calendar" style="--booking-half-hour-height:${30 * minuteHeight}px;--booking-hour-height:${60 * minuteHeight}px;grid-template-columns:58px repeat(${dayCount}, minmax(135px, 1fr));width:max(100%, ${calendarWidth}px)">
-      ${timeScale(minHour, maxHour, minuteHeight)}
+    <div class="booking-calendar" style="--booking-slot-height:${slotInterval * minuteHeight}px;--booking-slot-offset:${gridOffset * minuteHeight}px;grid-template-columns:58px repeat(${dayCount}, minmax(135px, 1fr));width:max(100%, ${calendarWidth}px)">
+      ${timeScale(minHour, maxHour, minuteHeight, slotInterval, gridOffset)}
       ${days.map((day) => dayColumn(day, data, minHour, maxHour, minuteHeight)).join("")}
     </div>
   </div>`;
@@ -346,7 +349,7 @@ function bookingVisitModal(visit) {
         <label><span>Филиал</span><select name="branch_id"><option value="">Выберите филиал</option>${branchOptions}</select></label>
         <label><span>Сотрудник</span><select name="employee_id"><option value="">Выберите сотрудника</option>${masterOptions}</select></label>
         <label><span>Клиент</span><input value="${escapeHtml(visit.full_name || visit.client_name || "")}" readonly></label>
-        <label><span>Статус</span><select name="visit_status">${STATUS_OPTIONS.map(([value, label]) => `<option value="${value}" ${visit.visit_status === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+        <label><span>Статус</span><select name="visit_status">${STATUS_OPTIONS.map(([value, label]) => `<option value="${value}" ${eventStatus(visit) === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
         <label><span>Стоимость</span><input name="total_cost" type="number" min="0" step="0.01" value="${escapeHtml(visit.total_cost ?? "")}"></label>
         <label><span>Скидка</span><input name="discount_amount" type="number" min="0" step="0.01" value="${escapeHtml(visit.discount_amount ?? "")}"></label>
         <label><span>Оплачено</span><input name="paid_amount" type="number" min="0" step="0.01" value="${escapeHtml(visit.paid_amount ?? "")}"></label>
@@ -372,20 +375,51 @@ function dayColumn(day, data, minHour, maxHour, minuteHeight) {
   </section>`;
 }
 
-function timeScale(minHour, maxHour, minuteHeight) {
-  const halfHourSlots = (maxHour - minHour) * 2 + 1;
+function timeScale(minHour, maxHour, minuteHeight, slotInterval, gridOffset) {
+  const totalMinutes = (maxHour - minHour) * 60;
+  const slotOffsets = Array.from(
+    { length: Math.floor((totalMinutes - gridOffset) / slotInterval) + 1 },
+    (_, index) => gridOffset + index * slotInterval,
+  );
   return `<div class="booking-time-scale">
     <div class="booking-time-spacer"></div>
     <div class="booking-time-body" style="height:${(maxHour - minHour) * 60 * minuteHeight}px">
-      ${Array.from({ length: halfHourSlots }, (_, index) => {
-        const isHalfHour = index % 2 === 1;
-        const hour = (minHour + index / 2) % 24;
-        const label = isHalfHour
-          ? "30"
-          : `${String(hour).padStart(2, "0")}<sup>00</sup>`;
-        return `<span class="${isHalfHour ? "booking-time-half" : "booking-time-hour"}" style="top:${index * 30 * minuteHeight}px">${label}</span>`;
+      ${slotOffsets.map((offset) => {
+        const absoluteMinutes = (minHour * 60) + offset;
+        const hour = Math.floor(absoluteMinutes / 60) % 24;
+        const minute = absoluteMinutes % 60;
+        const label = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        return `<span class="booking-time-hour" style="top:${offset * minuteHeight}px">${label}</span>`;
       }).join("")}
     </div>
+  </div>`;
+}
+
+function selectedBookingSlotInterval(data) {
+  const branch = data.branches?.find((item) => String(item.id) === String(bookingState.branchId));
+  return Math.max(1, Number(branch?.work_schedule?.slot_interval_minutes) || 30);
+}
+
+function selectedBookingGridStart(data, day, minHour) {
+  const branch = data.branches?.find((item) => String(item.id) === String(bookingState.branchId));
+  const schedule = branch?.work_schedule || {};
+  const dayKey = day ? ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][day.getDay()] : "";
+  const activeSchedule = schedule?.[dayKey] && typeof schedule[dayKey] === "object" ? schedule[dayKey] : schedule;
+  const [hours, minutes] = String(activeSchedule?.from || `${String(minHour).padStart(2, "0")}:00`).split(":").map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes) ? (hours * 60) + minutes : minHour * 60;
+}
+
+function bookingSlotIntervalSettings(data) {
+  const branch = data.branches?.find((item) => String(item.id) === String(bookingState.branchId));
+  if (!branch) {
+    return `<div class="booking-slot-settings"><span>\u0428\u0430\u0433 \u043e\u043d\u043b\u0430\u0439\u043d-\u0437\u0430\u043f\u0438\u0441\u0438</span><small>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0438\u043b\u0438\u0430\u043b</small></div>`;
+  }
+  const interval = selectedBookingSlotInterval(data);
+  return `<div class="booking-slot-settings" data-booking-slot-settings data-branch-id="${escapeHtml(branch.id)}">
+    <strong>\u0428\u0430\u0433 \u043e\u043d\u043b\u0430\u0439\u043d-\u0437\u0430\u043f\u0438\u0441\u0438</strong>
+    <label><span>\u0427\u0430\u0441\u044b</span><input type="number" min="0" max="23" step="1" value="${Math.floor(interval / 60)}" data-booking-slot-hours></label>
+    <label><span>\u041c\u0438\u043d\u0443\u0442\u044b</span><input type="number" min="0" max="59" step="1" value="${interval % 60}" data-booking-slot-minutes></label>
+    <button type="button" class="ghost" data-save-booking-slot-interval>\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c</button>
   </div>`;
 }
 
@@ -462,6 +496,7 @@ export async function booking(ctx) {
         <button type="button" class="ghost" data-booking-calendar-toggle>Календарь</button>
         <button type="button" class="ghost" data-booking-week="7">›</button>
         <strong>${rangeStart.getDate()} ${MONTH_NAMES[rangeStart.getMonth()]} — ${rangeEnd.getDate()} ${MONTH_NAMES[rangeEnd.getMonth()]}</strong>
+        ${bookingSlotIntervalSettings(data)}
         ${datePickerMarkup(rangeStart, rangeEnd)}
       </div>
       </div>
@@ -485,6 +520,32 @@ export async function booking(ctx) {
 
 export function bindBooking(root, ctx) {
   root.addEventListener("click", async (event) => {
+    const saveSlotInterval = event.target.closest("[data-save-booking-slot-interval]");
+    if (saveSlotInterval) {
+      const settings = saveSlotInterval.closest("[data-booking-slot-settings]");
+      const branch = bookingState.calendarData?.branches?.find((item) => String(item.id) === String(settings?.dataset.branchId));
+      const hours = Math.max(0, Math.min(23, Number(settings?.querySelector("[data-booking-slot-hours]")?.value) || 0));
+      const minutes = Math.max(0, Math.min(59, Number(settings?.querySelector("[data-booking-slot-minutes]")?.value) || 0));
+      const interval = (hours * 60) + minutes;
+      if (!branch || interval < 1) {
+        alert("\u0428\u0430\u0433 \u043e\u043d\u043b\u0430\u0439\u043d-\u0437\u0430\u043f\u0438\u0441\u0438 \u0434\u043e\u043b\u0436\u0435\u043d \u0431\u044b\u0442\u044c \u043d\u0435 \u043c\u0435\u043d\u044c\u0448\u0435 \u043e\u0434\u043d\u043e\u0439 \u043c\u0438\u043d\u0443\u0442\u044b.");
+        return;
+      }
+      saveSlotInterval.disabled = true;
+      try {
+        await api.updateBranch(branch.id, {
+          work_schedule: { ...(branch.work_schedule || {}), slot_interval_minutes: interval },
+        });
+        branch.work_schedule = { ...(branch.work_schedule || {}), slot_interval_minutes: interval };
+        renderCalendar(root);
+        showBookingToast("\u0428\u0430\u0433 \u043e\u043d\u043b\u0430\u0439\u043d-\u0437\u0430\u043f\u0438\u0441\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d");
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        saveSlotInterval.disabled = false;
+      }
+      return;
+    }
     const removeVisitPhoto = event.target.closest("[data-remove-booking-visit-photo]");
     if (removeVisitPhoto) {
       const form = removeVisitPhoto.closest("[data-booking-visit-form]");

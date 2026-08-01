@@ -19,6 +19,32 @@ const REGISTRATION_FIELD_NAMES = [
 ];
 const DEFAULT_CLIENT_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
 
+function showLoyaltyToast(message) {
+  document.querySelector("[data-loyalty-toast]")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "booking-toast";
+  toast.dataset.loyaltyToast = "";
+  toast.setAttribute("role", "status");
+  toast.innerHTML = '<span aria-hidden="true">✓</span><b>' + escapeHtml(message) + "</b>";
+  document.body.append(toast);
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+  window.setTimeout(() => { toast.classList.remove("is-visible"); window.setTimeout(() => toast.remove(), 200); }, 2600);
+}
+
+function showLoyaltyConfirm(message) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop client-confirm-backdrop";
+    backdrop.innerHTML = `<div class="modal-card client-confirm-card" role="dialog" aria-modal="true"><h3>Подтверждение</h3><p>${escapeHtml(message)}</p><div class="client-confirm-actions"><button type="button" class="client-confirm-cancel" data-loyalty-confirm-cancel>Отмена</button><button type="button" class="client-delete-button" data-loyalty-confirm-ok>Удалить</button></div></div>`;
+    const finish = (result) => { backdrop.remove(); resolve(result); };
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop || event.target.closest("[data-loyalty-confirm-cancel]")) finish(false);
+      if (event.target.closest("[data-loyalty-confirm-ok]")) finish(true);
+    });
+    document.body.append(backdrop);
+  });
+}
+
 const loyaltyState = {
   selectedClientId: null,
   levelParams: "",
@@ -467,7 +493,7 @@ function editButton(kind, item, label) {
 }
 
 function deleteButton(kind, id) {
-  return `<button type="button" class="danger" data-loyalty-delete-kind="${escapeHtml(kind)}" data-loyalty-delete="${escapeHtml(id)}">${L.delete}</button>`;
+  return `<button type="button" class="client-delete-icon-button" data-loyalty-delete-kind="${escapeHtml(kind)}" data-loyalty-delete="${escapeHtml(id)}" aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>`;
 }
 
 function actionButton(label, attr, id, className = "ghost") {
@@ -836,11 +862,11 @@ function clientSelector(orgId, tab, clients, selectedClient, filters, hasNextPag
 function rulesSection(ctx, rules, selectedClient, bonusTypes, levels, referrals) {
   const bonusRules = (rules || []).filter((item) => !isTransitionRule(item));
   return `
-    <div class="subpanel">${titleWithHint(L.rulesTitle, L.rulesHint)}
+    <div class="subpanel loyalty-rules-section">${titleWithHint(L.rulesTitle, L.rulesHint)}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-rule-create>${field(L.name, "name")}${accrualRuleTypeField()}${select(L.bonusType, "bonus_type", currentBonusTypeOptions(bonusTypes), "")}${accrualUnitField("amount", "0", loyaltyState.ruleExtras.level_params)}${field(L.termDays, "expires_in_days", "", 'type="number"')}${select(L.clientLevel, "client_level", [{ value: "", label: "Без уровня" }, ...levelOptions(levels, loyaltyState.ruleExtras.client_level)], loyaltyState.ruleExtras.client_level).replace('name="client_level"', 'name="client_level" data-optional="true"')}${select("\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u044b\u0435 \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u044b", "referral_source_id", referralProgramOptions(referrals), "").replace('name="referral_source_id"', 'name="referral_source_id" data-optional="true"')}<button class="primary" disabled>${L.createRule}</button><p data-message></p></form>` : ""}
       <table><tbody>${rows(bonusRules, L.rulesEmpty, (item) => {
         const label = item.client_level ? `${item.name} (${L.clientLevel}: ${item.client_level})` : item.name;
-        return `<tr><td>${editButton("rule", item, label)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
+        return `<tr class="loyalty-rule-row"><td>${editButton("rule", item, label)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
       })}</tbody></table>
     </div>
     ${transitionRulesSection(ctx, rules, levels, selectedClient)}`;
@@ -853,12 +879,12 @@ function isTransitionRule(item) {
 function transitionRulesSection(ctx, rules, levels, selectedClient) {
   const transitionRules = (rules || []).filter(isTransitionRule);
   return `
-    <div class="subpanel">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
+    <div class="subpanel loyalty-transition-rules-section">${titleWithHint("Правила перехода", "Условия автоматического перехода клиента на уровень.")}
       ${canCreate(ctx, "rules") ? `<form class="inline-form compact" data-loyalty-transition-rule-create>
         ${select("Условие перехода", "trigger_type", [{ value: "purchase_amount", label: "Сумма покупок клиента больше" }, { value: "event_created", label: "Событие" }], "purchase_amount")}
         <label data-transition-condition-field><span data-transition-condition-label>Сумма покупок клиента больше</span><input data-transition-purchase-threshold name="purchase_threshold" value="0" type="number" step="0.01" min="0"><select data-transition-event-type name="event_type" hidden><option value="created">Создание</option></select></label>
         ${select("\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u043d\u0430 \u0443\u0440\u043e\u0432\u0435\u043d\u044c", "client_level", levelOptions(levels), "").replace('name="client_level"', 'name="client_level" data-optional="true"')}
-        <button class="primary" disabled>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u0430\u0432\u0438\u043b\u043e</button>
+        <button class="primary loyalty-transition-create" disabled>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u0430\u0432\u0438\u043b\u043e</button>
         <p data-message></p>
       </form>` : ""}
       <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
@@ -866,7 +892,8 @@ function transitionRulesSection(ctx, rules, levels, selectedClient) {
         const targetLevel = item.client_level || "Следующий уровень";
         const apply = selectedClient ? `<button type="button" class="ghost" data-apply-rule="${escapeHtml(item.id)}" data-transition-rule="1">${L.apply}</button>` : "";
         const applyAll = canCreate(ctx, "rules") ? `<button type="button" class="ghost" data-apply-rule-all="${escapeHtml(item.id)}">Применить ко всем</button>` : "";
-        return `<tr><td>${escapeHtml(`Сумма покупок > ${threshold}`)}</td><td>${escapeHtml(targetLevel)}</td><td class="actions">${apply}${applyAll}${deleteButtonIfAllowed(ctx, "rule", item.id)}</td></tr>`;
+        const deleteAction = canDelete(ctx, "rule") ? `<button type="button" class="client-delete-button" data-loyalty-delete-kind="rule" data-loyalty-delete="${escapeHtml(item.id)}">Удалить</button>` : "";
+        return `<tr class="loyalty-transition-rule-row"><td>${escapeHtml(`Сумма покупок > ${threshold}`)}</td><td>${escapeHtml(targetLevel)}</td><td class="transition-rule-actions">${apply}</td><td class="actions"><div class="loyalty-rule-actions-popover"><button type="button" class="loyalty-rule-settings" aria-label="Действия правила" title="Действия правила"><img src="/fronted/icons/settings_org.svg" alt=""></button><div class="loyalty-rule-actions-menu">${applyAll}${deleteAction}</div></div></td></tr>`;
       })}</tbody></table>
       ${loyaltyState.actionResult ? `<p class="empty">${escapeHtml(loyaltyState.actionResult)}</p>` : ""}
     </div>`;
@@ -980,7 +1007,7 @@ function selectedVisitDetails(visits) {
 
 function visitsPreview(visits) {
   const items = (visits || []).slice(0, 8);
-  if (!items.length) return `<p class="empty">\u0412\u0438\u0437\u0438\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</p>`;
+  if (!items.length) return "";
   return `
     <div class="entity-list compact-list">
       ${items.map((item) => {
@@ -1046,7 +1073,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_chat",
-      html: cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", `<p class="empty">\u0427\u0430\u0442 \u0431\u0443\u0434\u0435\u0442 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d \u043f\u043e\u0441\u043b\u0435 backend-\u043b\u043e\u0433\u0438\u043a\u0438.</p>`, enabledSections.includes("client_chat")),
+      html: cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", "", enabledSections.includes("client_chat")),
     },
   ];
   const order = new Map(enabledSections.map((key, index) => [key, index]));
@@ -1059,7 +1086,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
 function personalLinkPreview(selectedClient) {
   const authPath = loyaltyState.clientAuthLink?.url || loyaltyState.clientAuthLink?.path || "";
   const link = authPath ? new URL(authPath, window.location.origin).toString() : "";
-  if (!selectedClient) return `<p class="empty">Выберите клиента, чтобы сгенерировать ссылку.</p>`;
+  if (!selectedClient) return "";
   return `<div class="inline-form compact"><button type="button" class="primary" data-loyalty-client-auth-link>Сгенерировать ссылку</button>${link ? `<label><span>Ссылка в личный кабинет, активна 5 минут</span><input value="${escapeHtml(link)}" readonly></label><button type="button" class="ghost" data-loyalty-copy-auth-link="${escapeHtml(link)}">Копировать</button>` : ""}</div>`;
 }
 
@@ -1070,7 +1097,7 @@ function clientCabinetCurrencySelect(bonusTypes, enabledSections) {
     ? selected.map((item) => item.name || item.code).join(", ")
     : "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0430\u043b\u044e\u0442\u044b";
   return `
-    <label>
+    <label class="client-card-currency-select">
       <span>\u0412\u0430\u043b\u044e\u0442\u044b \u0432 \u043a\u0430\u0431\u0438\u043d\u0435 \u043a\u043b\u0438\u0435\u043d\u0442\u0430</span>
       <details class="checkbox-select">
         <summary>${escapeHtml(summary)}</summary>
@@ -1113,11 +1140,6 @@ function cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalance
         </div>
       ` : ""}
       ${loyaltyState.actionResult ? `<p class="empty">${escapeHtml(loyaltyState.actionResult)}</p>` : ""}
-      <div class="card-bottom-switch">
-        <button type="button" class="${mode === "client" ? "active" : ""}" data-card-mode="client">\u041a\u0430\u0440\u0442\u0430</button>
-        <button type="button" class="${mode === "chat" ? "active" : ""}" data-card-mode="chat">\u0427\u0430\u0442</button>
-      </div>
-      ${mode === "chat" ? `<div class="readonly-field"><span>\u0427\u0430\u0442</span><b>\u0418\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441 \u0447\u0430\u0442\u0430 \u043f\u043e\u043a\u0430 \u0431\u0435\u0437 backend-\u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f.</b></div>` : ""}
     </div>
   `;
 }
@@ -1585,6 +1607,16 @@ export function bindLoyalty(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const settingsButton = event.target.closest(".loyalty-rule-settings");
+    if (settingsButton) {
+      event.preventDefault();
+      const popover = settingsButton.closest(".loyalty-rule-actions-popover");
+      root.querySelectorAll(".loyalty-rule-actions-popover.is-open").forEach((item) => {
+        if (item !== popover) item.classList.remove("is-open");
+      });
+      popover?.classList.toggle("is-open");
+      return;
+    }
     const tasksButton = event.target.closest("[data-go-tasks]");
     if (tasksButton) {
       tasksButton.closest("[data-loyalty-modal]")?.remove();
@@ -1694,7 +1726,7 @@ export function bindLoyalty(root, ctx) {
           window.alert("Недостаточно прав для удаления.");
           return;
         }
-        if (!window.confirm(L.confirmDelete)) return;
+        if (!await showLoyaltyConfirm(L.confirmDelete)) return;
         const id = Number(deleteButton.dataset.loyaltyDelete);
         const kind = deleteButton.dataset.loyaltyDeleteKind;
         if (kind === "rule") await api.deleteRule(id);
@@ -1703,6 +1735,7 @@ export function bindLoyalty(root, ctx) {
         else if (kind === "bonus") await api.deleteBonus(id);
         else if (kind === "referral") await api.deleteReferralSource(id);
         else if (kind === "promotion") await api.deletePromotion(id);
+        showLoyaltyToast("Удаление выполнено");
         ctx.reload();
         return;
       }
