@@ -132,7 +132,7 @@ export async function finance(ctx) {
             <div>
               <h2>Базовые ставки</h2>
             </div>
-            <button type="button" class="secondary" data-finance-save-rules>Сохранить ставки</button>
+            <button type="button" class="primary" data-finance-save-rules>Сохранить ставки</button>
           </div>
           <div class="finance-rules-grid finance-base-grid">
             ${ruleInput("base_services_percent", "Базовый % услуг", rules.base_services_percent)}
@@ -162,7 +162,6 @@ export async function finance(ctx) {
 
       <div class="finance-summary">
         <div class="stat"><span>Завершённых визитов</span><strong>${Number(totals.visits_count || 0)}</strong></div>
-        <div class="stat"><span>Уникальных клиентов</span><strong>${Number(totals.clients_count || 0)}</strong></div>
         <div class="stat"><span>Выручка по услугам</span><strong>${money(totals.services_base)}</strong></div>
         <div class="stat"><span>Выручка по товарам</span><strong>${money(totals.goods_base)}</strong></div>
         <div class="stat finance-salary-stat"><span>Зарплата по правилам</span><strong>${money(totals.salary_total)}</strong></div>
