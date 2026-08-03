@@ -228,6 +228,8 @@ export const api = {
   bookingCalendar: (orgId, dateFrom, dateTo, viewBy, branchId = "", employeeId = "") => request(`/booking-api/calendar?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}&view_by=${viewBy}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),
   updateBookingVisitStatus: (id, visitStatus) => request(`/booking-api/visits/${id}/status`, { method: "PATCH", body: JSON.stringify({ visit_status: visitStatus }) }),
   financePayroll: (orgId, dateFrom, dateTo, branchId = "", employeeId = "") => request(`/finanse-api/payroll?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+  updateFinanceRules: (orgId, body) => request(`/finanse-api/salary-rules/${orgId}`, { method: "PUT", body: JSON.stringify(body) }),
+  updateFinanceEmployeePlan: (orgId, employeeId, enabled) => request(`/finanse-api/salary-plans/${orgId}/employees/${employeeId}`, { method: "PUT", body: JSON.stringify({ enabled }) }),
   clientAccounts: (id) => request(`/crm-api/client-accounts/clients/${id}`),
   clientSegments: (orgId) => request(`/crm-api/client-segments?organization_id=${orgId}`),
   clientCategories: (id) => request(`/crm-api/clients-core/category-links?client_id=${id}`),
