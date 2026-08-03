@@ -965,6 +965,7 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
   text-align: left;
 }
 .loyalty-rule-actions-popover { position: relative; display: inline-flex; }
+.loyalty-rule-actions-popover::before { content: ""; position: absolute; inset: -50px; }
 .loyalty-rule-settings { display: inline-grid; width: 40px; height: 40px; min-height: 40px; padding: 8px; place-items: center; border: 0; border-radius: 7px; background: transparent; }
 .loyalty-rule-settings:hover { background: #eef2f7; }
 .loyalty-rule-settings img { width: 24px; height: 24px; display: block; }
@@ -1110,6 +1111,17 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
   box-shadow: none;
 }
 
+.notification-image-previews {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+.notification-image-previews[hidden] { display: none; }
+.notification-image-previews figure { position: relative; min-width: 0; margin: 0; }
+.notification-image-previews img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.notification-image-previews button { position: absolute; top: 4px; right: 4px; display: grid; width: 22px; height: 22px; padding: 0; place-items: center; border: 0; border-radius: 50%; background: rgb(17 24 39 / 78%); color: #fff; font-size: 17px; line-height: 1; cursor: pointer; }
+
 .notification-composer-toolbar {
   display: flex;
   align-items: center;
@@ -1164,7 +1176,7 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 .notification-config-warning { margin: 0; }
 .notification-channels-field { width: max-content; max-width: 100%; }
 .notification-composer-toolbar .notification-counter { margin-left: 2px; font-size: 11px; }
-.notification-composer-toolbar .notification-submit {
+.notification-composer-toolbar .notification-attach {
   display: inline-grid;
   width: 36px;
   min-width: 36px;
@@ -1172,11 +1184,37 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
   min-height: 36px;
   margin-left: auto;
   padding: 0;
+  border: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  transition: background-color .2s ease;
+}
+.notification-composer-toolbar .notification-attach:hover { background: #eef2f7; }
+.notification-composer-toolbar .notification-submit {
+  display: inline-grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  margin-left: 0;
+  padding: 0;
   place-items: center;
   border-radius: 50%;
 }
 .notification-composer-toolbar .notification-submit svg { width: 18px; height: 18px; }
 
+.event-row-create > td:first-child > button,
+.event-row-complete > td:first-child > button,
+.event-row-cancel > td:first-child > button,
+.event-row-review > td:first-child > button {
+  width: 150px;
+  min-width: 150px;
+  box-sizing: border-box;
+  text-align: center;
+}
 .event-row-create > td:first-child > button { border-color: #d0d5dd; background: #f2f4f7; }
 .event-row-complete > td:first-child > button { border-color: #86efac; background: #dcfce7; }
 .event-row-cancel > td:first-child > button { border-color: #fca5a5; background: #fee2e2; }
@@ -1540,6 +1578,10 @@ td small { display: block; color: #667085; margin-top: 4px; }
   padding: 20px;
   display: grid;
   gap: 16px;
+}
+
+.auth-code-card {
+  width: min(420px, calc(100vw - 32px));
 }
 
 .task-added-card {

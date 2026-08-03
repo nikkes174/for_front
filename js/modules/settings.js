@@ -475,15 +475,12 @@ function categoryTypeById(categoryId) {
 
 function branchWorkScheduleFields(schedule = {}) {
   const slotInterval = Math.max(1, Number(schedule?.slot_interval_minutes) || 30);
-  const slotIntervalHours = Math.floor(slotInterval / 60);
-  const slotIntervalMinutes = slotInterval % 60;
   return `
     <label><span>Работа с</span><input name="work_schedule_from" type="time" value="${escapeHtml(schedule?.from || "")}"></label>
     <label><span>Работа до</span><input name="work_schedule_to" type="time" value="${escapeHtml(schedule?.to || "")}"></label>
     <label><span>Обед с</span><input name="work_schedule_lunch_from" type="time" value="${escapeHtml(schedule?.lunch_from || "")}"></label>
     <label><span>Обед до</span><input name="work_schedule_lunch_to" type="time" value="${escapeHtml(schedule?.lunch_to || "")}"></label>
-    <label><span>Шаг записи, часы</span><input name="work_schedule_slot_interval_hours" type="number" min="0" max="23" step="1" value="${slotIntervalHours}"></label>
-    <label><span>Шаг записи, минуты</span><input name="work_schedule_slot_interval_minutes" type="number" min="0" max="59" step="1" value="${slotIntervalMinutes}"></label>
+    <label><span>Интервал онлайн-записи, минут</span><input name="work_schedule_slot_interval_minutes" type="number" min="1" max="1440" step="1" value="${slotInterval}"></label>
   `;
 }
 
@@ -492,11 +489,9 @@ function branchWorkSchedulePayload(data) {
   const to = optional(data.work_schedule_to);
   const lunchFrom = optional(data.work_schedule_lunch_from);
   const lunchTo = optional(data.work_schedule_lunch_to);
-  const slotIntervalHours = Math.max(0, Math.min(23, Number(data.work_schedule_slot_interval_hours) || 0));
-  const slotIntervalMinutePart = Math.max(0, Math.min(59, Number(data.work_schedule_slot_interval_minutes) || 0));
-  const slotIntervalMinutes = (slotIntervalHours * 60) + slotIntervalMinutePart;
+  const slotIntervalMinutes = Math.max(1, Math.min(1440, Number(data.work_schedule_slot_interval_minutes) || 30));
   return from || to || lunchFrom || lunchTo || slotIntervalMinutes
-    ? { from, to, lunch_from: lunchFrom, lunch_to: lunchTo, slot_interval_minutes: slotIntervalMinutes || 30 }
+    ? { from, to, lunch_from: lunchFrom, lunch_to: lunchTo, slot_interval_minutes: slotIntervalMinutes }
     : null;
 }
 

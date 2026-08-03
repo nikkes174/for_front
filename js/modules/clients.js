@@ -181,6 +181,9 @@ function saveClientListFilters(orgId, filters) {
 function filterClientsBySearch(items, search) {
   const query = String(search || "").trim().toLowerCase();
   if (!query) return items;
+  const messengerMatch = query.match(/^(tg(?:_id)?|telegram(?:_id)?|max(?:_id)?)\s*[:=#]?\s*(\d+)$/i);
+  const messengerField = messengerMatch?.[1].startsWith("max") ? "max" : "telegram";
+  const messengerId = messengerMatch?.[2] || "";
   const phoneQuery = normalizePhone(query);
   return items.filter((client) => [
     client.full_name,
@@ -192,12 +195,17 @@ function filterClientsBySearch(items, search) {
     client.phone,
     client.email,
     client.telegram_id,
+    client.tg_id,
     client.max_id,
     client.vk_id,
   ].some((value) => String(value || "").toLowerCase().includes(query)) || (
     phoneQuery.length === 11 && [client.primary_phone, client.secondary_phone, client.phone]
       .some((value) => normalizePhone(value) === phoneQuery)
-  ));
+  ) || (messengerId && (
+    messengerField === "max"
+      ? String(client.max_id || "") === messengerId
+      : [client.telegram_id, client.tg_id].some((value) => String(value || "") === messengerId)
+  )));
 }
 
 function clientListUrl(ctx, filters = {}) {
@@ -1546,7 +1554,7 @@ return `
         <input
           name="q"
           value="${escapeHtml(search)}"
-          placeholder="Фамилия, телефон или email"
+          placeholder="Фамилия, телефон, email, tg_id, max_id"
         >
       </label>
 

@@ -1,10 +1,12 @@
-const CACHE_NAME = "cabinet-pwa-v7-photo";
+const CACHE_NAME = "cabinet-pwa-v9-media";
 const APP_SHELL = [
   "/cabinet.html",
   "/auth.html",
   "/css/styles.css",
   "/css/cabinet.css",
-  "/manifest.webmanifest",
+  "/auth/pwa-manifest.webmanifest",
+  "/js/cabinet.js",
+  "/js/dom-legacy.js",
   "/pwa-icon.svg",
   "/pwa-icon-192.png",
   "/pwa-icon-512.png",
@@ -30,7 +32,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request).catch(() => caches.match("/cabinet.html")));
     return;
   }
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request, { ignoreSearch: true })));
 });
 
 self.addEventListener("push", (event) => {
@@ -39,6 +41,7 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: data.icon || "/pwa-icon.svg",
     badge: data.badge || "/pwa-icon.svg",
+    image: data.image || undefined,
     tag: data.tag || "organization-broadcast",
     data: { url: data.url || "/cabinet.html" },
   }));
@@ -46,6 +49,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/cabinet.html";
+  const notificationData = event.notification.data || {};
+  const url = notificationData.url || "/cabinet.html";
   event.waitUntil(clients.openWindow(url));
 });

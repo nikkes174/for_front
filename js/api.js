@@ -63,6 +63,7 @@ export const api = {
   restoreSession: (body) => request("/auth/session/restore", { method: "POST", body: JSON.stringify(body) }),
   testResetPassword: (body) => request("/auth/test-reset-password", { method: "POST", body: JSON.stringify(body) }),
   loginContext: () => request("/auth/login-context"),
+  clientCodeOrganizations: (body) => request("/auth/client-code/organizations", { method: "POST", body: JSON.stringify(body) }),
   startClientCodeAuth: (body) => request("/auth/client-code/start", { method: "POST", body: JSON.stringify(body) }),
   startClientMaxAuth: (body) => request("/auth/client-max/start", { method: "POST", body: JSON.stringify(body) }),
   start2fa: (body) => request("/auth/2fa/start", { method: "POST", body: JSON.stringify(body) }),
@@ -238,6 +239,11 @@ export const api = {
   clientPushMessages: (clientId) => request(`/crm-api/client-communications/clients/${clientId}/messages?channel=push&message_type=notification&limit=20`, { cache: "no-store" }),
   sendPushNotification: (body) => request("/crm-api/client-communications/push/send", { method: "POST", body: JSON.stringify(body) }),
   startPushNotificationJob: (body) => request("/crm-api/client-communications/push/send-jobs", { method: "POST", body: JSON.stringify(body) }),
+  uploadPushNotificationImages: (files) => {
+    const data = new FormData();
+    [...files].forEach((file) => data.append("files", file));
+    return upload("/crm-api/client-communications/push/images", data);
+  },
   pushNotificationJobs: (organizationId) => request(`/crm-api/client-communications/push/send-jobs?organization_id=${organizationId}`, { cache: "no-store" }),
 
   rules: (orgId) => request(`/loyalty-api/organizations/${orgId}/rules`),

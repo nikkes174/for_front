@@ -64,6 +64,15 @@ function addDays(value, days) {
   return date;
 }
 
+function shiftCalendarPeriod(value, direction) {
+  const date = new Date(value);
+  if (bookingState.period === "month" || bookingState.period === "all") {
+    date.setMonth(date.getMonth() + direction);
+    return date;
+  }
+  return addDays(date, direction * (bookingState.period === "week" ? 7 : 1));
+}
+
 function branchTimezone(branchId) {
   return bookingState.calendarData?.branches?.find((branch) => String(branch.id) === String(branchId))?.timezone || "Europe/Moscow";
 }
@@ -492,9 +501,9 @@ export async function booking(ctx) {
           </button>
         </div>
         <div class="booking-nav">
-        <button type="button" class="ghost" data-booking-week="-7">‹</button>
+        <button type="button" class="ghost" data-booking-period-navigation="-1">‹</button>
         <button type="button" class="ghost" data-booking-calendar-toggle>Календарь</button>
-        <button type="button" class="ghost" data-booking-week="7">›</button>
+        <button type="button" class="ghost" data-booking-period-navigation="1">›</button>
         <strong>${rangeStart.getDate()} ${MONTH_NAMES[rangeStart.getMonth()]} — ${rangeEnd.getDate()} ${MONTH_NAMES[rangeEnd.getMonth()]}</strong>
         ${bookingSlotIntervalSettings(data)}
         ${datePickerMarkup(rangeStart, rangeEnd)}
@@ -519,6 +528,15 @@ export async function booking(ctx) {
 }
 
 export function bindBooking(root, ctx) {
+  if (!document.body.dataset.bookingDatePickerOutsideBound) {
+    document.body.dataset.bookingDatePickerOutsideBound = "true";
+    document.addEventListener("click", (event) => {
+      const picker = document.querySelector("[data-booking-date-picker]");
+      if (!picker || picker.hidden) return;
+      if (event.target.closest("[data-booking-date-picker], [data-booking-calendar-toggle]")) return;
+      picker.hidden = true;
+    });
+  }
   root.addEventListener("click", async (event) => {
     const saveSlotInterval = event.target.closest("[data-save-booking-slot-interval]");
     if (saveSlotInterval) {
@@ -633,9 +651,12 @@ export function bindBooking(root, ctx) {
         return;
       }
     }
-    const weekButton = event.target.closest("[data-booking-week]");
-    if (weekButton) {
-      bookingState.weekStart = addDays(bookingState.weekStart || weekStart(), Number(weekButton.dataset.bookingWeek));
+    const periodNavigationButton = event.target.closest("[data-booking-period-navigation]");
+    if (periodNavigationButton) {
+      bookingState.weekStart = shiftCalendarPeriod(
+        bookingState.weekStart || weekStart(),
+        Number(periodNavigationButton.dataset.bookingPeriodNavigation),
+      );
       bookingState.dateFrom = "";
       bookingState.dateTo = "";
       ctx.reload();

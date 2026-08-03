@@ -3,6 +3,8 @@ import { escapeHtml } from "../dom.js";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TITLE_LENGTH = 120;
+const MAX_NOTIFICATION_IMAGES = 10;
+const notificationFiles = new WeakMap();
 
 export async function notifications(ctx, { embedded = false } = {}) {
   const status = await api.pushStatus(ctx.org.id).catch(() => ({ active_count: 0, max_count: 0, telegram_count: 0, configured: false }));
@@ -15,6 +17,7 @@ export async function notifications(ctx, { embedded = false } = {}) {
         </label>
         <div class="wide notification-message-field" data-notification-composer>
           <textarea name="message" maxlength="${MAX_MESSAGE_LENGTH}" rows="4" wrap="soft" required placeholder="Введите текст сообщения ..."></textarea>
+          <div class="notification-image-previews" data-notification-image-previews hidden></div>
           <div class="notification-composer-toolbar">
             <div class="notification-channels-field">
               <div class="notification-channels-select" data-notification-channels-select>
@@ -32,6 +35,18 @@ export async function notifications(ctx, { embedded = false } = {}) {
               </div>
             </div>
             <p class="notification-counter" data-notification-counter>0 / ${MAX_MESSAGE_LENGTH}</p>
+            <input type="file" accept="image/*" multiple data-notification-images hidden>
+            <button type="button" class="notification-attach" data-notification-images-open aria-label="Прикрепить изображения" title="Прикрепить до 10 изображений">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <g clip-path="url(#clip0_403_3418)">
+                  <path d="M12 0C9.62662 0 7.30654 0.703788 5.33315 2.02236C3.35976 3.34094 1.82169 5.21509 0.913443 7.4078C0.0051918 9.60051 -0.232448 12.0133 0.230574 14.3411C0.693597 16.6689 1.83649 18.8071 3.51472 20.4853C5.19295 22.1635 7.33114 23.3064 9.65891 23.7694C11.9867 24.2324 14.3995 23.9948 16.5922 23.0866C18.7849 22.1783 20.6591 20.6402 21.9776 18.6668C23.2962 16.6935 24 14.3734 24 12C23.9966 8.81846 22.7312 5.76821 20.4815 3.51852C18.2318 1.26883 15.1815 0.00344108 12 0V0ZM12 22C10.0222 22 8.08879 21.4135 6.4443 20.3147C4.7998 19.2159 3.51808 17.6541 2.7612 15.8268C2.00433 13.9996 1.80629 11.9889 2.19215 10.0491C2.578 8.10929 3.5304 6.32746 4.92893 4.92893C6.32746 3.53041 8.10929 2.578 10.0491 2.19215C11.9889 1.8063 13.9996 2.00433 15.8268 2.7612C17.6541 3.51808 19.2159 4.79981 20.3147 6.4443C21.4135 8.08879 22 10.0222 22 12C21.9971 14.6513 20.9426 17.1931 19.0679 19.0679C17.1931 20.9426 14.6513 21.9971 12 22ZM13 11H17V13H13V17H11V13H7V11H11V7H13V11Z" fill="#374957"/>
+                </g>
+                <defs>
+                  <clipPath id="clip0_403_3418">
+                    <rect width="24" height="24" fill="white"/>
+                  </clipPath>
+                </defs>              </svg>
+            </button>
             <button type="submit" class="primary notification-submit" data-notification-submit disabled aria-label="Разослать" title="Разослать">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M12 19V5M6.5 10.5L12 5L17.5 10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -54,6 +69,17 @@ export async function notifications(ctx, { embedded = false } = {}) {
 }
 
 export function bindNotifications(root, ctx = {}) {
+  function renderNotificationImages(form) {
+    const preview = form.querySelector("[data-notification-image-previews]");
+    const files = notificationFiles.get(form) || [];
+    preview.querySelectorAll("[data-object-url]").forEach((image) => URL.revokeObjectURL(image.dataset.objectUrl));
+    preview.hidden = !files.length;
+    preview.innerHTML = files.map((file, index) => {
+      const url = URL.createObjectURL(file);
+      return `<figure><img src="${url}" data-object-url="${url}" alt="${escapeHtml(file.name)}"><button type="button" data-remove-notification-image="${index}" aria-label="Убрать изображение">&times;</button></figure>`;
+    }).join("");
+  }
+
   function syncNotificationTitle(input) {
     const field = input.closest("[data-notification-title-field]");
     if (!field) return;
@@ -74,6 +100,20 @@ export function bindNotifications(root, ctx = {}) {
   }
 
   root.addEventListener("click", (event) => {
+    const openImages = event.target.closest("[data-notification-images-open]");
+    if (openImages) {
+      openImages.closest("[data-notification-form]")?.querySelector("[data-notification-images]")?.click();
+      return;
+    }
+    const removeImage = event.target.closest("[data-remove-notification-image]");
+    if (removeImage) {
+      const form = removeImage.closest("[data-notification-form]");
+      const files = notificationFiles.get(form) || [];
+      files.splice(Number(removeImage.dataset.removeNotificationImage), 1);
+      notificationFiles.set(form, files);
+      renderNotificationImages(form);
+      return;
+    }
     const trigger = event.target.closest("[data-notification-channels-trigger]");
     if (trigger) {
       const select = trigger.closest("[data-notification-channels-select]");
@@ -147,6 +187,19 @@ export function bindNotifications(root, ctx = {}) {
     updateNotificationForm(form);
   });
 
+  root.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-notification-images]");
+    if (!input) return;
+    const form = input.closest("[data-notification-form]");
+    const previous = notificationFiles.get(form) || [];
+    const selected = [...input.files].filter((file) => file.type.startsWith("image/"));
+    const files = [...previous, ...selected].filter((file, index, list) => list.findIndex((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified) === index).slice(0, MAX_NOTIFICATION_IMAGES);
+    notificationFiles.set(form, files);
+    input.value = "";
+    renderNotificationImages(form);
+    form.querySelector("[data-message]").textContent = previous.length + selected.length > MAX_NOTIFICATION_IMAGES ? "Можно прикрепить не более 10 изображений." : "";
+  });
+
   root.addEventListener("submit", async (event) => {
     const form = event.target.closest("[data-notification-form]");
     if (!form) return;
@@ -156,11 +209,15 @@ export function bindNotifications(root, ctx = {}) {
     const title = String(data.get("title") || "").trim().slice(0, MAX_TITLE_LENGTH);
     const message = String(data.get("message") || "").trim().slice(0, MAX_MESSAGE_LENGTH);
     const channels = data.getAll("channels").map(String);
+    const files = notificationFiles.get(form) || [];
     if (!title || !message || !channels.length) return;
     try {
-      await api.startPushNotificationJob({ organization_id: Number(orgId), title, message, channels });
+      const uploaded = files.length ? await api.uploadPushNotificationImages(files) : { image_urls: [] };
+      await api.startPushNotificationJob({ organization_id: Number(orgId), title, message, channels, image_urls: uploaded.image_urls || [] });
       form.querySelector("[data-message]").textContent = "Рассылка поставлена в очередь. Прогресс отображается во вкладке «Задачи».";
       form.reset();
+      notificationFiles.set(form, []);
+      renderNotificationImages(form);
       form.querySelector("[data-notification-counter]").textContent = `0 / ${MAX_MESSAGE_LENGTH}`;
       syncNotificationTitle(form.elements.title);
       syncNotificationComposer(form.elements.message);

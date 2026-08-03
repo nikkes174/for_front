@@ -209,6 +209,21 @@
   overflow-wrap: anywhere;
 }
 
+.cabinet-notification-item .cabinet-notification-media {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  width: min(100%, 420px);
+  overflow: hidden;
+  border-radius: 12px;
+  white-space: normal;
+}
+.cabinet-notification-media button { min-width: 0; padding: 0; border: 0; border-radius: 0; background: #eef2f7; cursor: pointer; }
+.cabinet-notification-media button:only-child { grid-column: 1 / -1; }
+.cabinet-notification-media img { display: block; width: 100%; aspect-ratio: 1.25; object-fit: cover; transition: transform .2s ease; }
+.cabinet-notification-media button:only-child img { aspect-ratio: 16 / 9; }
+.cabinet-notification-media button:hover img { transform: scale(1.025); }
+
 .cabinet-notification-item a {
   color: #2563eb;
 }

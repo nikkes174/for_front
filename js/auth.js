@@ -8,6 +8,9 @@ let loginDraft = "";
 let twoFactorTarget = "/";
 let resetPasswordOpen = false;
 let codeMethodPopoverOpen = false;
+let codeChannelStepOpen = false;
+let clientCodeOrganizations = [];
+let clientCodeOrganizationId = "";
 let loginContext = { is_client_domain: false };
 const SESSION_TOKEN_KEY = "loyalty.sessionToken";
 
@@ -29,7 +32,7 @@ function twoFactorHtml() {
       : `\u041a\u043e\u0434 \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0432 ${label}.`;
   return `
     <div class="modal-backdrop" data-2fa-modal>
-      <div class="modal-card auth-2fa-card">
+      <div class="modal-card auth-2fa-card auth-code-card">
         <div class="modal-head">
           <h3>\u041a\u043e\u0434 \u0432\u0445\u043e\u0434\u0430 \u0447\u0435\u0440\u0435\u0437 ${label}</h3>
           <button type="button" class="ghost" data-2fa-cancel>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
@@ -68,6 +71,17 @@ function resetPasswordHtml() {
 
 function codeMethodPopoverHtml() {
   if (!codeMethodPopoverOpen) return "";
+  if (!codeChannelStepOpen) {
+    return `<div class="auth-code-popover" data-auth-code-popover role="dialog" aria-label="Выбор организации">
+      <strong>Выберите организацию</strong>
+      <label><span>Организация</span>
+        <select name="code_organization_id" required>
+          ${clientCodeOrganizations.map((organization) => '<option value="' + organization.id + '" ' + (String(organization.id) === String(clientCodeOrganizationId) ? "selected" : "") + '>' + escapeHtml(organization.name) + '</option>').join("")}
+        </select>
+      </label>
+      <button type="button" class="primary" data-code-organization-continue>Продолжить</button>
+    </div>`;
+  }
   return `<div class="auth-code-popover" data-auth-code-popover role="dialog" aria-label="Способ получения кода">
     <strong>Получить код</strong>
     <p>Выберите один способ</p>
@@ -161,7 +175,45 @@ root.addEventListener("click", async (event) => {
   }
 
   if (event.target.closest("[data-code-method-open]")) {
-    codeMethodPopoverOpen = !codeMethodPopoverOpen;
+    if (codeMethodPopoverOpen) {
+      codeMethodPopoverOpen = false;
+      codeChannelStepOpen = false;
+      draw();
+      return;
+    }
+    const form = event.target.closest("[data-auth-form]");
+    const data = formData(form);
+    const phone = normalizePhone(data.login || loginDraft);
+    setMessage(form, "");
+    try {
+      if (!phone) throw new Error("Укажите телефон");
+      const result = await api.clientCodeOrganizations({ phone });
+      clientCodeOrganizations = result.organizations || [];
+      if (!clientCodeOrganizations.length) {
+        throw new Error("Для клиента не найдены организации");
+      }
+      clientCodeOrganizationId = String(clientCodeOrganizations[0].id);
+      codeChannelStepOpen = false;
+      codeMethodPopoverOpen = true;
+      draw();
+    } catch (error) {
+      clientCodeOrganizations = [];
+      clientCodeOrganizationId = "";
+      setMessage(form, error.message);
+    }
+    return;
+  }
+
+  const organizationContinue = event.target.closest("[data-code-organization-continue]");
+  if (organizationContinue) {
+    const form = organizationContinue.closest("[data-auth-form]");
+    const organizationId = form.querySelector('[name="code_organization_id"]')?.value;
+    if (!organizationId) {
+      setMessage(form, "Выберите организацию");
+      return;
+    }
+    clientCodeOrganizationId = String(organizationId);
+    codeChannelStepOpen = true;
     draw();
     return;
   }
@@ -173,12 +225,15 @@ root.addEventListener("click", async (event) => {
     const data = formData(form);
     const phone = normalizePhone(data.login || loginDraft);
     const channel = form.querySelector('[name="code_channel"]:checked')?.value || "max";
+    const organizationId = Number(clientCodeOrganizationId || 0);
     setMessage(form, "");
     try {
       if (!phone) throw new Error("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
-      twoFactor = await api.startClientCodeAuth({ phone, channel });
+      if (!organizationId) throw new Error("Выберите организацию");
+      twoFactor = await api.startClientCodeAuth({ phone, channel, organization_id: organizationId });
       twoFactorTarget = sameHostUrl(twoFactor.redirect_url) || "/";
       codeMethodPopoverOpen = false;
+      codeChannelStepOpen = false;
       draw();
     } catch (error) {
       setMessage(form, error.message);
@@ -191,6 +246,9 @@ root.addEventListener("click", async (event) => {
   mode = button.dataset.mode;
   twoFactor = null;
   codeMethodPopoverOpen = false;
+  codeChannelStepOpen = false;
+  clientCodeOrganizations = [];
+  clientCodeOrganizationId = "";
   twoFactorTarget = "/";
   history.replaceState(null, "", `/auth.html?mode=${mode}`);
   draw();
