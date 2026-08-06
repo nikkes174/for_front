@@ -109,6 +109,13 @@ export const api = {
   createProductItem: (body) => request("/organizations/product-items", { method: "POST", body: JSON.stringify(body) }),
   updateProductItem: (id, body) => request(`/organizations/product-items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteProductItem: (id) => request(`/organizations/product-items/${id}`, { method: "DELETE" }),
+  importProductItems: (orgId, categoryId, file) => {
+    const data = new FormData();
+    data.append("category_id", categoryId);
+    data.append("file", file);
+    return upload(`/organizations/${orgId}/product-items/import`, data);
+  },
+  exportProductItemsUrl: (orgId, itemType) => `/organizations/${orgId}/product-items/export?item_type=${encodeURIComponent(itemType)}`,
   uploadProductItemImages: (id, files) => {
     const data = new FormData();
     [...files].forEach((file) => data.append("files", file));
@@ -226,10 +233,17 @@ export const api = {
   deleteVisitPhoto: (id, stage, photoId) => request(`/crm-api/client-history/visits/${id}/photos/${stage}/${encodeURIComponent(photoId)}`, { method: "DELETE" }),
   deleteClientVisit: (id) => request(`/crm-api/client-history/visits/${id}`, { method: "DELETE" }),
   bookingCalendar: (orgId, dateFrom, dateTo, viewBy, branchId = "", employeeId = "") => request(`/booking-api/calendar?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}&view_by=${viewBy}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+  createStaffBooking: (body) => request("/booking-api/staff-booking", { method: "POST", body: JSON.stringify(body) }),
   updateBookingVisitStatus: (id, visitStatus) => request(`/booking-api/visits/${id}/status`, { method: "PATCH", body: JSON.stringify({ visit_status: visitStatus }) }),
   financePayroll: (orgId, dateFrom, dateTo, branchId = "", employeeId = "") => request(`/finanse-api/payroll?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+  financeBreakdown: (orgId, dateFrom, dateTo, branchId = "") => request(`/finanse-api/breakdown?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}${branchId ? `&branch_id=${branchId}` : ""}`),
   updateFinanceRules: (orgId, body) => request(`/finanse-api/salary-rules/${orgId}`, { method: "PUT", body: JSON.stringify(body) }),
   updateFinanceEmployeePlan: (orgId, employeeId, enabled) => request(`/finanse-api/salary-plans/${orgId}/employees/${employeeId}`, { method: "PUT", body: JSON.stringify({ enabled }) }),
+  financeIndividualPlan: (orgId, employeeId) => request(`/finanse-api/individual-plans/${orgId}/employees/${employeeId}`),
+  updateFinanceIndividualPlan: (orgId, employeeId, body) => request(`/finanse-api/individual-plans/${orgId}/employees/${employeeId}`, { method: "PUT", body: JSON.stringify(body) }),
+  financeAdditionalPlans: (orgId) => request(`/finanse-api/additional-plans?organization_id=${orgId}`),
+  updateFinanceAdditionalPlans: (orgId, body) => request(`/finanse-api/additional-plans/${orgId}`, { method: "PUT", body: JSON.stringify(body) }),
+  updateFinanceAdditionalPlanAssignment: (orgId, employeeId, planId) => request(`/finanse-api/additional-plan-assignments/${orgId}/employees/${employeeId}`, { method: "PUT", body: JSON.stringify({ plan_id: planId || null }) }),
   clientAccounts: (id) => request(`/crm-api/client-accounts/clients/${id}`),
   clientSegments: (orgId) => request(`/crm-api/client-segments?organization_id=${orgId}`),
   clientCategories: (id) => request(`/crm-api/clients-core/category-links?client_id=${id}`),

@@ -1,0 +1,38 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  aria-hidden="true"
+>
+  <path
+    d="M13 4H6.8A1.8 1.8 0 0 0 5 5.8v12.4A1.8 1.8 0 0 0 6.8 20h6.4a1.8 1.8 0 0 0 1.8-1.8V17"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M8 8h4M8 12h3M8 16h2"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+  />
+
+  <circle
+    cx="16.5"
+    cy="10.5"
+    r="3.5"
+    stroke="currentColor"
+    stroke-width="1.8"
+  />
+
+  <path
+    d="m19 13 2 2"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+  />
+</svg>

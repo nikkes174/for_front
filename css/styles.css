@@ -328,6 +328,24 @@ button:active { transform: translateY(1px); }
 .booking-event-cancelled, .booking-event-no_show { border-color: #b42318; background: #fecdca; }
 .booking-event-time { font-weight: 700; }
 .booking-status { width: 100%; min-height: 18px; margin-top: auto; padding: 1px 3px; border: 0; border-radius: 4px; font-size: 9px; }
+.booking-master-calendar .booking-time-spacer, .booking-master-calendar .booking-master-header { height: 96px; }
+.booking-master-header { position: sticky; top: 0; z-index: 12; display: flex; align-items: flex-start; gap: 9px; padding: 12px 10px; border-bottom: 1px solid #d9dee8; background: #fff; }
+.booking-master-photo, .booking-master-initials { flex: 0 0 38px; width: 38px; height: 38px; border-radius: 8px; object-fit: cover; }
+.booking-master-initials { display: grid; place-items: center; background: #e8eefc; color: #1d4ed8; font-size: 12px; font-weight: 800; }
+.booking-master-header > span:not(.booking-master-initials) { display: grid; min-width: 0; gap: 2px; }
+.booking-master-header strong, .booking-master-header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booking-master-header strong { font-size: 13px; }
+.booking-master-header small { color: #667085; font-size: 11px; line-height: 1.25; white-space: normal; }
+.booking-master-free-popover { position: absolute; z-index: 40; top: calc(100% - 5px); left: 8px; display: none; gap: 5px; width: min(260px, calc(100vw - 32px)); max-height: 280px; overflow: auto; padding: 10px; border: 1px solid #d9dee8; border-radius: 9px; background: #fff; box-shadow: 0 14px 34px rgb(16 24 40 / 20%); }
+.booking-master-header:hover .booking-master-free-popover, .booking-master-header:focus-within .booking-master-free-popover { display: grid; }
+.booking-master-free-popover > b { margin-bottom: 3px; font-size: 13px; }
+.booking-master-free-popover button { display: flex; justify-content: space-between; min-height: 32px; padding: 6px 8px; border: 1px solid #dbe4f4; background: #f7f9fc; color: #344054; font-size: 12px; }
+.booking-master-free-popover button:hover { border-color: #84adff; background: #eef4ff; }
+.booking-master-free-popover button span { color: #2563eb; font-weight: 700; }
+.booking-master-day .booking-day-body { background-color: #eef1f5; }
+.booking-working-interval { position: absolute; inset-inline: 0; z-index: 0; background: #fff; }
+.booking-create-card { width: min(720px, calc(100vw - 32px)); }
+.booking-add-row { display: flex; justify-content: flex-start; }
 .content:has(.booking-page) { overflow: visible; }
 
 @media (max-width: 900px) {
@@ -618,20 +636,57 @@ button:active { transform: translateY(1px); }
 .finance-salary-cell { font-weight: 800; }
 .finance-plan-toggle { min-width: 112px; padding: 7px 10px; white-space: nowrap; }
 .finance-plan-toggle.is-active { border-color: #b9d6ff; background: #eef5ff; color: #1769c2; }
+.finance-plan-actions { display: grid; gap: 6px; min-width: 176px; }
+.finance-plan-actions button { width: 100%; padding: 7px 10px; white-space: nowrap; }
+.finance-plan-head-actions { display: flex; gap: 8px; }
+.finance-additional-assignment { display: grid; gap: 4px; color: #667085; font-size: 11px; font-weight: 600; }
+.finance-additional-assignment select { min-width: 176px; width: 100%; }
+.finance-additional-modal { width: min(1220px, 100%); }
+.finance-additional-list { display: grid; gap: 14px; }
+.finance-additional-card { display: grid; gap: 10px; border: 1px solid #c7d7ee; border-radius: 10px; background: #f8fbff; padding: 12px; }
+.finance-additional-card-head { display: flex; align-items: end; justify-content: space-between; gap: 10px; }
+.finance-additional-card-head label { display: grid; flex: 1; gap: 5px; color: #667085; font-size: 12px; font-weight: 600; }
+.finance-additional-rule-add { justify-self: start; }
+.finance-additional-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 4px; border-top: 1px solid #e5e7eb; }
+.finance-individual-plan-button.is-active { border-color: #7c3aed; background: #f3e8ff; color: #6d28d9; }
+.finance-individual-modal { width: min(1180px, 100%); }
+.finance-individual-close { min-width: 40px; padding: 7px 11px; font-size: 20px; line-height: 1; }
+.finance-individual-note { border: 1px solid #c4b5fd; border-radius: 8px; background: #f5f3ff; padding: 10px 12px; color: #5b21b6; }
+.finance-individual-rules { display: grid; gap: 10px; }
+.finance-individual-rule { display: grid; grid-template-columns: 1.6fr .65fr 1fr 1.35fr .8fr auto; gap: 8px; align-items: end; border: 1px solid #dce3ee; border-radius: 9px; background: #f8fafc; padding: 10px; }
+.finance-individual-rule label { display: grid; gap: 5px; min-width: 0; color: #667085; font-size: 12px; font-weight: 600; }
+.finance-individual-rule select, .finance-individual-rule input { width: 100%; min-width: 0; }
+.finance-individual-percent { display: flex; align-items: center; border: 1px solid #dce3ee; border-radius: 8px; background: #fff; }
+.finance-individual-percent input { border: 0; box-shadow: none; }
+.finance-individual-percent b { padding-right: 9px; color: #667085; }
+.finance-individual-remove { min-height: 42px; padding: 8px 11px; }
+.finance-individual-add-row, .finance-individual-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.finance-individual-add-row span { color: #667085; font-size: 12px; }
+.finance-individual-footer { padding-top: 4px; border-top: 1px solid #e5e7eb; }
 .finance-empty { padding: 36px 16px; text-align: center; color: #667085; }
+.breakdown-filters { grid-template-columns: repeat(2, minmax(135px, .8fr)) repeat(3, minmax(165px, 1fr)) auto; }
+.breakdown-table { min-width: 1120px; }
+.breakdown-type { display: inline-flex; padding: 4px 8px; border-radius: 999px; background: #eef5ff; color: #1769c2; font-size: 12px; font-weight: 700; }
+.breakdown-table td { vertical-align: middle; }
 
 @media (max-width: 1100px) {
   .finance-filter-panel, .finance-settings { grid-template-columns: 1fr; }
   .finance-filters { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+  .breakdown-filters { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
   .finance-rules-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
   .finance-base-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
   .finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
-  .finance-filters, .finance-summary, .finance-rules-grid, .finance-base-grid { grid-template-columns: 1fr; }
+  .finance-filters, .breakdown-filters, .finance-summary, .finance-rules-grid, .finance-base-grid { grid-template-columns: 1fr; }
   .finance-table-head, .finance-rules-head { align-items: start; flex-direction: column; }
   .finance-rules-head button { width: 100%; }
+  .finance-plan-head-actions, .finance-additional-card-head, .finance-additional-footer { align-items: stretch; flex-direction: column; width: 100%; }
+  .finance-additional-card-head button:not(.client-delete-icon-button), .finance-additional-footer button:not(.client-delete-icon-button) { width: 100%; }
+  .finance-individual-rule { grid-template-columns: 1fr; }
+  .finance-individual-add-row, .finance-individual-footer { align-items: stretch; flex-direction: column; }
+  .finance-individual-footer button:not(.client-delete-icon-button) { width: 100%; }
 }
 
 .subpanel {
@@ -1051,6 +1106,15 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 .inline-form.compact {
   grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
 }
+.catalog-excel-actions { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.catalog-excel-actions > label:first-child { display: grid; gap: 6px; min-width: 230px; color: #667085; font-size: 13px; font-weight: 600; }
+.catalog-excel-upload, .catalog-excel-export { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 7px; background: #eef2f7; padding: 8px 14px; color: #172033; box-sizing: border-box; }
+.catalog-excel-upload { position: relative; cursor: pointer; }
+.catalog-excel-upload:hover, .catalog-excel-export:hover { background: #e2e8f0; }
+.catalog-excel-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.catalog-excel-upload.is-disabled { opacity: .5; cursor: not-allowed; }
+.catalog-excel-export { text-decoration: none; }
+[data-product-excel-message] { align-self: center; color: #667085; }
 
 [data-notifications] .inline-form {
   align-items: start;

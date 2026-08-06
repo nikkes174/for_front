@@ -839,7 +839,18 @@ function productItemExtraFields(item) {
     <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
   `;
   if (category?.type === "product") return `
+    <label><span>Название в чеке</span><input name="receipt_title" value="${escapeHtml(item.receipt_title || "")}"></label>
+    <label><span>Артикул</span><input name="sku" value="${escapeHtml(item.sku || "")}"></label>
     <label><span>Штрих-код</span><input name="barcode" value="${escapeHtml(item.barcode || "")}"></label>
+    <label><span>Ед. продажи</span><input name="sale_unit" value="${escapeHtml(item.sale_unit || item.unit_short_title || "")}"></label>
+    <label><span>Ед. списания</span><input name="writeoff_unit" value="${escapeHtml(item.writeoff_unit || item.service_unit_short_title || "")}"></label>
+    <label><span>Коэффициент списания</span><input name="writeoff_ratio" type="number" step="0.001" min="0" value="${escapeHtml(item.writeoff_ratio ?? item.unit_equals ?? "")}"></label>
+    <label><span>Масса нетто, гр.</span><input name="net_weight" type="number" step="0.01" min="0" value="${escapeHtml(item.net_weight ?? "")}"></label>
+    <label><span>Масса брутто, гр.</span><input name="gross_weight" type="number" step="0.01" min="0" value="${escapeHtml(item.gross_weight ?? "")}"></label>
+    <label><span>Себестоимость</span><input name="cost" type="number" step="0.01" min="0" value="${escapeHtml(item.cost ?? item.actual_cost ?? "")}"></label>
+    <label><span>Критический остаток</span><input name="critical_stock" type="number" step="0.01" min="0" value="${escapeHtml(item.critical_stock ?? "")}"></label>
+    <label><span>Желаемый остаток</span><input name="desired_stock" type="number" step="0.01" min="0" value="${escapeHtml(item.desired_stock ?? "")}"></label>
+    <label><span>Редактирование только в сети</span><select name="network_editable"><option value="true" ${item.network_editable !== false ? "selected" : ""}>Да</option><option value="false" ${item.network_editable === false ? "selected" : ""}>Нет</option></select></label>
     <label><span>ID ед. продажи</span><input name="unit_id" type="number" step="1" min="0" value="${escapeHtml(item.unit_id ?? "")}"></label>
     <label><span>Единица измерения</span><select name="unit_short_title">
       <option value="">Не выбрано</option>
@@ -1616,6 +1627,7 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
   const scopedItems = productItems
     .filter((item) => categoryTypeById(item.category_id) === type)
     .filter((item) => !selectedCategoryId || String(item.category_id) === String(selectedCategoryId));
+  const importCategoryId = selectedCategoryId || scopedCategories[0]?.id || "";
   return `
     <div id="categories" data-permission="settings.categories.view">
       ${section(categoriesTitle, `
@@ -1634,6 +1646,14 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
 
     <div id="product-items" data-permission="settings.items.view">
       ${section(title, `
+        <div class="catalog-excel-actions">
+          <label><span>Категория для загрузки</span><select data-product-excel-category>
+            ${scopedCategories.map((category) => `<option value="${escapeHtml(category.id)}" ${String(category.id) === String(importCategoryId) ? "selected" : ""}>${escapeHtml(category.name)}</option>`).join("")}
+          </select></label>
+          <label class="secondary catalog-excel-upload ${scopedCategories.length ? "" : "is-disabled"}">Загрузить Excel<input type="file" accept=".xls,.xlsx" data-product-excel-file data-item-type="${escapeHtml(type)}" ${scopedCategories.length ? "" : "disabled"}></label>
+          <button type="button" class="catalog-excel-export" data-product-excel-export data-item-type="${escapeHtml(type)}">Выгрузить Excel</button>
+          <span data-product-excel-message></span>
+        </div>
         ${productItemCreateForm(
           scopedCategories,
           activeTab === "services" ? "услугу" : "товар",
@@ -2167,6 +2187,33 @@ function productItemCreateForm(categories, title, categoryFilter = "") {
   `;
 }
 
+async function saveProductExcel(url, suggestedName) {
+  if (typeof window.showSaveFilePicker !== "function") {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = suggestedName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    return false;
+  }
+
+  const fileHandle = await window.showSaveFilePicker({
+    suggestedName,
+    types: [{
+      description: "Excel",
+      accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
+    }],
+  });
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw new Error("Не удалось сформировать Excel-файл");
+
+  const writable = await fileHandle.createWritable();
+  await writable.write(await response.blob());
+  await writable.close();
+  return true;
+}
+
 function findEntity(type, id) {
   const source = {
     org: cache.organizations,
@@ -2496,6 +2543,17 @@ async function saveEntity(type, id, data, form = null) {
       api_id: categoryType === "service" ? optional(data.api_id) : null,
       good_id: categoryType === "product" ? numberOrNull(currentItem.good_id) : null,
       barcode: categoryType === "product" ? optional(data.barcode) : null,
+      receipt_title: categoryType === "product" ? optional(data.receipt_title) : null,
+      sku: categoryType === "product" ? optional(data.sku) : null,
+      sale_unit: categoryType === "product" ? optional(data.sale_unit) : null,
+      writeoff_unit: categoryType === "product" ? optional(data.writeoff_unit) : null,
+      writeoff_ratio: categoryType === "product" ? numberOrNull(data.writeoff_ratio) : null,
+      net_weight: categoryType === "product" ? numberOrNull(data.net_weight) : null,
+      gross_weight: categoryType === "product" ? numberOrNull(data.gross_weight) : null,
+      cost: categoryType === "product" ? numberOrNull(data.cost) : null,
+      critical_stock: categoryType === "product" ? numberOrNull(data.critical_stock) : null,
+      desired_stock: categoryType === "product" ? numberOrNull(data.desired_stock) : null,
+      network_editable: categoryType === "product" ? data.network_editable === "true" : true,
       unit_id: categoryType === "product" ? numberOrNull(data.unit_id) : null,
       unit_short_title: categoryType === "product" ? optional(data.unit_short_title) : null,
       service_unit_id: categoryType === "product" ? numberOrNull(data.service_unit_id) : null,
@@ -2936,6 +2994,23 @@ export function bindSettings(root, ctx) {
   });
 
   root.addEventListener("change", (event) => {
+    if (event.target.matches("[data-product-excel-file]")) {
+      const file = event.target.files?.[0];
+      const actions = event.target.closest(".catalog-excel-actions");
+      const categoryId = actions?.querySelector("[data-product-excel-category]")?.value;
+      if (!file || !categoryId) return;
+      const message = actions.querySelector("[data-product-excel-message]");
+      event.target.disabled = true;
+      message.textContent = "Загружаем позиции...";
+      api.importProductItems(ctx.org.id, categoryId, file)
+        .then((result) => {
+          message.textContent = `Готово: создано ${result.created}, обновлено ${result.updated}`;
+          ctx.reload();
+        })
+        .catch((error) => { message.textContent = error.message || "Не удалось загрузить Excel"; })
+        .finally(() => { event.target.disabled = false; event.target.value = ""; });
+      return;
+    }
     if (event.target.matches("[data-department-filter-branch]")) {
       departmentFilterBranchId = event.target.value || "";
       ctx.reload();
@@ -3210,6 +3285,28 @@ export function bindSettings(root, ctx) {
   root.addEventListener("click", async (event) => {
     if (handleAchievementConditionClick(event, root)) return;
     if (handleProductAmountClick(event, root)) return;
+
+    const exportButton = event.target.closest("[data-product-excel-export]");
+    if (exportButton) {
+      const actions = exportButton.closest(".catalog-excel-actions");
+      const message = actions?.querySelector("[data-product-excel-message]");
+      const isService = exportButton.dataset.itemType === "service";
+      event.preventDefault();
+      exportButton.disabled = true;
+      if (message) message.textContent = "Выберите место для сохранения...";
+      saveProductExcel(
+        api.exportProductItemsUrl(ctx.org.id, exportButton.dataset.itemType),
+        isService ? "Услуги.xlsx" : "Товары.xlsx",
+      )
+        .then((savedWithDialog) => {
+          if (message) message.textContent = savedWithDialog ? "Файл сохранён" : "Файл скачивается...";
+        })
+        .catch((error) => {
+          if (message) message.textContent = error?.name === "AbortError" ? "" : (error.message || "Не удалось выгрузить Excel");
+        })
+        .finally(() => { exportButton.disabled = false; });
+      return;
+    }
 
     const openClientButton = event.target.closest("[data-open-settings-client]");
     if (openClientButton) {
