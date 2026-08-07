@@ -109,11 +109,14 @@ export const api = {
   createProductItem: (body) => request("/organizations/product-items", { method: "POST", body: JSON.stringify(body) }),
   updateProductItem: (id, body) => request(`/organizations/product-items/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteProductItem: (id) => request(`/organizations/product-items/${id}`, { method: "DELETE" }),
-  importProductItems: (orgId, categoryId, file) => {
-    const data = new FormData();
-    data.append("category_id", categoryId);
-    data.append("file", file);
-    return upload(`/organizations/${orgId}/product-items/import`, data);
+  previewProductItems: (orgId, categoryId, file) => {
+    const data = new FormData(); data.append("category_id", categoryId); data.append("file", file);
+    return upload("/organizations/" + orgId + "/product-items/import-preview", data);
+  },
+  importProductItems: (orgId, categoryId, file, excludedRows = []) => {
+    const data = new FormData(); data.append("category_id", categoryId); data.append("file", file);
+    excludedRows.forEach((rowNumber) => data.append("excluded_rows", rowNumber));
+    return upload("/organizations/" + orgId + "/product-items/import", data);
   },
   exportProductItemsUrl: (orgId, itemType) => `/organizations/${orgId}/product-items/export?item_type=${encodeURIComponent(itemType)}`,
   uploadProductItemImages: (id, files) => {
@@ -142,6 +145,9 @@ export const api = {
   createDepartments: (body) => request("/organizations/departments/bulk", { method: "POST", body: JSON.stringify(body) }),
   updateDepartment: (id, body) => request(`/organizations/departments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteDepartment: (id) => request(`/organizations/departments/${id}`, { method: "DELETE" }),
+  organizationBots: (orgId) => request(`/bots/organizations/${orgId}`, { cache: "no-store" }),
+  saveOrganizationBot: (orgId, platform, body) => request(`/bots/organizations/${orgId}/${platform}`, { method: "PUT", body: JSON.stringify(body) }),
+  toggleOrganizationBot: (orgId, platform, enabled) => request(`/bots/organizations/${orgId}/${platform}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
 
   workplaces: (orgId) => request(`/organizations/${orgId}/workplaces`),
   createWorkplace: (body) => request("/organizations/workplaces", { method: "POST", body: JSON.stringify(body) }),
@@ -262,6 +268,7 @@ export const api = {
     return upload("/crm-api/client-communications/push/images", data);
   },
   pushNotificationJobs: (organizationId) => request(`/crm-api/client-communications/push/send-jobs?organization_id=${organizationId}`, { cache: "no-store" }),
+  deletePushNotificationJob: (jobId, organizationId) => request(`/crm-api/client-communications/push/send-jobs/${encodeURIComponent(jobId)}?organization_id=${organizationId}`, { method: "DELETE" }),
 
   rules: (orgId) => request(`/loyalty-api/organizations/${orgId}/rules`),
   createRule: (body) => request("/loyalty-api/client-bonuses/rules", { method: "POST", body: JSON.stringify(body) }),

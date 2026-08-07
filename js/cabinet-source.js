@@ -190,6 +190,13 @@ const form = document.querySelector("[data-cabinet-form]");
       }
 
       document.addEventListener("click", (event) => {
+        const galleryButton = event.target.closest("[data-service-gallery-open]");
+        if (galleryButton) {
+          event.preventDefault();
+          const imageUrls = JSON.parse(galleryButton.dataset.serviceGalleryImages || "[]");
+          if (imageUrls.length) openServiceGallery(imageUrls, galleryButton.dataset.serviceGalleryTitle, galleryButton.dataset.serviceGalleryIndex);
+          return;
+        }
         const step = event.target.closest("[data-service-gallery-step]");
         if (step && serviceGalleryUrls.length) {
           serviceGalleryIndex = (serviceGalleryIndex + Number(step.dataset.serviceGalleryStep) + serviceGalleryUrls.length) % serviceGalleryUrls.length;

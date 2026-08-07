@@ -185,7 +185,7 @@ function minuteClock(value) {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-function masterFreeIntervals(master, day, data) {
+function masterFreeSlots(master, day, data) {
   const dateKey = localIsoDate(day);
   const working = data.working_intervals
     .filter((item) => item.date === dateKey && String(item.employee_id) === String(master.id))
@@ -198,6 +198,7 @@ function masterFreeIntervals(master, day, data) {
     const to = toHour * 60 + toMinute;
     const busy = data.events
       .filter((item) => item.start.slice(0, 10) === dateKey && String(item.employee_id) === String(master.id))
+      .filter((item) => !["cancelled", "no_show"].includes(eventStatus(item)))
       .filter((item) => String(item.branch_id) === String(interval.branch_id))
       .map((item) => [minutesOfDay(item.start, item.branch_id), minutesOfDay(item.blocked_until || item.end, item.branch_id)])
       .sort((left, right) => left[0] - right[0]);
@@ -208,18 +209,41 @@ function masterFreeIntervals(master, day, data) {
     });
     if (cursor < to) result.push({ from: cursor, to, branchId: interval.branch_id });
   });
-  return result.filter((item) => item.to - item.from >= 15);
+  const now = new Date();
+  const todayKey = localIsoDate(now);
+  if (dateKey < todayKey) return [];
+  const isToday = dateKey === todayKey;
+  const currentMinute = (now.getHours() * 60) + now.getMinutes();
+  return result.flatMap((item) => {
+    const branch = data.branches?.find((candidate) => String(candidate.id) === String(item.branchId));
+    const step = Math.max(1, Number(branch?.work_schedule?.slot_interval_minutes) || 30);
+    const gridStart = Math.min(...working
+      .filter((interval) => String(interval.branch_id) === String(item.branchId))
+      .map((interval) => {
+        const [hours, minutes] = String(interval.from).split(":").map(Number);
+        return (hours * 60) + minutes;
+      }));
+    const remainder = ((item.from - gridStart) % step + step) % step;
+    const firstSlot = item.from + (remainder ? step - remainder : 0);
+    const slots = [];
+    for (let from = firstSlot; from + step <= item.to; from += step) {
+      if (!isToday || from > currentMinute) slots.push({ from, to: item.to, branchId: item.branchId });
+    }
+    return slots;
+  });
 }
 
 function masterHeader(master, day, data) {
-  const free = masterFreeIntervals(master, day, data);
+  const free = masterFreeSlots(master, day, data);
+  const dateLabel = day.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long" });
   const initials = String(master.name || "?").split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   return `<header class="booking-master-header" tabindex="0">
     ${master.photo_url ? `<img class="booking-master-photo" src="${escapeHtml(master.photo_url)}" alt="${escapeHtml(master.name)}">` : `<span class="booking-master-initials">${escapeHtml(initials)}</span>`}
     <span><strong>${escapeHtml(master.name)}</strong><small>${escapeHtml(master.role || "Без роли")}</small></span>
     <aside class="booking-master-free-popover">
       <b>Свободное время</b>
-      ${free.length ? free.map((item) => `<button type="button" data-open-booking-create data-master-id="${escapeHtml(master.id)}" data-branch-id="${escapeHtml(item.branchId)}" data-booking-start="${localIsoDate(day)}T${minuteClock(item.from)}">${minuteClock(item.from)}–${minuteClock(item.to)} <span>Записать</span></button>`).join("") : "<small>Свободного времени нет</small>"}
+      <small>${escapeHtml(dateLabel)}</small>
+      ${free.length ? free.map((item) => `<button type="button" data-open-booking-create data-master-id="${escapeHtml(master.id)}" data-branch-id="${escapeHtml(item.branchId)}" data-booking-start="${localIsoDate(day)}T${minuteClock(item.from)}">${minuteClock(item.from)} <span>Записать</span></button>`).join("") : "<small>В этот день нет свободного времени</small>"}
     </aside>
   </header>`;
 }
@@ -239,6 +263,11 @@ function masterDayColumn(master, day, data, minHour, maxHour, minuteHeight) {
         const top = Math.max((fromHour * 60 + fromMinute - minHour * 60) * minuteHeight, 0);
         const height = Math.max((toHour * 60 + toMinute - fromHour * 60 - fromMinute) * minuteHeight, 0);
         return `<span class="booking-working-interval" style="top:${top}px;height:${height}px"></span>`;
+      }).join("")}
+      ${masterFreeSlots(master, day, data).map((slot) => {
+        const top = Math.max((slot.from - minHour * 60) * minuteHeight, 0);
+        const height = Math.max(selectedBookingSlotInterval(data) * minuteHeight, 18);
+        return `<button type="button" class="booking-grid-create" data-open-booking-create data-master-id="${escapeHtml(master.id)}" data-branch-id="${escapeHtml(slot.branchId)}" data-booking-start="${dateKey}T${minuteClock(slot.from)}" data-booking-available-until="${minuteClock(slot.to)}" style="top:${top}px;height:${height}px" aria-label="Создать запись ${dateKey} в ${minuteClock(slot.from)}"><span>+</span></button>`;
       }).join("")}
       ${events.map((item) => eventCard(item, minHour, minuteHeight)).join("")}
     </div>
@@ -264,9 +293,16 @@ function bookingCreateModal(data, values = {}) {
   const masterId = String(values.masterId || bookingState.employeeId || data.masters?.find((item) => item.branch_ids?.some((id) => String(id) === branchId))?.id || "");
   const master = data.masters?.find((item) => String(item.id) === masterId);
   const serviceIds = new Set((master?.service_ids || []).map(String));
-  const services = data.services?.filter((item) => !serviceIds.size || serviceIds.has(String(item.id))) || [];
   const selectedDay = visibleCalendarDays(data)[0] || new Date();
   const startsAt = values.startsAt || `${localIsoDate(selectedDay)}T${minuteClock(selectedBookingGridStart(data, selectedDay, 9))}`;
+  const [startHour, startMinute] = String(startsAt).slice(11, 16).split(":").map(Number);
+  const [untilHour, untilMinute] = String(values.availableUntil || "24:00").split(":").map(Number);
+  const availableSeconds = Math.max(0, ((untilHour * 60 + untilMinute) - (startHour * 60 + startMinute)) * 60);
+  const services = data.services?.filter((item) => {
+    if (serviceIds.size && !serviceIds.has(String(item.id))) return false;
+    const duration = Number(master?.service_durations?.[String(item.id)] || item.seance_length || 3600);
+    return !values.availableUntil || duration <= availableSeconds;
+  }) || [];
   return `<div class="modal-backdrop" data-booking-create-modal>
     <div class="modal-card booking-create-card">
       <div class="modal-head"><h3>Новая запись</h3><button type="button" class="ghost" data-close-booking-create>Закрыть</button></div>
@@ -279,7 +315,7 @@ function bookingCreateModal(data, values = {}) {
         <label><span>Имя</span><input name="first_name" autocomplete="given-name" required></label>
         <label class="modal-full"><span>Услуга</span><select name="service_id" required>${services.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)}${Number(item.price) ? ` — ${Number(item.price).toLocaleString("ru-RU")} ₽` : ""}</option>`).join("")}</select></label>
         <p class="modal-full" data-message></p>
-        <button class="primary modal-full">Создать запись</button>
+        <button type="submit" class="primary booking-create-submit">Создать</button>
       </form>
     </div>
   </div>`;
@@ -654,6 +690,7 @@ export function bindBooking(root, ctx) {
         branchId: openBookingCreate.dataset.branchId,
         masterId: openBookingCreate.dataset.masterId,
         startsAt: openBookingCreate.dataset.bookingStart,
+        availableUntil: openBookingCreate.dataset.bookingAvailableUntil,
       }));
       return;
     }

@@ -12,6 +12,9 @@ const financeState = {
   branchMemberships: [],
   rules: null,
   additionalPlans: [],
+  rows: [],
+  tableSort: "name",
+  tableDirection: "asc",
 };
 
 function isoDate(value) {
@@ -34,6 +37,7 @@ function resetPeriod(organizationId) {
   financeState.branchMemberships = [];
   financeState.rules = null;
   financeState.additionalPlans = [];
+  financeState.rows = [];
 }
 
 function employeeName(user) {
@@ -74,6 +78,61 @@ function money(value) {
 
 function numberValue(value) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(Number(value || 0));
+}
+
+function financeSortValue(row, key) {
+  if (key === "name") return String(row.name || "").toLocaleLowerCase("ru-RU");
+  if (key === "plan") return [row.has_individual_plan ? 2 : 0, row.additional_plan_id ? 1 : 0, row.plan_enabled ? 1 : 0].join("");
+  if (key === "rates") return (Number(row.services_percent || 0) * 1000) + Number(row.goods_percent || 0);
+  return Number(row[key] || 0);
+}
+
+function sortedFinanceRows(rows) {
+  const factor = financeState.tableDirection === "desc" ? -1 : 1;
+  const key = financeState.tableSort;
+  return [...rows].sort((left, right) => {
+    const first = financeSortValue(left, key);
+    const second = financeSortValue(right, key);
+    return typeof first === "string"
+      ? factor * first.localeCompare(second, "ru-RU")
+      : factor * (first - second);
+  });
+}
+
+function financeTableHeader(key, label) {
+  const marker = financeState.tableSort === key ? (financeState.tableDirection === "asc" ? " ↑" : " ↓") : "";
+  const nextDirection = financeState.tableSort === key && financeState.tableDirection === "asc" ? "desc" : "asc";
+  return `<button type="button" class="pagination-link finance-table-sort" data-finance-table-sort="${key}" data-finance-table-direction="${nextDirection}">${escapeHtml(label + marker)}</button>`;
+}
+
+function financeTableMarkup(rows) {
+  const sortedRows = sortedFinanceRows(rows);
+  return `<div class="table-wrap finance-table-wrap" data-finance-table-wrap>
+    <table class="finance-table">
+      <thead><tr><th>${financeTableHeader("name", "Сотрудник")}</th><th>${financeTableHeader("plan", "План")}</th><th>${financeTableHeader("visits_count", "Визиты")}</th><th>${financeTableHeader("clients_count", "Клиенты")}</th><th>${financeTableHeader("return_rate_percent", "Возвращаемость")}</th><th>${financeTableHeader("services_base", "Услуги")}</th><th>${financeTableHeader("goods_base", "Товары")}</th><th>${financeTableHeader("rates", "Ставки")}</th><th>${financeTableHeader("turnover", "Оборот")}</th><th>${financeTableHeader("salary_total", "К выплате")}</th></tr></thead>
+      <tbody>
+        ${sortedRows.length ? sortedRows.map((row) => `<tr class="${row.is_active ? "" : "is-inactive"}">
+          <td><strong>${escapeHtml(row.name)}</strong>${row.is_active ? "" : "<small>Неактивен</small>"}</td>
+          <td><div class="finance-plan-actions">
+            <button type="button" class="secondary finance-plan-toggle ${row.plan_enabled ? "is-active" : ""}" data-finance-plan-toggle data-employee-id="${row.employee_id}" data-enabled="${row.plan_enabled ? "false" : "true"}">${row.plan_enabled ? "Убрать общий" : "Поставить общий"}</button>
+            <label class="finance-additional-assignment"><span>Доп. план</span><select data-finance-additional-assignment data-employee-id="${row.employee_id}">
+              <option value="">Без доп. плана</option>
+              ${financeState.additionalPlans.map((plan) => `<option value="${escapeHtml(plan.id)}" ${plan.id === row.additional_plan_id ? "selected" : ""}>${escapeHtml(plan.name)}</option>`).join("")}
+            </select></label>
+            <button type="button" class="secondary finance-individual-plan-button ${row.has_individual_plan ? "is-active" : ""}" data-finance-individual-open data-employee-id="${row.employee_id}" data-employee-name="${escapeHtml(row.name)}">${row.has_individual_plan ? "Изменить индивидуальный" : "Создать индивидуальный"}</button>
+          </div></td>
+          <td>${Number(row.visits_count || 0)}</td>
+          <td>${Number(row.clients_count || 0)}<small>повторных: ${Number(row.returning_clients_count || 0)}</small></td>
+          <td>${numberValue(row.return_rate_percent)}%</td>
+          <td>${money(row.services_base)}</td>
+          <td>${money(row.goods_base)}</td>
+          <td><strong>${numberValue(row.services_percent)}% / ${numberValue(row.goods_percent)}%</strong><small>${row.services_percent_source === "individual" || row.goods_percent_source === "individual" ? "индивидуальный приоритет" : row.services_percent_source === "additional_plan" || row.goods_percent_source === "additional_plan" ? `доп. план: ${row.additional_plan_name || ""}` : "услуги / товары"}</small></td>
+          <td>${money(row.turnover)}</td>
+          <td class="finance-salary-cell">${money(row.salary_total)}</td>
+        </tr>`).join("") : `<tr><td colspan="10" class="finance-empty">За выбранный период начислений нет</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
 }
 
 function ruleInput(name, label, value, suffix = "%", step = "0.01") {
@@ -231,6 +290,7 @@ export async function finance(ctx) {
 
   const totals = report.totals || {};
   const rows = report.rows || [];
+  financeState.rows = rows;
   const rules = financeState.rules;
 
   return `
@@ -304,32 +364,7 @@ export async function finance(ctx) {
           <div><h2>Сотрудники</h2><p>${financeState.dateFrom} — ${financeState.dateTo}</p></div>
           <span>${rows.length} сотрудников</span>
         </div>
-        <div class="table-wrap finance-table-wrap">
-          <table class="finance-table">
-            <thead><tr><th>Сотрудник</th><th>План</th><th>Визиты</th><th>Клиенты</th><th>Возвращаемость</th><th>Услуги</th><th>Товары</th><th>Ставки</th><th>Оборот</th><th>К выплате</th></tr></thead>
-            <tbody>
-              ${rows.length ? rows.map((row) => `<tr class="${row.is_active ? "" : "is-inactive"}">
-                <td><strong>${escapeHtml(row.name)}</strong>${row.is_active ? "" : "<small>Неактивен</small>"}</td>
-                <td><div class="finance-plan-actions">
-                  <button type="button" class="secondary finance-plan-toggle ${row.plan_enabled ? "is-active" : ""}" data-finance-plan-toggle data-employee-id="${row.employee_id}" data-enabled="${row.plan_enabled ? "false" : "true"}">${row.plan_enabled ? "Убрать общий" : "Поставить общий"}</button>
-                  <label class="finance-additional-assignment"><span>Доп. план</span><select data-finance-additional-assignment data-employee-id="${row.employee_id}">
-                    <option value="">Без доп. плана</option>
-                    ${financeState.additionalPlans.map((plan) => `<option value="${escapeHtml(plan.id)}" ${plan.id === row.additional_plan_id ? "selected" : ""}>${escapeHtml(plan.name)}</option>`).join("")}
-                  </select></label>
-                  <button type="button" class="secondary finance-individual-plan-button ${row.has_individual_plan ? "is-active" : ""}" data-finance-individual-open data-employee-id="${row.employee_id}" data-employee-name="${escapeHtml(row.name)}">${row.has_individual_plan ? "Изменить индивидуальный" : "Создать индивидуальный"}</button>
-                </div></td>
-                <td>${Number(row.visits_count || 0)}</td>
-                <td>${Number(row.clients_count || 0)}<small>повторных: ${Number(row.returning_clients_count || 0)}</small></td>
-                <td>${numberValue(row.return_rate_percent)}%</td>
-                <td>${money(row.services_base)}</td>
-                <td>${money(row.goods_base)}</td>
-                <td><strong>${numberValue(row.services_percent)}% / ${numberValue(row.goods_percent)}%</strong><small>${row.services_percent_source === "individual" || row.goods_percent_source === "individual" ? "индивидуальный приоритет" : row.services_percent_source === "additional_plan" || row.goods_percent_source === "additional_plan" ? `доп. план: ${row.additional_plan_name || ""}` : "услуги / товары"}</small></td>
-                <td>${money(row.turnover)}</td>
-                <td class="finance-salary-cell">${money(row.salary_total)}</td>
-              </tr>`).join("") : `<tr><td colspan="10" class="finance-empty">За выбранный период начислений нет</td></tr>`}
-            </tbody>
-          </table>
-        </div>
+        ${financeTableMarkup(rows)}
       </div>
     </section>
   `;
@@ -395,6 +430,15 @@ export function bindFinance(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const tableSort = event.target.closest("[data-finance-table-sort]");
+    if (tableSort) {
+      financeState.tableSort = tableSort.dataset.financeTableSort || "name";
+      financeState.tableDirection = tableSort.dataset.financeTableDirection || "asc";
+      const tableWrap = root.querySelector("[data-finance-table-wrap]");
+      if (tableWrap) tableWrap.outerHTML = financeTableMarkup(financeState.rows);
+      return;
+    }
+
     const employeeOption = event.target.closest("[data-finance-employee]");
     if (employeeOption) {
       financeState.employeeId = employeeOption.dataset.financeEmployee || "";
@@ -509,7 +553,7 @@ export function bindFinance(root, ctx) {
 
     const individualModal = event.target.closest("[data-finance-individual-modal]");
     const closeIndividual = event.target.closest("[data-finance-individual-close]");
-    if (closeIndividual || (individualModal && event.target === individualModal)) {
+    if (closeIndividual) {
       individualModal?.remove();
       return;
     }

@@ -5,9 +5,45 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TITLE_LENGTH = 120;
 const MAX_NOTIFICATION_IMAGES = 10;
 const notificationFiles = new WeakMap();
+const notificationImageUrls = new WeakMap();
+
+function showNotificationToast(message) {
+  document.querySelector("[data-notification-toast]")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "booking-toast";
+  toast.dataset.notificationToast = "";
+  toast.setAttribute("role", "status");
+  toast.innerHTML = `<span aria-hidden="true">✓</span><b>${escapeHtml(message)}</b>`;
+  document.body.append(toast);
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+  window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+    window.setTimeout(() => toast.remove(), 220);
+  }, 1800);
+}
+
+function notificationHistoryMarkup(jobs = []) {
+  const heading = '<h3 class="subpanel-title">\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0440\u0430\u0441\u0441\u044b\u043b\u043e\u043a</h3>';
+  if (!jobs.length) return '<section class="notification-history">' + heading + '<p class="notification-history-empty">\u0420\u0430\u0441\u0441\u044b\u043b\u043e\u043a \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</p></section>';
+  return '<section class="notification-history">' + heading + '<div class="notification-history-list">' + jobs.map((job) => {
+    const images = Array.isArray(job.image_urls) ? job.image_urls : [];
+    const data = encodeURIComponent(JSON.stringify({ title: job.title || "", message: job.broadcast_message || "", channels: job.channels || ["application"], image_urls: images, single_delivery: Boolean(job.single_delivery) }));
+    const createdAt = job.created_at ? new Date(job.created_at).toLocaleString("ru-RU") : "";
+    const statusText = job.status === "completed" ? "Выполнено" : (job.status || "");
+    const statusClass = job.status === "completed" ? "is-completed" : "";
+    const imagesMarkup = images.length ? '<div class="notification-history-images">' + images.map((url) => '<img src="' + escapeHtml(url) + '" alt="\u0412\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0438">').join("") + '</div>' : "";
+    return '<article class="notification-history-item" data-notification-history="' + data + '"><div class="notification-history-content"><div class="notification-history-meta"><span>' + escapeHtml(createdAt) + '</span><span class="' + statusClass + '">' + escapeHtml(statusText) + '</span></div><strong>' + escapeHtml(job.title || "\u0411\u0435\u0437 \u0442\u0435\u043c\u044b") + '</strong><p>' + escapeHtml(job.broadcast_message || "") + '</p>' + imagesMarkup + '</div><div class="notification-history-actions"><button type="button" class="copy-icon-button" data-notification-history-edit aria-label="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0443" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13.5 5.5L18.5 10.5M4 20L8.2 19.1L19.2 8.1C20.3 7 20.3 5.2 19.2 4.1C18.1 3 16.3 3 15.2 4.1L4.2 15.1L4 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" class="client-delete-icon-button" data-notification-history-delete="' + escapeHtml(job.id) + '" aria-label="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0443" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0443"><img src="/fronted/icons/basket.svg" alt=""></button></div></article>';
+  }).join("") + '</div></section>';
+}
 
 export async function notifications(ctx, { embedded = false } = {}) {
-  const status = await api.pushStatus(ctx.org.id).catch(() => ({ active_count: 0, max_count: 0, telegram_count: 0, configured: false }));
+  const [status, jobs, bots] = await Promise.all([
+    api.pushStatus(ctx.org.id).catch(() => ({ active_count: 0, max_count: 0, telegram_count: 0, configured: false })),
+    api.pushNotificationJobs(ctx.org.id).catch(() => []),
+    api.organizationBots(ctx.org.id).catch(() => []),
+  ]);
+  const maxAvailable = bots.some((bot) => bot.platform === "max" && bot.is_active);
+  const telegramAvailable = bots.some((bot) => bot.platform === "telegram" && bot.is_active);
   const body = `
     <div class="subpanel">
       <h3 class="subpanel-title">Новая рассылка</h3>
@@ -28,9 +64,10 @@ export async function notifications(ctx, { embedded = false } = {}) {
                   <span>Разослать через</span>
                 </button>
                 <div class="notification-channels-options">
-                  <label><input type="checkbox" name="channels" value="max"><span>MAX</span></label>
-                  <label><input type="checkbox" name="channels" value="telegram"><span>Telegram</span></label>
+                  ${maxAvailable ? '<label><input type="checkbox" name="channels" value="max"><span>MAX</span></label>' : ""}
+                  ${telegramAvailable ? '<label><input type="checkbox" name="channels" value="telegram"><span>Telegram</span></label>' : ""}
                   <label><input type="checkbox" name="channels" value="application" checked><span>Приложение</span></label>
+                  <label class="notification-single-delivery"><input type="checkbox" name="single_delivery"><span>Отправка только одного уведомления</span></label>
                 </div>
               </div>
             </div>
@@ -58,6 +95,7 @@ export async function notifications(ctx, { embedded = false } = {}) {
         <p data-message></p>
         ${status.configured ? "" : `<p class="notification-config-warning">${escapeHtml("Push-ключи VAPID не настроены, доставка пока недоступна.")}</p>`}
       </form>
+      ${notificationHistoryMarkup(jobs)}
     </div>
   `;
   if (embedded) return body;
@@ -72,12 +110,14 @@ export function bindNotifications(root, ctx = {}) {
   function renderNotificationImages(form) {
     const preview = form.querySelector("[data-notification-image-previews]");
     const files = notificationFiles.get(form) || [];
+    const storedUrls = notificationImageUrls.get(form) || [];
     preview.querySelectorAll("[data-object-url]").forEach((image) => URL.revokeObjectURL(image.dataset.objectUrl));
-    preview.hidden = !files.length;
+    preview.hidden = !files.length && !storedUrls.length;
     preview.innerHTML = files.map((file, index) => {
       const url = URL.createObjectURL(file);
       return `<figure><img src="${url}" data-object-url="${url}" alt="${escapeHtml(file.name)}"><button type="button" data-remove-notification-image="${index}" aria-label="Убрать изображение">&times;</button></figure>`;
     }).join("");
+    preview.innerHTML = storedUrls.map((url) => '<figure><img src="' + escapeHtml(url) + '" alt="\u0412\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0438"></figure>').join("") + preview.innerHTML;
   }
 
   function syncNotificationTitle(input) {
@@ -112,6 +152,33 @@ export function bindNotifications(root, ctx = {}) {
       files.splice(Number(removeImage.dataset.removeNotificationImage), 1);
       notificationFiles.set(form, files);
       renderNotificationImages(form);
+      return;
+    }
+    const editHistory = event.target.closest("[data-notification-history-edit]");
+    if (editHistory) {
+      const item = editHistory.closest("[data-notification-history]");
+      const saved = item ? JSON.parse(decodeURIComponent(item.dataset.notificationHistory || "")) : null;
+      const form = root.querySelector("[data-notification-form]");
+      if (!saved || !form) return;
+      form.elements.title.value = saved.title || "";
+      form.elements.message.value = saved.message || "";
+      form.querySelectorAll('[name="channels"]').forEach((input) => { input.checked = saved.channels.includes(input.value); });
+      form.elements.single_delivery.checked = Boolean(saved.single_delivery);
+      notificationFiles.set(form, []);
+      notificationImageUrls.set(form, [...(saved.image_urls || [])]);
+      renderNotificationImages(form);
+      syncNotificationTitle(form.elements.title);
+      syncNotificationComposer(form.elements.message);
+      updateNotificationForm(form);
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      form.elements.title.focus();
+      return;
+    }
+    const deleteHistory = event.target.closest("[data-notification-history-delete]");
+    if (deleteHistory) {
+      if (!window.confirm("\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0443 \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438?")) return;
+      const orgId = location.pathname.split("/").filter(Boolean)[1];
+      api.deletePushNotificationJob(deleteHistory.dataset.notificationHistoryDelete, Number(orgId)).then(() => { showNotificationToast("\u0420\u0430\u0441\u0441\u044b\u043b\u043a\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430"); ctx.reload?.(); }).catch((error) => { root.querySelector("[data-message]").textContent = error.message; });
       return;
     }
     const trigger = event.target.closest("[data-notification-channels-trigger]");
@@ -209,20 +276,24 @@ export function bindNotifications(root, ctx = {}) {
     const title = String(data.get("title") || "").trim().slice(0, MAX_TITLE_LENGTH);
     const message = String(data.get("message") || "").trim().slice(0, MAX_MESSAGE_LENGTH);
     const channels = data.getAll("channels").map(String);
+    const singleDelivery = data.get("single_delivery") === "on";
     const files = notificationFiles.get(form) || [];
     if (!title || !message || !channels.length) return;
     try {
       const uploaded = files.length ? await api.uploadPushNotificationImages(files) : { image_urls: [] };
-      await api.startPushNotificationJob({ organization_id: Number(orgId), title, message, channels, image_urls: uploaded.image_urls || [] });
-      form.querySelector("[data-message]").textContent = "Рассылка поставлена в очередь. Прогресс отображается во вкладке «Задачи».";
+      const storedUrls = notificationImageUrls.get(form) || [];
+      await api.startPushNotificationJob({ organization_id: Number(orgId), title, message, channels, image_urls: [...storedUrls, ...(uploaded.image_urls || [])], single_delivery: singleDelivery });
+      form.querySelector("[data-message]").textContent = "";
       form.reset();
       notificationFiles.set(form, []);
+      notificationImageUrls.set(form, []);
       renderNotificationImages(form);
       form.querySelector("[data-notification-counter]").textContent = `0 / ${MAX_MESSAGE_LENGTH}`;
       syncNotificationTitle(form.elements.title);
       syncNotificationComposer(form.elements.message);
       updateNotificationForm(form);
-      ctx.navigate?.(`/organizations/${orgId}/tasks`);
+      showNotificationToast("Задача добавлена в очередь");
+      ctx.reload?.();
     } catch (error) {
       form.querySelector("[data-message]").textContent = error.message;
     }

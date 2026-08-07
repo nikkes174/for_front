@@ -6,11 +6,14 @@ import { openExternalClientCard } from "./clients.js";
 
 const no = "Не указано";
 let cache = {};
+const productExcelPreviewState = new WeakMap();
 let selectedEventVisit = null;
 let departmentFilterBranchId = "";
 let workplaceFilterBranchId = "";
 let productFilterCategoryId = "";
 let serviceFilterCategoryId = "";
+let productSearchQuery = "";
+let serviceSearchQuery = "";
 let userFilterBranchId = "";
 let userFilterRoleId = "";
 let userFilterDepartmentId = "";
@@ -34,6 +37,7 @@ const SETTINGS_TABS = [
   { slug: "roles", label: "Роли и права", permissions: ["settings.roles.manage"] },
   { slug: "users", label: "Пользователи", permissions: ["settings.users.view", "settings.users.create", "settings.users.assign_roles"] },
   { slug: "logs", label: "Логи работы", permissions: ["settings.audit.view", "settings.events.view"] },
+  { slug: "bots", label: "Боты", permissions: ["settings.bots.view"] },
 ];
 const TAX_SYSTEM_OPTIONS = [
   { value: "УСН Доходы", label: "УСН Доходы" },
@@ -463,6 +467,20 @@ function productItemDetails(item) {
   const categoryLabel = category ? `${category.name} (${categoryTypeLabel(category.type)})` : no;
   const price = item.price === null || item.price === undefined ? no : item.price;
   return `${categoryLabel} · Цена: ${price} · ${item.active ? "активен" : "неактивен"}`;
+}
+
+function catalogItemListMarkup(itemType) {
+  const isService = itemType === "service";
+  const selectedCategoryId = isService ? serviceFilterCategoryId : productFilterCategoryId;
+  const searchQuery = (isService ? serviceSearchQuery : productSearchQuery).trim().toLowerCase();
+  const items = (cache.productItems || [])
+    .filter((item) => categoryTypeById(item.category_id) === itemType)
+    .filter((item) => !selectedCategoryId || String(item.category_id) === String(selectedCategoryId))
+    .filter((item) => !searchQuery || `${item.title || ""} ${productItemDetails(item)}`.toLowerCase().includes(searchQuery));
+  return entityList(items, searchQuery ? "Ничего не найдено" : (isService ? "Услуг пока нет" : "Товаров пока нет"), "productItem", (item) => item.title, productItemDetails, {
+    deleteIcon: true,
+    deleteLabel: "Удалить",
+  });
 }
 
 function productItemCategory(item) {
@@ -1624,6 +1642,7 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
     : "Товары привязаны к товарным категориям организации.";
   const scopedCategories = categories.filter((category) => category.type === type);
   const selectedCategoryId = activeTab === "services" ? serviceFilterCategoryId : productFilterCategoryId;
+  const searchQuery = activeTab === "services" ? serviceSearchQuery : productSearchQuery;
   const scopedItems = productItems
     .filter((item) => categoryTypeById(item.category_id) === type)
     .filter((item) => !selectedCategoryId || String(item.category_id) === String(selectedCategoryId));
@@ -1653,16 +1672,15 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
           <label class="secondary catalog-excel-upload ${scopedCategories.length ? "" : "is-disabled"}">Загрузить Excel<input type="file" accept=".xls,.xlsx" data-product-excel-file data-item-type="${escapeHtml(type)}" ${scopedCategories.length ? "" : "disabled"}></label>
           <button type="button" class="catalog-excel-export" data-product-excel-export data-item-type="${escapeHtml(type)}">Выгрузить Excel</button>
           <span data-product-excel-message></span>
+          <div class="catalog-excel-preview" data-product-excel-preview hidden></div>
         </div>
         ${productItemCreateForm(
           scopedCategories,
           activeTab === "services" ? "услугу" : "товар",
           productItemCategoryFilterOptions(scopedCategories, selectedCategoryId, activeTab === "services" ? "data-service-filter-category" : "data-product-filter-category"),
         )}
-        ${entityList(scopedItems, activeTab === "services" ? "Услуг пока нет" : "Товаров пока нет", "productItem", (item) => item.title, productItemDetails, {
-          deleteIcon: true,
-          deleteLabel: "Удалить",
-        })}
+        <form class="inline-form compact"><label><span>Поиск ${activeTab === "services" ? "услуги" : "товара"}</span><input type="search" placeholder="Название" value="${escapeHtml(searchQuery)}" data-catalog-item-search data-item-type="${escapeHtml(type)}"></label></form>
+        <div data-catalog-item-list>${catalogItemListMarkup(type)}</div>
       `, itemsHint)}
     </div>
   `;
@@ -2187,6 +2205,15 @@ function productItemCreateForm(categories, title, categoryFilter = "") {
   `;
 }
 
+function renderProductExcelPreview(actions) {
+  const preview = actions?.querySelector("[data-product-excel-preview]");
+  const state = actions ? productExcelPreviewState.get(actions) : null;
+  if (!preview || !state) return;
+  const items = state.rows.filter((row) => !state.excludedRows.has(Number(row.row_number)));
+  preview.hidden = false;
+  preview.innerHTML = '<div class="modal-card catalog-excel-preview-card"><div class="modal-head"><h3>\u041a \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0435: ' + items.length + '</h3><button type="button" class="ghost" data-product-excel-preview-close>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button></div><div class="catalog-excel-preview-list">' + items.map((row) => '<div><span>' + escapeHtml(row.title || "\u0411\u0435\u0437 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f") + '</span><small>' + escapeHtml(row.sku || row.barcode || "") + '</small><button type="button" class="client-delete-icon-button" data-product-excel-preview-remove="' + Number(row.row_number) + '"><img src="/fronted/icons/basket.svg" alt=""></button></div>').join("") + '</div><div class="catalog-excel-preview-footer"><button type="button" class="primary" data-product-excel-import-confirm>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435</button></div></div>';
+}
+
 async function saveProductExcel(url, suggestedName) {
   if (typeof window.showSaveFilePicker !== "function") {
     const link = document.createElement("a");
@@ -2701,7 +2728,60 @@ async function deleteEntity(type, id) {
   throw new Error("Неизвестная сущность");
 }
 
+function showOrganizationBotToast(message, kind = "success") {
+  const toast = document.createElement("div");
+  toast.className = `organization-bot-toast is-${kind}`;
+  toast.setAttribute("role", "status");
+  toast.textContent = message;
+  document.body.append(toast);
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+  window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+    window.setTimeout(() => toast.remove(), 220);
+  }, 2200);
+}
+
+function organizationBotsSettingsMarkup(ctx, bots) {
+  return `
+    <section class="panel" data-settings data-settings-section="bots">
+      <h2>${escapeHtml(ctx.org.name)}</h2>
+      <div id="bots" data-permission="settings.bots.view">
+        ${section("Боты организации", `
+          <div class="organization-bots-grid">
+            ${[
+              { platform: "telegram", label: "Telegram" },
+              { platform: "max", label: "MAX" },
+            ].map(({ platform, label }) => {
+              const bot = bots.find((item) => item.platform === platform);
+              return `<article class="organization-bot-card">
+                <div class="organization-bot-heading">
+                  <div><h3>${label}</h3><p>${bot ? escapeHtml(bot.bot_name || "Бот подключён") : "Бот не подключён"}</p></div>
+                  <span class="organization-bot-status ${bot?.is_active ? "is-active" : ""}">${bot?.is_active ? "Включён" : "Выключен"}</span>
+                </div>
+                <form class="organization-bot-actions" data-bot-save data-platform="${platform}">
+                  <label class="organization-bot-token"><span>Токен бота</span><input name="token" type="password" autocomplete="off" required placeholder="${bot ? escapeHtml(bot.token_hint) : "Вставьте токен"}"></label>
+                  <button class="primary" type="submit">${bot ? "Заменить бота" : "Подключить бота"}</button>
+                  <label class="organization-bot-switch" title="${bot?.is_active ? "Выключить бота" : "Включить бота"}">
+                    <input type="checkbox" data-bot-toggle data-platform="${platform}" ${bot?.is_active ? "checked" : ""} ${bot ? "" : "disabled"} aria-label="${bot?.is_active ? "Выключить бота" : "Включить бота"}">
+                    <span aria-hidden="true"></span>
+                  </label>
+                  <p class="organization-bot-message" data-message></p>
+                </form>
+              </article>`;
+            }).join("")}
+          </div>
+        `, "При включении устанавливается вебхук. При выключении вебхук удаляется, и канал пропадает из рассылок.")}
+      </div>
+    </section>
+  `;
+}
+
 export async function settings(ctx, tabSlug = "") {
+  const currentTab = activeSettingsTab(ctx, tabSlug);
+  if (currentTab === "bots") {
+    const bots = await api.organizationBots(ctx.org.id).catch(() => []);
+    return organizationBotsSettingsMarkup(ctx, bots);
+  }
   const settingsData = await loadSettingsData(ctx.org.id);
   const {
     organizations,
@@ -2730,7 +2810,6 @@ export async function settings(ctx, tabSlug = "") {
     : workplaces;
 
   hydrateSettingsCache(ctx.org.id, settingsData);
-  const currentTab = activeSettingsTab(ctx, tabSlug);
   const filteredUsers = users.filter((user) => userMatchesFilters(user, memberships, branchMemberships));
   const pagedUsersData = paginate(filteredUsers, userPage, USER_PAGE_SIZE);
   const pagedAuditData = paginate(auditLogs, auditPage, auditPageSize);
@@ -2909,6 +2988,7 @@ export async function settings(ctx, tabSlug = "") {
         `, "\u0421\u043e\u0431\u044b\u0442\u0438\u044f \u2014 \u044d\u0442\u043e \u0441\u0438\u0441\u0442\u0435\u043c\u043d\u044b\u0435 \u0437\u0430\u043f\u0438\u0441\u0438 \u043e \u043f\u0440\u043e\u0438\u0437\u043e\u0448\u0435\u0434\u0448\u0438\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f\u0445.")}
       </div>
       ` : ""}
+
             ${eventVisitModal()}
     </section>
   `;
@@ -2982,6 +3062,13 @@ export function bindSettings(root, ctx) {
       updateUserList(true);
       return;
     }
+    if (event.target.matches("[data-catalog-item-search]")) {
+      if (event.target.dataset.itemType === "service") serviceSearchQuery = event.target.value || "";
+      else productSearchQuery = event.target.value || "";
+      const list = event.target.closest("[data-permission]")?.querySelector("[data-catalog-item-list]");
+      if (list) list.innerHTML = catalogItemListMarkup(event.target.dataset.itemType);
+      return;
+    }
     if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
       syncRequiredPanelForms(root);
     }
@@ -3000,15 +3087,11 @@ export function bindSettings(root, ctx) {
       const categoryId = actions?.querySelector("[data-product-excel-category]")?.value;
       if (!file || !categoryId) return;
       const message = actions.querySelector("[data-product-excel-message]");
-      event.target.disabled = true;
-      message.textContent = "Загружаем позиции...";
-      api.importProductItems(ctx.org.id, categoryId, file)
-        .then((result) => {
-          message.textContent = `Готово: создано ${result.created}, обновлено ${result.updated}`;
-          ctx.reload();
-        })
-        .catch((error) => { message.textContent = error.message || "Не удалось загрузить Excel"; })
-        .finally(() => { event.target.disabled = false; event.target.value = ""; });
+      event.target.disabled = true; message.textContent = "\u0413\u043e\u0442\u043e\u0432\u0438\u043c \u043f\u0440\u0435\u0432\u044c\u044e...";
+      api.previewProductItems(ctx.org.id, categoryId, file).then((result) => {
+        productExcelPreviewState.set(actions, { file, rows: result.rows || [], excludedRows: new Set() });
+        renderProductExcelPreview(actions); message.textContent = "";
+      }).catch((error) => { message.textContent = error.message || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u044c Excel"; }).finally(() => { event.target.disabled = false; event.target.value = ""; });
       return;
     }
     if (event.target.matches("[data-department-filter-branch]")) {
@@ -3169,7 +3252,9 @@ export function bindSettings(root, ctx) {
       validateRequiredPanelForm(form);
       if (!form.reportValidity()) return;
       const data = formData(form);
-      if (form.matches("[data-brand-create]")) {
+      if (form.matches("[data-bot-save]")) {
+        await api.saveOrganizationBot(ctx.org.id, form.dataset.platform, { token: data.token });
+      } else if (form.matches("[data-brand-create]")) {
         await api.createBrand({ organization_id: ctx.org.id, name: data.name });
       } else if (form.matches("[data-legal-create]")) {
         await api.createLegalEntity({
@@ -3283,10 +3368,45 @@ export function bindSettings(root, ctx) {
   });
 
   root.addEventListener("click", async (event) => {
+    const botToggle = event.target.closest("[data-bot-toggle]");
+    if (botToggle) {
+      const enabled = botToggle.checked;
+      botToggle.disabled = true;
+      try {
+        await api.toggleOrganizationBot(ctx.org.id, botToggle.dataset.platform, enabled);
+        showOrganizationBotToast(enabled ? "Бот включён" : "Бот выключен", enabled ? "success" : "danger");
+        ctx.reload();
+      } catch (error) {
+        botToggle.checked = !enabled;
+        showOrganizationBotToast(error.message || "Не удалось изменить статус бота", "danger");
+        botToggle.disabled = false;
+      }
+      return;
+    }
     if (handleAchievementConditionClick(event, root)) return;
     if (handleProductAmountClick(event, root)) return;
 
-    const exportButton = event.target.closest("[data-product-excel-export]");
+    const previewCloseButton = event.target.closest("[data-product-excel-preview-close]");
+    if (previewCloseButton) { previewCloseButton.closest("[data-product-excel-preview]")?.setAttribute("hidden", ""); return; }
+    if (event.target.matches("[data-product-excel-preview]")) { event.target.setAttribute("hidden", ""); return; }
+        const previewRemoveButton = event.target.closest("[data-product-excel-preview-remove]");
+    if (previewRemoveButton) {
+      const actions = previewRemoveButton.closest(".catalog-excel-actions"); const state = productExcelPreviewState.get(actions);
+      if (state) { state.excludedRows.add(Number(previewRemoveButton.dataset.productExcelPreviewRemove)); renderProductExcelPreview(actions); }
+      return;
+    }
+    const previewConfirmButton = event.target.closest("[data-product-excel-import-confirm]");
+    if (previewConfirmButton) {
+      const actions = previewConfirmButton.closest(".catalog-excel-actions"); const state = productExcelPreviewState.get(actions);
+      const categoryId = actions?.querySelector("[data-product-excel-category]")?.value; const message = actions?.querySelector("[data-product-excel-message]");
+      if (!state || !categoryId || !message) return;
+      previewConfirmButton.disabled = true; message.textContent = "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c \u043f\u043e\u0437\u0438\u0446\u0438\u0438...";
+      api.importProductItems(ctx.org.id, categoryId, state.file, [...state.excludedRows]).then((result) => {
+        message.textContent = "\u0413\u043e\u0442\u043e\u0432\u043e: " + result.total; ctx.reload();
+      }).catch((error) => { message.textContent = error.message || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c Excel"; previewConfirmButton.disabled = false; });
+      return;
+    }
+        const exportButton = event.target.closest("[data-product-excel-export]");
     if (exportButton) {
       const actions = exportButton.closest(".catalog-excel-actions");
       const message = actions?.querySelector("[data-product-excel-message]");

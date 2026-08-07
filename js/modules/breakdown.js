@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { escapeHtml } from "../dom.js";
+import { openExternalClientCard } from "./clients.js";
 
 const state = { organizationId: null, dateFrom: "", dateTo: "", branchId: "", itemType: "all", itemKey: "" };
 
@@ -110,7 +111,7 @@ export async function breakdown(ctx) {
               <td>${quantity(row.quantity)}</td><td>${money(row.price)}</td><td>${money(row.discount_amount)}</td><td><strong>${money(row.total_amount)}</strong></td>
               <td>${escapeHtml(userMap.get(String(row.employee_id)) || row.employee_name || `Сотрудник #${row.employee_id || "—"}`)}</td>
               <td>${escapeHtml(branchMap.get(String(row.branch_id)) || `Филиал #${row.branch_id || "—"}`)}</td>
-              <td>#${escapeHtml(row.visit_id || "—")}</td>
+              <td>${row.visit_id ? `<button type="button" class="link-button" data-breakdown-open-visit="${escapeHtml(row.visit_id)}">${escapeHtml(formatDate(row.sold_at))}</button>` : "—"}</td>
             </tr>`).join("") : '<tr><td colspan="10" class="finance-empty">По выбранным фильтрам продаж не найдено</td></tr>'}</tbody>
           </table>
         </div>
@@ -129,7 +130,26 @@ export function bindBreakdown(root, ctx) {
     state.itemKey = "";
     ctx.reload();
   });
-  root.addEventListener("click", (event) => {
+  root.addEventListener("click", async (event) => {
+    const visitButton = event.target.closest("[data-breakdown-open-visit]");
+    if (visitButton) {
+      visitButton.disabled = true;
+      try {
+        const details = await api.clientVisitDetails(visitButton.dataset.breakdownOpenVisit);
+        const clientId = details?.visit?.client_id;
+        if (!clientId) throw new Error("У визита не указан клиент");
+        await openExternalClientCard(ctx, clientId, {
+          selectedVisitId: visitButton.dataset.breakdownOpenVisit,
+          visitOnly: true,
+        });
+      } catch (error) {
+        alert(error.message || "Не удалось открыть визит");
+      } finally {
+        visitButton.disabled = false;
+      }
+      return;
+    }
+
     if (!event.target.closest("[data-breakdown-apply]")) return;
     state.dateFrom = root.querySelector("[data-breakdown-date-from]")?.value || state.dateFrom;
     state.dateTo = root.querySelector("[data-breakdown-date-to]")?.value || state.dateTo;

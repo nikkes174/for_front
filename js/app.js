@@ -31,6 +31,7 @@ const SETTINGS_PERMISSIONS = [
   "settings.brands.view",
   "settings.audit.view",
   "settings.events.view",
+  "settings.bots.view",
 ];
 const LOYALTY_PERMISSIONS = [
   "loyalty.rules.view",
@@ -56,6 +57,7 @@ const SETTINGS_MENU_SECTIONS = [
   { slug: "roles", label: "Роли и права", permissions: ["settings.roles.manage"] },
   { slug: "users", label: "Пользователи", permissions: ["settings.users.view", "settings.users.create", "settings.users.assign_roles"] },
   { slug: "logs", label: "События", permissions: ["settings.audit.view", "settings.events.view"] },
+  { slug: "bots", label: "Боты", permissions: ["settings.bots.view"] },
 ];
 const CATALOG_MENU_SECTIONS = [
   { slug: "products", label: "Товары", permissions: ["settings.categories.view", "settings.items.view"] },
@@ -860,6 +862,36 @@ function settingsSidebarMenu(orgId) {
   `;
 }
 
+function financeSidebarMenu(orgId) {
+  const isFinancePage = location.pathname.includes(`/organizations/${orgId}/finance`)
+    || location.pathname.includes(`/organizations/${orgId}/breakdown`);
+  const activeSlug = location.pathname.includes(`/organizations/${orgId}/breakdown`)
+    ? "breakdown"
+    : "salary";
+  return `
+    <div class="sidebar-group ${isFinancePage ? "active" : ""}">
+      <button
+        type="button"
+        class="sidebar-group-toggle ${isFinancePage ? "active" : ""}"
+        data-finance-menu-toggle
+        aria-expanded="${isFinancePage ? "true" : "false"}"
+        aria-controls="finance-submenu"
+      >
+        <span class="sidebar-group-label">${sidebarIcon("finance.svg")}<span>Финансы</span></span>
+        <span class="sidebar-group-chevron" aria-hidden="true"></span>
+      </button>
+      <div
+        id="finance-submenu"
+        class="sidebar-submenu ${isFinancePage ? "is-open" : ""}"
+        ${isFinancePage ? "" : "hidden"}
+      >
+        <a class="${activeSlug === "salary" ? "active" : ""}" href="/organizations/${orgId}/finance">Зарплаты</a>
+        <a class="${activeSlug === "breakdown" ? "active" : ""}" href="/organizations/${orgId}/breakdown">Детализация</a>
+      </div>
+    </div>
+  `;
+}
+
 function shell(content, title) {
   const org = state.org;
   const orgOptions = state.orgs.map((item) => `
@@ -883,8 +915,7 @@ function shell(content, title) {
           ${settingsSidebarMenu(org.id)}
           ${navLink(`/organizations/${org.id}/tasks`, "Задачи", "tasks.svg")}
           ${navLink(`/organizations/${org.id}/booking`, "Записи", "recorsd.svg")}
-          ${navLink(`/organizations/${org.id}/finance`, "Зарплаты", "finance.svg")}
-          ${navLink(`/organizations/${org.id}/breakdown`, "Детализация", "breakdown.svg")}
+          ${financeSidebarMenu(org.id)}
         </nav>
       </aside>
       <main class="content">
@@ -966,6 +997,16 @@ function toggleCatalogSidebarMenu() {
 function toggleLoyaltySidebarMenu() {
   const toggle = root.querySelector("[data-loyalty-menu-toggle]");
   const submenu = root.querySelector("#loyalty-submenu");
+  if (!toggle || !submenu) return;
+  const isOpen = toggle.getAttribute("aria-expanded") === "true";
+  toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+  submenu.hidden = isOpen;
+  submenu.classList.toggle("is-open", !isOpen);
+}
+
+function toggleFinanceSidebarMenu() {
+  const toggle = root.querySelector("[data-finance-menu-toggle]");
+  const submenu = root.querySelector("#finance-submenu");
   if (!toggle || !submenu) return;
   const isOpen = toggle.getAttribute("aria-expanded") === "true";
   toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
@@ -1207,6 +1248,11 @@ root.addEventListener("click", async (event) => {
 
   if (event.target.closest("[data-loyalty-menu-toggle]")) {
     toggleLoyaltySidebarMenu();
+    return;
+  }
+
+  if (event.target.closest("[data-finance-menu-toggle]")) {
+    toggleFinanceSidebarMenu();
     return;
   }
 
