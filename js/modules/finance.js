@@ -453,7 +453,7 @@ export function bindFinance(root, ctx) {
 
     const additionalModal = event.target.closest("[data-finance-additional-modal]");
     const closeAdditional = event.target.closest("[data-finance-additional-close]");
-    if (closeAdditional || (additionalModal && event.target === additionalModal)) {
+    if (closeAdditional) {
       additionalModal?.remove();
       return;
     }

@@ -226,21 +226,34 @@
     if (!response.ok) throw new Error("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F");
     return response.json();
   }
-  var CABINET_ORGANIZATION_NAME_CACHE_PREFIX = "cabinet.organizationName:";
+  var CABINET_ORGANIZATION_BRANDING_CACHE_PREFIX = "cabinet.organizationBranding:";
+  var cabinetOrganizationBranding = null;
   async function loadCabinetOrganizationName(organizationId) {
-    var _a3;
     const id = Number(organizationId || 0);
     const wordmark = document.querySelector("[data-cabinet-organization-name]");
     if (!id || !wordmark) return;
-    const cacheKey = `${CABINET_ORGANIZATION_NAME_CACHE_PREFIX}${id}`;
-    const cachedName = localStorage.getItem(cacheKey);
-    if (cachedName) wordmark.textContent = cachedName;
-    if (cachedName) return;
+    const cacheKey = `${CABINET_ORGANIZATION_BRANDING_CACHE_PREFIX}${id}`;
+    let cachedBranding = null;
+    try {
+      cachedBranding = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    } catch (e) {
+    }
+    if (cachedBranding == null ? void 0 : cachedBranding.name) {
+      cabinetOrganizationBranding = cachedBranding;
+      wordmark.textContent = cachedBranding.name;
+      return;
+    }
     const result = await requestJson(`/public-api/organizations/${encodeURIComponent(id)}/booking-reference`, { cache: "default" }).catch(() => null);
-    const name = String(((_a3 = result == null ? void 0 : result.organization) == null ? void 0 : _a3.name) || "").trim();
+    const organization = (result == null ? void 0 : result.organization) || {};
+    const name = String(organization.name || "").trim();
     if (!name) return;
+    cabinetOrganizationBranding = {
+      name,
+      photo_file_id: organization.photo_file_id || "",
+      updated_at: organization.updated_at || ""
+    };
     wordmark.textContent = name;
-    localStorage.setItem(cacheKey, name);
+    localStorage.setItem(cacheKey, JSON.stringify(cabinetOrganizationBranding));
   }
   async function restoreStoredSession() {
     const token2 = localStorage.getItem(SESSION_TOKEN_KEY);
@@ -707,7 +720,7 @@
     const organizationId = Number(
       (clientBookingOptions == null ? void 0 : clientBookingOptions.organization_id) || publicBookingOrganizationId || (cabinetData == null ? void 0 : cabinetData.organization_id) || ((_a3 = cabinetData == null ? void 0 : cabinetData.client) == null ? void 0 : _a3.organization_id) || (currentClient == null ? void 0 : currentClient.organization_id) || 0
     );
-    const photoUrl = (branch == null ? void 0 : branch.id) ? `/organizations/branches/${encodeURIComponent(branch.id)}/photo-file?v=${encodeURIComponent(branch.photo_file_id || "7-photo")}` : organizationId ? `/organizations/${encodeURIComponent(organizationId)}/photo-file?v=7-photo` : "";
+    const photoUrl = (branch == null ? void 0 : branch.id) ? `/organizations/branches/${encodeURIComponent(branch.id)}/photo-file?v=${encodeURIComponent(branch.photo_file_id || "7-photo")}` : organizationId ? `/organizations/${encodeURIComponent(organizationId)}/photo-file?v=${encodeURIComponent((cabinetOrganizationBranding == null ? void 0 : cabinetOrganizationBranding.updated_at) || (cabinetOrganizationBranding == null ? void 0 : cabinetOrganizationBranding.photo_file_id) || "7-photo")}` : "";
     logo.innerHTML = `<span>L</span>${photoUrl ? `<img class="cabinet-booking-service-photo" src="${escapeHtml(photoUrl)}" alt="" loading="lazy" decoding="async" onload="this.previousElementSibling.hidden=true" onerror="this.remove()" />` : ""}`;
   }
   async function renderClientBookingBranchMeta() {
@@ -1361,6 +1374,7 @@
     setRegistrationMode(false);
     if (publicBookingOrganizationId) {
       document.body.classList.add("cabinet-public-booking-mode");
+      await loadCabinetOrganizationName(publicBookingOrganizationId);
       const result = await currentUser().catch(() => null);
       if (result) {
         await loadCabinetSections(["visits"]);

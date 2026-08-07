@@ -239,6 +239,7 @@ export const api = {
   deleteVisitPhoto: (id, stage, photoId) => request(`/crm-api/client-history/visits/${id}/photos/${stage}/${encodeURIComponent(photoId)}`, { method: "DELETE" }),
   deleteClientVisit: (id) => request(`/crm-api/client-history/visits/${id}`, { method: "DELETE" }),
   bookingCalendar: (orgId, dateFrom, dateTo, viewBy, branchId = "", employeeId = "") => request(`/booking-api/calendar?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}&view_by=${viewBy}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+  bookingCompatibility: (orgId, branchId, masterId, serviceId, bookingDate) => request(`/booking-api/public-booking/compatibility?organization_id=${orgId}&branch_id=${branchId}&master_id=${masterId}&service_ids=${serviceId}&booking_date=${encodeURIComponent(bookingDate)}`),
   createStaffBooking: (body) => request("/booking-api/staff-booking", { method: "POST", body: JSON.stringify(body) }),
   updateBookingVisitStatus: (id, visitStatus) => request(`/booking-api/visits/${id}/status`, { method: "PATCH", body: JSON.stringify({ visit_status: visitStatus }) }),
   financePayroll: (orgId, dateFrom, dateTo, branchId = "", employeeId = "") => request(`/finanse-api/payroll?organization_id=${orgId}&date_from=${dateFrom}&date_to=${dateTo}${branchId ? `&branch_id=${branchId}` : ""}${employeeId ? `&employee_id=${employeeId}` : ""}`),

@@ -82,13 +82,16 @@ function codeMethodPopoverHtml() {
       <button type="button" class="primary" data-code-organization-continue>Продолжить</button>
     </div>`;
   }
+  const selectedOrganization = clientCodeOrganizations.find((organization) => String(organization.id) === String(clientCodeOrganizationId));
+  const availableChannels = selectedOrganization?.channels || [];
+  const defaultChannel = availableChannels.includes("max") ? "max" : availableChannels[0] || "";
   return `<div class="auth-code-popover" data-auth-code-popover role="dialog" aria-label="Способ получения кода">
     <strong>Получить код</strong>
-    <p>Выберите один способ</p>
-    <label class="auth-code-method"><input type="radio" name="code_channel" value="max" checked><span>Через MAX</span></label>
-    <label class="auth-code-method"><input type="radio" name="code_channel" value="telegram"><span>Через Telegram</span></label>
+    <p>${availableChannels.length ? "Выберите один способ" : "У организации нет подключённых ботов"}</p>
+    ${availableChannels.includes("max") ? `<label class="auth-code-method"><input type="radio" name="code_channel" value="max" ${defaultChannel === "max" ? "checked" : ""}><span>Через MAX</span></label>` : ""}
+    ${availableChannels.includes("telegram") ? `<label class="auth-code-method"><input type="radio" name="code_channel" value="telegram" ${defaultChannel === "telegram" ? "checked" : ""}><span>Через Telegram</span></label>` : ""}
     <label class="auth-code-method disabled"><input type="radio" name="code_channel" value="sms" disabled><span>По СМС</span><small>Скоро</small></label>
-    <button type="button" class="primary" data-client-code-request>Продолжить</button>
+    <button type="button" class="primary" data-client-code-request ${availableChannels.length ? "" : "disabled"}>Продолжить</button>
   </div>`;
 }
 

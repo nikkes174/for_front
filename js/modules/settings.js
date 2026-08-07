@@ -3388,7 +3388,6 @@ export function bindSettings(root, ctx) {
 
     const previewCloseButton = event.target.closest("[data-product-excel-preview-close]");
     if (previewCloseButton) { previewCloseButton.closest("[data-product-excel-preview]")?.setAttribute("hidden", ""); return; }
-    if (event.target.matches("[data-product-excel-preview]")) { event.target.setAttribute("hidden", ""); return; }
         const previewRemoveButton = event.target.closest("[data-product-excel-preview-remove]");
     if (previewRemoveButton) {
       const actions = previewRemoveButton.closest(".catalog-excel-actions"); const state = productExcelPreviewState.get(actions);
@@ -3564,6 +3563,12 @@ export function bindSettings(root, ctx) {
     if (handleAchievementConditionClick(event)) return;
     if (handleProductAmountClick(event)) return;
 
+    if (event.target.matches("[data-event-visit-modal]")) {
+      selectedEventVisit = null;
+      event.target.remove();
+      return;
+    }
+
     const addBookingBlock = event.target.closest("[data-add-user-booking-block]");
     if (addBookingBlock) {
       addBookingBlock.closest(".user-profile-section")?.querySelector("[data-user-booking-blocks]")?.insertAdjacentHTML("beforeend", userBookingBlockRow());
@@ -3611,11 +3616,6 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("mousedown", (event) => {
-    if (event.target.matches("[data-event-visit-modal]")) {
-      selectedEventVisit = null;
-      event.target.remove();
-      return;
-    }
     if (!event.target.closest("[data-branch-achievement-select]")) {
       document.querySelectorAll("[data-branch-achievement-select] details[open]").forEach((item) => {
         item.removeAttribute("open");

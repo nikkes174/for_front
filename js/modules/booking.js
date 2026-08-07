@@ -288,34 +288,80 @@ function masterDayCalendarMarkup(day, data, minHour, maxHour, minuteHeight, slot
   </div>`;
 }
 
+function bookingCreateServices(data, branchId, masterId, selectedServiceId = "") {
+  const master = data.masters?.find((item) => String(item.id) === String(masterId));
+  const serviceIds = new Set((master?.service_ids || []).map(String));
+  return (data.services || []).filter((item) => {
+    if (serviceIds.size && !serviceIds.has(String(item.id))) return false;
+    return !item.branch_ids?.length || item.branch_ids.some((id) => String(id) === String(branchId));
+  }).map((item) => `<option value="${escapeHtml(item.id)}" ${String(item.id) === String(selectedServiceId) ? "selected" : ""}>${escapeHtml(item.title)}${Number(item.price) ? ` — ${Number(item.price).toLocaleString("ru-RU")} ₽` : ""}</option>`).join("");
+}
+
+function bookingCreateSlotsMarkup(slots, selectedStart = "") {
+  if (!slots.length) return '<span class="booking-create-slots-empty">Нет свободного времени для выбранной услуги.</span>';
+  return `<div class="booking-create-slots-list">${slots.map((slot) => {
+    const selected = String(slot.start).slice(0, 16) === String(selectedStart).slice(0, 16);
+    return `<label><input type="radio" name="starts_at" value="${escapeHtml(slot.start)}" ${selected ? "checked" : ""}><span>${escapeHtml(slot.time)}</span></label>`;
+  }).join("")}</div>`;
+}
+
+async function loadBookingCreateSlots(form, ctx) {
+  const slots = form.querySelector("[data-booking-create-slots]");
+  const submit = form.querySelector("[data-booking-create-submit]");
+  const branchId = Number(form.elements.branch_id?.value || 0);
+  const masterId = Number(form.elements.master_id?.value || 0);
+  const serviceId = Number(form.elements.service_id?.value || 0);
+  const bookingDate = String(form.elements.booking_date?.value || "");
+  if (!slots || !branchId || !masterId || !serviceId || !bookingDate) return;
+  slots.innerHTML = '<legend>Свободное время</legend><span class="booking-create-slots-empty">Загружаем свободное время…</span>';
+  if (submit) submit.disabled = true;
+  try {
+    const result = await api.bookingCompatibility(ctx.org.id, branchId, masterId, serviceId, bookingDate);
+    const selectedStart = form.dataset.bookingSelectedStart || "";
+    const available = (result.slots || []).filter((slot) => (slot.master_ids || []).map(String).includes(String(masterId)) && (slot.service_ids || []).map(String).includes(String(serviceId)));
+    const selected = available.find((slot) => String(slot.start).slice(0, 16) === String(selectedStart).slice(0, 16));
+    form.dataset.bookingSelectedStart = selected ? selected.start : "";
+    slots.innerHTML = `<legend>Свободное время</legend>${bookingCreateSlotsMarkup(available, form.dataset.bookingSelectedStart)}`;
+    if (submit) submit.disabled = !selected;
+  } catch (error) {
+    slots.innerHTML = `<legend>Свободное время</legend><span class="booking-create-slots-empty">${escapeHtml(error.message || "Не удалось загрузить свободное время.")}</span>`;
+  }
+}
+
+function syncBookingCreateSelections(form, data) {
+  const branchId = String(form.elements.branch_id.value || "");
+  const masterSelect = form.elements.master_id;
+  const previousMasterId = masterSelect.value;
+  const availableMasters = (data.masters || []).filter((item) => !branchId || item.branch_ids?.some((id) => String(id) === branchId));
+  masterSelect.innerHTML = availableMasters.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+  masterSelect.value = availableMasters.some((item) => String(item.id) === String(previousMasterId)) ? previousMasterId : String(availableMasters[0]?.id || "");
+  const serviceSelect = form.elements.service_id;
+  const previousServiceId = serviceSelect.value;
+  serviceSelect.innerHTML = bookingCreateServices(data, branchId, masterSelect.value, previousServiceId);
+  if (!serviceSelect.value && serviceSelect.options.length) serviceSelect.selectedIndex = 0;
+}
+
 function bookingCreateModal(data, values = {}) {
   const branchId = String(values.branchId || bookingState.branchId || data.branches?.[0]?.id || "");
   const masterId = String(values.masterId || bookingState.employeeId || data.masters?.find((item) => item.branch_ids?.some((id) => String(id) === branchId))?.id || "");
-  const master = data.masters?.find((item) => String(item.id) === masterId);
-  const serviceIds = new Set((master?.service_ids || []).map(String));
   const selectedDay = visibleCalendarDays(data)[0] || new Date();
   const startsAt = values.startsAt || `${localIsoDate(selectedDay)}T${minuteClock(selectedBookingGridStart(data, selectedDay, 9))}`;
-  const [startHour, startMinute] = String(startsAt).slice(11, 16).split(":").map(Number);
-  const [untilHour, untilMinute] = String(values.availableUntil || "24:00").split(":").map(Number);
-  const availableSeconds = Math.max(0, ((untilHour * 60 + untilMinute) - (startHour * 60 + startMinute)) * 60);
-  const services = data.services?.filter((item) => {
-    if (serviceIds.size && !serviceIds.has(String(item.id))) return false;
-    const duration = Number(master?.service_durations?.[String(item.id)] || item.seance_length || 3600);
-    return !values.availableUntil || duration <= availableSeconds;
-  }) || [];
+  const bookingDate = String(startsAt).slice(0, 10);
+  const services = bookingCreateServices(data, branchId, masterId);
   return `<div class="modal-backdrop" data-booking-create-modal>
     <div class="modal-card booking-create-card">
       <div class="modal-head"><h3>Новая запись</h3><button type="button" class="ghost" data-close-booking-create>Закрыть</button></div>
-      <form class="modal-grid" data-booking-create-form>
+      <form class="modal-grid" data-booking-create-form data-booking-selected-start="${escapeHtml(startsAt)}">
         <label><span>Филиал</span><select name="branch_id" required>${data.branches.map((item) => `<option value="${escapeHtml(item.id)}" ${String(item.id) === branchId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></label>
         <label><span>Мастер</span><select name="master_id" required>${data.masters.map((item) => `<option value="${escapeHtml(item.id)}" data-branch-ids="${escapeHtml((item.branch_ids || []).join(","))}" ${String(item.id) === masterId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></label>
-        <label><span>Дата и время</span><input name="starts_at" type="datetime-local" value="${escapeHtml(startsAt)}" required></label>
+        <label><span>Дата</span><input name="booking_date" type="date" value="${escapeHtml(bookingDate)}" required></label>
+        <label class="modal-full"><span>Услуга</span><select name="service_id" required>${services}</select></label>
+        <fieldset class="modal-full booking-create-slots" data-booking-create-slots><legend>Свободное время</legend><span class="booking-create-slots-empty">Загружаем свободное время…</span></fieldset>
         <label><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" placeholder="+7 999 123-45-67" required></label>
         <label><span>Фамилия</span><input name="last_name" autocomplete="family-name" required></label>
         <label><span>Имя</span><input name="first_name" autocomplete="given-name" required></label>
-        <label class="modal-full"><span>Услуга</span><select name="service_id" required>${services.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)}${Number(item.price) ? ` — ${Number(item.price).toLocaleString("ru-RU")} ₽` : ""}</option>`).join("")}</select></label>
         <p class="modal-full" data-message></p>
-        <button type="submit" class="primary booking-create-submit">Создать</button>
+        <button type="submit" class="primary booking-create-submit" data-booking-create-submit disabled>Создать</button>
       </form>
     </div>
   </div>`;
@@ -598,7 +644,7 @@ export async function booking(ctx) {
     bookingState.employeeId = "";
     bookingState.defaultBranchInitialized = false;
   }
-  bookingState.weekStart ||= weekStart();
+  bookingState.weekStart ||= new Date();
   const start = bookingState.weekStart;
   const defaultRange = bookingState.period === "day"
     ? { start, end: start }
@@ -692,6 +738,7 @@ export function bindBooking(root, ctx) {
         startsAt: openBookingCreate.dataset.bookingStart,
         availableUntil: openBookingCreate.dataset.bookingAvailableUntil,
       }));
+      await loadBookingCreateSlots(root.querySelector("[data-booking-create-form]"), ctx);
       return;
     }
     if (event.target.closest("[data-close-booking-create]")) {
@@ -960,6 +1007,20 @@ export function bindBooking(root, ctx) {
   });
 
   root.addEventListener("change", async (event) => {
+    const createForm = event.target.closest("[data-booking-create-form]");
+    if (createForm) {
+      if (event.target.name === "branch_id" || event.target.name === "master_id") syncBookingCreateSelections(createForm, bookingState.calendarData);
+      if (["branch_id", "master_id", "service_id", "booking_date"].includes(event.target.name)) {
+        createForm.dataset.bookingSelectedStart = "";
+        await loadBookingCreateSlots(createForm, ctx);
+        return;
+      }
+      if (event.target.name === "starts_at") {
+        createForm.dataset.bookingSelectedStart = event.target.value;
+        createForm.querySelector("[data-booking-create-submit]").disabled = false;
+        return;
+      }
+    }
     if (event.target.matches('[name="visit_comment_photos"]')) {
       const album = event.target.closest("[data-visit-photo-album]");
       const previews = album?.querySelector("[data-visit-photo-previews]");

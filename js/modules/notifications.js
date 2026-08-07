@@ -46,7 +46,10 @@ export async function notifications(ctx, { embedded = false } = {}) {
   const telegramAvailable = bots.some((bot) => bot.platform === "telegram" && bot.is_active);
   const body = `
     <div class="subpanel">
-      <h3 class="subpanel-title">Новая рассылка</h3>
+      <div class="notification-compose-heading">
+        <h3 class="subpanel-title">Новая рассылка</h3>
+        <button type="button" class="notification-compose-clear" data-notification-clear hidden aria-label="Очистить тему и текст" title="Очистить тему и текст">×</button>
+      </div>
       <form class="inline-form compact" data-notification-form>
         <label class="wide notification-title-field" data-notification-title-field>
           <input name="title" maxlength="${MAX_TITLE_LENGTH}" required placeholder="Тема рассылки" />
@@ -217,6 +220,8 @@ export function bindNotifications(root, ctx = {}) {
     }
     form.querySelector("[data-notification-counter]").textContent = `${message.length} / ${MAX_MESSAGE_LENGTH}`;
     form.querySelector("[data-notification-submit]").disabled = !title.trim() || !message.trim() || !channels.length;
+    const clearButton = form.querySelector("[data-notification-clear]");
+    if (clearButton) clearButton.hidden = !title.trim() || !message.trim();
   }
 
   root.addEventListener("keydown", (event) => {
@@ -252,6 +257,19 @@ export function bindNotifications(root, ctx = {}) {
     if (control.matches('[name="title"]')) syncNotificationTitle(control);
     if (control.matches("textarea")) syncNotificationComposer(control);
     updateNotificationForm(form);
+  });
+
+  root.addEventListener("click", (event) => {
+    const clearButton = event.target.closest("[data-notification-clear]");
+    if (!clearButton) return;
+    const form = clearButton.closest(".subpanel")?.querySelector("[data-notification-form]") || root.querySelector("[data-notification-form]");
+    if (!form) return;
+    form.elements.title.value = "";
+    form.elements.message.value = "";
+    syncNotificationTitle(form.elements.title);
+    syncNotificationComposer(form.elements.message);
+    updateNotificationForm(form);
+    form.elements.title.focus();
   });
 
   root.addEventListener("change", (event) => {
