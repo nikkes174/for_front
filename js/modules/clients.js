@@ -1335,7 +1335,7 @@ function modal(client) {
             const pages = Math.max(Math.ceil(visits.length / 5), 1);
             const page = Math.min(state.visitPage, pages);
             const pageVisits = visits.slice((page - 1) * 5, page * 5);
-            return `<table><tbody>
+            return `<table class="app-table"><tbody>
             ${rows(pageVisits, "Истории визитов пока нет.", (item) => {
               const visit = item.visit || item;
               const visitStatusClass = visit.visit_status === "completed" ? "is-completed" : ["cancelled", "no_show"].includes(visit.visit_status) ? "is-cancelled" : "";
@@ -1378,7 +1378,7 @@ function modal(client) {
             <button class="primary">Выполнить</button>
             <p data-message></p>
           </form>
-          <table><tbody>
+          <table class="app-table"><tbody>
             ${rows(client.bonusHistory || [], "История бонусов пока пуста.", (item) => `<tr>
               <td>${escapeHtml(bonusOperationDetails(item, client.visits))}</td>
               <td>${escapeHtml(bonusTransactionTypes[item.transaction_type || item.operation] || item.transaction_type || item.operation || "")}</td>
