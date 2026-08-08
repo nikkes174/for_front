@@ -102,7 +102,7 @@ export async function breakdown(ctx) {
       <div class="panel">
         <div class="finance-table-head"><div><h2>Отчёт</h2><p>${state.dateFrom} — ${state.dateTo}</p></div><span>${rows.length} позиций</span></div>
         <div class="table-wrap finance-table-wrap">
-          <table class="finance-table breakdown-table">
+          <table class="finance-table breakdown-table app-table">
             <thead><tr><th>Дата и время</th><th>Тип</th><th>Позиция</th><th>Кол-во</th><th>Цена</th><th>Скидка</th><th>Сумма</th><th>Сотрудник</th><th>Филиал</th><th>Визит</th></tr></thead>
             <tbody>${rows.length ? rows.map((row) => `<tr>
               <td>${escapeHtml(formatDate(row.sold_at))}</td>

@@ -100,15 +100,15 @@ function sortedFinanceRows(rows) {
 }
 
 function financeTableHeader(key, label) {
-  const marker = financeState.tableSort === key ? (financeState.tableDirection === "asc" ? " ↑" : " ↓") : "";
+  const marker = financeState.tableSort === key ? (financeState.tableDirection === "asc" ? "↑" : "↓") : "";
   const nextDirection = financeState.tableSort === key && financeState.tableDirection === "asc" ? "desc" : "asc";
-  return `<button type="button" class="pagination-link finance-table-sort" data-finance-table-sort="${key}" data-finance-table-direction="${nextDirection}">${escapeHtml(label + marker)}</button>`;
+  return `<button type="button" class="finance-table-sort table-sort" data-finance-table-sort="${key}" data-finance-table-direction="${nextDirection}" aria-label="Сортировать по: ${escapeHtml(label)}"><span class="table-sort-label">${escapeHtml(label)}</span>${marker ? `<span class="table-sort-marker" aria-hidden="true">${marker}</span>` : ""}</button>`;
 }
 
 function financeTableMarkup(rows) {
   const sortedRows = sortedFinanceRows(rows);
   return `<div class="table-wrap finance-table-wrap" data-finance-table-wrap>
-    <table class="finance-table">
+    <table class="finance-table app-table">
       <thead><tr><th>${financeTableHeader("name", "Сотрудник")}</th><th>${financeTableHeader("plan", "План")}</th><th>${financeTableHeader("visits_count", "Визиты")}</th><th>${financeTableHeader("clients_count", "Клиенты")}</th><th>${financeTableHeader("return_rate_percent", "Возвращаемость")}</th><th>${financeTableHeader("services_base", "Услуги")}</th><th>${financeTableHeader("goods_base", "Товары")}</th><th>${financeTableHeader("rates", "Ставки")}</th><th>${financeTableHeader("turnover", "Оборот")}</th><th>${financeTableHeader("salary_total", "К выплате")}</th></tr></thead>
       <tbody>
         ${sortedRows.length ? sortedRows.map((row) => `<tr class="${row.is_active ? "" : "is-inactive"}">
