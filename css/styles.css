@@ -164,6 +164,14 @@ button, input, select { font: inherit; }
 .auth-code-method input { width: 17px; height: 17px; margin: 0; accent-color: #111; }
 .auth-code-method small { margin-left: auto; color: #98a2b3; }
 .auth-code-method.disabled { color: #98a2b3; cursor: not-allowed; }
+.auth-card .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.auth-card .col { min-width: 0; }
+.auth-card .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 1px solid #dce3ee; border-radius: 8px; padding: 10px 12px; background: #fff; color: #172033; font: inherit; font-weight: 600; cursor: pointer; }
+.auth-card .btn:hover { background: #f8fafc; }
+.auth-card .btn svg { flex: 0 0 auto; }
+@media (max-width: 560px) {
+  .auth-card .row { grid-template-columns: 1fr; }
+}
 
 label {
   display: grid;
