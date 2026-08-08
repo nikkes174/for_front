@@ -531,7 +531,7 @@ function productItemStaffFields(item) {
         </div>
       </div>
       <div class="service-staff-table-wrap">
-        <table class="service-staff-table">
+        <table class="service-staff-table app-table">
           <thead><tr><th>Оказывает услугу</th><th>Сотрудник</th><th>Цена от</th><th>Цена до</th><th>Длительность</th><th>Тех. перерыв, мин</th></tr></thead>
           <tbody data-service-staff-grid>
             ${users.map((user) => serviceStaffRow(user, pairsByMaster.get(String(user.id)), item, selectedMasterIds.has(String(user.id)))).join("")}
@@ -1763,7 +1763,7 @@ function eventsContent() {
   eventsPage = pagedEventsData.currentPage;
   return `
     ${eventsFilterPanel()}
-    <table><thead><tr><th>\u0421\u043e\u0431\u044b\u0442\u0438\u0435</th><th>\u0414\u0435\u0442\u0430\u043b\u0438</th><th>\u0414\u0430\u0442\u0430 \u0438 \u0432\u0440\u0435\u043c\u044f</th></tr></thead><tbody>
+    <table class="app-table"><thead><tr><th>\u0421\u043e\u0431\u044b\u0442\u0438\u0435</th><th>\u0414\u0435\u0442\u0430\u043b\u0438</th><th>\u0414\u0430\u0442\u0430 \u0438 \u0432\u0440\u0435\u043c\u044f</th></tr></thead><tbody>
       ${rows(pagedEventsData.pageItems, "\u0421\u043e\u0431\u044b\u0442\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442", (item) => `
         <tr class="${eventRowClass(item)}">
           <td>${eventNameCell(item)}</td>
@@ -2109,7 +2109,7 @@ function uniqueNames(values) {
 function userAccessTable(users, empty, memberships, branchMemberships, branches, departments, workplaces, roles) {
   if (!users.length) return `<p class="empty">${escapeHtml(empty)}</p>`;
   return `
-    <table class="centered-list-table">
+    <table class="centered-list-table app-table">
       <thead><tr>
         <th>Сотрудник</th>
         <th>Филиал</th>
