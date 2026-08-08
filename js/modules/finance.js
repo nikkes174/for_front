@@ -199,7 +199,7 @@ function individualPlanModal(plan, employeeId, masterName) {
             <h3>Индивидуальный план</h3>
             <span class="modal-title-id">${escapeHtml(masterName)}</span>
           </div>
-          <button type="button" class="secondary finance-individual-close" aria-label="Закрыть" data-finance-individual-close>×</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-finance-individual-close><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
 
         <div class="finance-individual-rules" data-finance-individual-rules>
@@ -248,7 +248,7 @@ function additionalPlansModal(plans) {
           <div>
             <h3>Дополнительные планы</h3>
           </div>
-          <button type="button" class="secondary finance-individual-close" aria-label="Закрыть" data-finance-additional-close>×</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-finance-additional-close><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
 
         <div class="finance-additional-list" data-finance-additional-list>

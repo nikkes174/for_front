@@ -350,7 +350,7 @@ function bookingCreateModal(data, values = {}) {
   const services = bookingCreateServices(data, branchId, masterId);
   return `<div class="modal-backdrop" data-booking-create-modal>
     <div class="modal-card booking-create-card">
-      <div class="modal-head"><h3>Новая запись</h3><button type="button" class="ghost" data-close-booking-create>Закрыть</button></div>
+      <div class="modal-head"><h3>Новая запись</h3><button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-booking-create><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button></div>
       <form class="modal-grid" data-booking-create-form data-booking-selected-start="${escapeHtml(startsAt)}">
         <label><span>Филиал</span><select name="branch_id" required>${data.branches.map((item) => `<option value="${escapeHtml(item.id)}" ${String(item.id) === branchId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></label>
         <label><span>Мастер</span><select name="master_id" required>${data.masters.map((item) => `<option value="${escapeHtml(item.id)}" data-branch-ids="${escapeHtml((item.branch_ids || []).join(","))}" ${String(item.id) === masterId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></label>
@@ -542,7 +542,7 @@ function bookingVisitModal(visit) {
   const masterOptions = masters.map((master) => `<option value="${escapeHtml(master.id)}" ${String(master.id) === String(visit.employee_id) ? "selected" : ""}>${escapeHtml(master.name)}</option>`).join("");
   return `<div class="modal-backdrop" data-booking-visit-modal>
     <div class="modal-card">
-      <div class="modal-head"><h3>Редактирование визита</h3><button type="button" class="ghost" data-close-booking-visit>Закрыть</button></div>
+      <div class="modal-head"><h3>Редактирование визита</h3><button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-booking-visit><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button></div>
       <form class="modal-grid" data-booking-visit-form data-visit-id="${escapeHtml(visit.id)}">
         <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at, visit.branch_id))}" required></label>
         <label><span>Филиал</span><select name="branch_id"><option value="">Выберите филиал</option>${branchOptions}</select></label>

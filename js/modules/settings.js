@@ -1197,7 +1197,7 @@ function openReviewTextModal(item) {
       <div class="modal-card">
         <div class="modal-head">
           <h3>Отзыв</h3>
-          <button type="button" class="ghost" data-close-modal>Закрыть</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-modal><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
         <div class="modal-grid">
           ${readonly("Текст отзыва", payload.text)}
@@ -1867,7 +1867,7 @@ function eventVisitModal() {
       <div class="modal-card">
         <div class="modal-head">
           <h3>Визит</h3>
-          <button type="button" class="ghost" data-close-event-visit>Закрыть</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-event-visit><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
         <form class="modal-grid" data-event-visit-edit data-visit-id="${escapeHtml(visitId || "")}">
           <label><span>Дата и время</span><input name="visit_at" type="datetime-local" value="${escapeHtml(dateTimeInput(visit.visit_at, visit.branch_id))}"></label>
@@ -2286,7 +2286,7 @@ function renderProductExcelPreview(actions) {
   if (!preview || !state) return;
   const items = state.rows.filter((row) => !state.excludedRows.has(Number(row.row_number)));
   preview.hidden = false;
-  preview.innerHTML = '<div class="modal-card catalog-excel-preview-card"><div class="modal-head"><h3>\u041a \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0435: ' + items.length + '</h3><button type="button" class="ghost" data-product-excel-preview-close>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button></div><div class="catalog-excel-preview-list">' + items.map((row) => '<div><span>' + escapeHtml(row.title || "\u0411\u0435\u0437 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f") + '</span><small>' + escapeHtml(row.sku || row.barcode || "") + '</small><button type="button" class="client-delete-icon-button" data-product-excel-preview-remove="' + Number(row.row_number) + '"><img src="/fronted/icons/basket.svg" alt=""></button></div>').join("") + '</div><div class="catalog-excel-preview-footer"><button type="button" class="primary" data-product-excel-import-confirm>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435</button></div></div>';
+  preview.innerHTML = '<div class="modal-card catalog-excel-preview-card"><div class="modal-head"><h3>\u041a \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0435: ' + items.length + '</h3><button type="button" class="modal-close-icon" aria-label="\u0417\u0430\u043a\u0440\u044b\u0442\u044c" title="\u0417\u0430\u043a\u0440\u044b\u0442\u044c" data-product-excel-preview-close><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button></div><div class="catalog-excel-preview-list">' + items.map((row) => '<div><span>' + escapeHtml(row.title || "\u0411\u0435\u0437 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f") + '</span><small>' + escapeHtml(row.sku || row.barcode || "") + '</small><button type="button" class="client-delete-icon-button" data-product-excel-preview-remove="' + Number(row.row_number) + '"><img src="/fronted/icons/basket.svg" alt=""></button></div>').join("") + '</div><div class="catalog-excel-preview-footer"><button type="button" class="primary" data-product-excel-import-confirm>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435</button></div></div>';
 }
 
 async function saveProductExcel(url, suggestedName) {
@@ -2560,7 +2560,7 @@ async function openEntityModal(type, item) {
       <div class="modal-card${isServiceProfile ? " service-profile-modal" : ""}${type === "org" ? " organization-profile-modal" : ""}">
         <div class="modal-head">
           <h3>${escapeHtml(modalTitle)}${modalTitleId}</h3>
-          <button type="button" class="ghost" data-close-modal>Закрыть</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-modal><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
         ${serviceProfileHeader}
         <form class="modal-grid${type === "user" ? " user-profile-form" : ""}${isServiceProfile ? " service-profile-form" : ""}${type === "org" ? " organization-profile-form" : ""}" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">

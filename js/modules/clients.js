@@ -1275,7 +1275,7 @@ function modal(client) {
       <div class="modal-card client-profile-modal">
         <div class="modal-head">
           <h3>${escapeHtml(name(client))}</h3>
-          <button type="button" class="ghost" data-close-client>Закрыть</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-client><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
         <header class="client-profile-card-head">
           <div class="client-profile-avatar">${profilePhoto ? `<img src="${escapeHtml(profilePhoto)}" alt="Фото клиента">` : `<span>${escapeHtml(initials)}</span>`}</div>
@@ -1407,7 +1407,7 @@ function visitModal(client) {
       <div class="modal-card">
         <div class="modal-head">
           <h3>Визит</h3>
-          <button type="button" class="ghost" data-close-visit>Закрыть</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-visit><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
         <div class="modal-grid">
           ${readonly("Дата и время", dateTime(visit.visit_at, visit.branch_id))}
@@ -1450,7 +1450,7 @@ function editableVisitModal(client) {
       <div class="modal-card">
         <div class="modal-head">
           <h3>Визит</h3>
-          <button type="button" class="ghost" data-close-visit>Закрыть</button>
+          <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-visit><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
         </div>
         <p>ID визита: ${escapeHtml(String(visit.id ?? "-"))}</p>
         <form class="modal-grid" data-visit-edit data-permission="clients.visits.create">
