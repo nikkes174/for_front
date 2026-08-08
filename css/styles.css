@@ -2341,6 +2341,21 @@ td small { display: block; color: #667085; margin-top: 4px; }
 .auth-primary-btn {
   background-color: var(--auth-primary-color);
   border-color: var(--auth-primary-color);
-  color: #ffffff;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
 }
 .auth-primary-btn:hover { opacity: .9; }
+.auth-primary-btn svg { flex-shrink: 0; }
+.auth-primary-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.auth-login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.auth-login-actions .auth-primary-btn { width: 100%; }

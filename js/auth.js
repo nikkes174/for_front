@@ -62,20 +62,17 @@ function codeMethodPopoverHtml() {
 }
 
 function loginChannelsHtml() {
-  return `<div class="row">
-    <div class="col">
+  return `
       <button type="button" class="btn btn-4 w-100 auth-primary-btn" data-auth-channel="max">
         <svg xmlns="http://www.w3.org/2000/svg"
              width="24"
              height="24"
              viewBox="0 0 720 720"
              class="icon icon-2">
-          <path fill="#fff" d="M350.4,9.6C141.8,20.5,4.1,184.1,12.8,390.4c3.8,90.3,40.1,168,48.7,253.7,2.2,22.2-4.2,49.6,21.4,59.3,31.5,11.9,79.8-8.1,106.2-26.4,9-6.1,17.6-13.2,24.2-22,27.3,18.1,53.2,35.6,85.7,43.4,143.1,34.3,299.9-44.2,369.6-170.3C799.6,291.2,622.5-4.6,350.4,9.6h0ZM269.4,504c-11.3,8.8-22.2,20.8-34.7,27.7-18.1,9.7-23.7-.4-30.5-16.4-21.4-50.9-24-137.6-11.5-190.9,16.8-72.5,72.9-136.3,150-143.1,78-6.9,150.4,32.7,183.1,104.2,72.4,159.1-112.9,316.2-256.4,218.6h0Z"/>
+          <path fill="#000" d="M350.4,9.6C141.8,20.5,4.1,184.1,12.8,390.4c3.8,90.3,40.1,168,48.7,253.7,2.2,22.2-4.2,49.6,21.4,59.3,31.5,11.9,79.8-8.1,106.2-26.4,9-6.1,17.6-13.2,24.2-22,27.3,18.1,53.2,35.6,85.7,43.4,143.1,34.3,299.9-44.2,369.6-170.3C799.6,291.2,622.5-4.6,350.4,9.6h0ZM269.4,504c-11.3,8.8-22.2,20.8-34.7,27.7-18.1,9.7-23.7-.4-30.5-16.4-21.4-50.9-24-137.6-11.5-190.9,16.8-72.5,72.9-136.3,150-143.1,78-6.9,150.4,32.7,183.1,104.2,72.4,159.1-112.9,316.2-256.4,218.6h0Z"/>
         </svg>
-        Войти через MAX
+        <span>\u0412\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 MAX</span>
       </button>
-    </div>
-    <div class="col">
       <button type="button" class="btn btn-4 w-100 auth-primary-btn" data-auth-channel="telegram">
         <svg xmlns="http://www.w3.org/2000/svg"
              width="24"
@@ -89,10 +86,8 @@ function loginChannelsHtml() {
           <path fill="#a9c9dd" d="M199 404c7 0 11-4 16-8l45-43-56-34"/>
           <path fill="#f6fbfe" d="M204 319l135 99c14 9 26 4 30-14l55-258c5-22-9-32-24-25L79 245c-21 8-21 21-4 26l83 26 190-121c9-5 17-3 11 4"/>
         </svg>
-        Войти через Telegram
-      </button>
-    </div>
-  </div>`;
+        <span>\u0412\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 Telegram</span>
+      </button>`;
 }
 
 function authHtml() {
@@ -101,17 +96,22 @@ function authHtml() {
     <main class="auth-page">
       <form class="auth-card ${isRegister ? "wide" : ""}" data-auth-form>
         <h1>${isRegister ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f" : "\u0412\u0445\u043e\u0434"}</h1>
-        <div class="auth-tabs">
-          <button type="button" class="${!isRegister ? "primary" : "ghost"}" data-mode="login">\u0412\u043e\u0439\u0442\u0438</button>
-          <button type="button" class="${isRegister ? "primary" : "ghost"}" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
-        </div>
+        ${isRegister ? `<div class="auth-tabs">
+          <button type="button" class="ghost" data-mode="login">\u0412\u043e\u0439\u0442\u0438</button>
+          <button type="button" class="primary" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
+        </div>` : ""}
         ${isRegister ? '<label><span>\u0418\u043c\u044f</span><input name="name" required></label>' : ""}
         <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${isRegister ? 'type="email" autocomplete="email"' : `type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input value="${escapeHtml(loginDraft)}"`} required></label>
         ${isRegister ? '<label><span>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" data-phone-input></label>' : ""}
         ${isRegister ? '<label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" required></label>' : ""}
         ${isRegister ? '<label><span>\u041f\u043e\u0432\u0442\u043e\u0440 \u043f\u0430\u0440\u043e\u043b\u044f</span><input name="confirm" type="password" required></label>' : ""}
         <p data-message></p>
-        ${isRegister ? '<button class="primary">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>' : loginChannelsHtml()}
+        ${isRegister
+          ? '<button class="primary auth-primary-btn">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>'
+          : `<div class="auth-login-actions">
+              ${loginChannelsHtml()}
+              <button type="button" class="btn btn-4 w-100 auth-primary-btn" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
+            </div>`}
         ${isRegister ? "" : `<div class="auth-code-popover-wrap">${codeMethodPopoverHtml()}</div>`}
       </form>
       ${twoFactorHtml()}
