@@ -1702,6 +1702,24 @@ th, td { padding: 12px 14px; border-bottom: 1px solid #eef2f7; text-align: left;
 .centered-list-table th,
 .centered-list-table td { text-align: center; vertical-align: middle; }
 tbody tr:not(.loyalty-rule-row):not(.loyalty-transition-rule-row):not(.service-staff-row):hover > td { background: #f8fafc; }
+.table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  text-align: inherit;
+}
+.table-sort:hover { color: #172033; }
+.table-sort:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 4px; }
+.table-sort-label { display: inline-block; }
+.table-sort-marker { display: inline-block; }
 tr:last-child td { border-bottom: 0; }
 td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; line-height: 1.4; }
 .task-progress {

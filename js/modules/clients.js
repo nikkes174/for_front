@@ -230,14 +230,14 @@ function clientSortUrl(ctx, search, pageSize, sort, currentSort, currentDirectio
 }
 
 function clientTableHeader(ctx, search, pageSize, sort, direction, key, label) {
-  const marker = sort === key ? (direction === "asc" ? " ↑" : " ↓") : "";
+  const marker = sort === key ? (direction === "asc" ? "↑" : "↓") : "";
   const nextDirection = sort === key && direction === "asc" ? "desc" : "asc";
-  return `<button type="button" class="pagination-link" data-client-sort-link data-client-sort="${escapeHtml(key)}" data-client-direction="${nextDirection}">${escapeHtml(label + marker)}</button>`;
+  return `<button type="button" class="table-sort" data-client-sort-link data-client-sort="${escapeHtml(key)}" data-client-direction="${nextDirection}" aria-label="Сортировать по: ${escapeHtml(label)}"><span class="table-sort-label">${escapeHtml(label)}</span>${marker ? `<span class="table-sort-marker" aria-hidden="true">${marker}</span>` : ""}</button>`;
 }
 
 function clientTable(items, ctx, search, pageSize, sort, direction) {
   return `
-    <table class="centered-list-table">
+    <table class="centered-list-table app-table">
       <thead><tr>
         <th>${clientTableHeader(ctx, search, pageSize, sort, direction, "name", "Фамилия Имя")}</th>
         <th>Телефон</th>
