@@ -377,8 +377,8 @@ button:active { transform: translateY(1px); }
   .booking-day header { padding-inline: 7px; }
   .booking-day header strong { font-size: 16px; }
 }
-.primary { background: #2563eb; color: #fff; }
-.primary:hover { background: #1d4ed8; }
+.primary { background: #4299e1; color: #fff; }
+.primary:hover { background: #3182ce; }
 .inline-action-link {
   display: inline-flex;
   align-items: center;
@@ -2293,4 +2293,36 @@ td small { display: block; color: #667085; margin-top: 4px; }
   .organization-bot-actions { align-items: stretch; }
   .organization-bot-token { flex: 1 1 100%; }
   .organization-bot-actions > .primary { flex: 1; }
+}
+
+.user-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: auto;
+  margin: 16px 0 0;
+  padding: 0;
+  flex-wrap: nowrap;
+}
+
+.user-pagination .page-item {
+  flex: 0 0 auto;
+}
+
+.user-pagination .page-link {
+  min-width: 36px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-pagination .page-item.active .page-link {
+  background: #4299e1;
+  border-color: #4299e1;
+  color: #fff;
 }

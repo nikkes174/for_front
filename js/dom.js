@@ -2,52 +2,114 @@ export const root = document.querySelector("#root");
 
 export function normalizePhone(value) {
   let digits = String(value ?? "").replace(/\D/g, "");
-  if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) digits = `7${digits.slice(1)}`;
-  else if (digits.length === 10) digits = `7${digits}`;
+
+  if (
+    digits.length === 11
+    && (digits.startsWith("7") || digits.startsWith("8"))
+  ) {
+    digits = `7${digits.slice(1)}`;
+  } else if (digits.length === 10) {
+    digits = `7${digits}`;
+  }
+
   return digits;
 }
 
 export function formatPhone(value) {
   let digits = String(value ?? "").replace(/\D/g, "");
-  if (digits.startsWith("7") || digits.startsWith("8")) digits = digits.slice(1);
+
+  if (digits.startsWith("7") || digits.startsWith("8")) {
+    digits = digits.slice(1);
+  }
+
   digits = digits.slice(0, 10);
+
   if (!digits) return "";
-  const chunks = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean);
-  return `+7${chunks[0] ? ` (${chunks[0]}` : ""}${chunks[0]?.length === 3 ? ")" : ""}${chunks[1] ? ` ${chunks[1]}` : ""}${chunks[2] ? `-${chunks[2]}` : ""}${chunks[3] ? `-${chunks[3]}` : ""}`;
+
+  const chunks = [
+    digits.slice(0, 3),
+    digits.slice(3, 6),
+    digits.slice(6, 8),
+    digits.slice(8, 10),
+  ].filter(Boolean);
+
+  return `+7${
+    chunks[0] ? ` (${chunks[0]}` : ""
+  }${
+    chunks[0]?.length === 3 ? ")" : ""
+  }${
+    chunks[1] ? ` ${chunks[1]}` : ""
+  }${
+    chunks[2] ? `-${chunks[2]}` : ""
+  }${
+    chunks[3] ? `-${chunks[3]}` : ""
+  }`;
 }
 
 function isPhoneInput(element) {
-  return element instanceof HTMLInputElement
-    && (element.type === "tel" || element.dataset.phoneInput !== undefined || /(^|_)(phone|tel)(_|$)/i.test(element.name));
+  return (
+    element instanceof HTMLInputElement
+    && (
+      element.type === "tel"
+      || element.dataset.phoneInput !== undefined
+      || /(^|_)(phone|tel)(_|$)/i.test(element.name)
+    )
+  );
 }
 
 function isPhoneLikeLoginInput(element) {
-  return element instanceof HTMLInputElement
+  return (
+    element instanceof HTMLInputElement
     && element.dataset.loginPhoneInput !== undefined
-    && /^[+\d()\s-]+$/.test(String(element.value || "").trim());
+    && /^[+\d()\s-]+$/.test(String(element.value || "").trim())
+  );
 }
 
 document.addEventListener("input", (event) => {
-  if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) return;
+  if (
+    !isPhoneInput(event.target)
+    && !isPhoneLikeLoginInput(event.target)
+  ) {
+    return;
+  }
+
   event.target.value = formatPhone(event.target.value);
 });
 
-document.addEventListener("blur", (event) => {
-  if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) return;
-  event.target.value = formatPhone(event.target.value);
-}, true);
+document.addEventListener(
+  "blur",
+  (event) => {
+    if (
+      !isPhoneInput(event.target)
+      && !isPhoneLikeLoginInput(event.target)
+    ) {
+      return;
+    }
+
+    event.target.value = formatPhone(event.target.value);
+  },
+  true,
+);
 
 let bodyScrollY = 0;
 let bodyScrollLocked = false;
 
 function visibleModalCount() {
-  return document.querySelectorAll(".modal-backdrop:not([hidden])").length;
+  return document.querySelectorAll(
+    ".modal-backdrop:not([hidden])",
+  ).length;
 }
 
 function lockBodyScroll() {
   if (bodyScrollLocked) return;
-  bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+
+  bodyScrollY =
+    window.scrollY
+    || document.documentElement.scrollTop
+    || 0;
+
   const body = document.body;
+
   body.dataset.scrollLock = "true";
   body.style.position = "fixed";
   body.style.top = `-${bodyScrollY}px`;
@@ -55,48 +117,92 @@ function lockBodyScroll() {
   body.style.right = "0";
   body.style.width = "100%";
   body.style.overflow = "hidden";
+
   bodyScrollLocked = true;
 }
 
 function unlockBodyScroll() {
   if (!bodyScrollLocked) return;
+
   const body = document.body;
+
   body.style.position = "";
   body.style.top = "";
   body.style.left = "";
   body.style.right = "";
   body.style.width = "";
   body.style.overflow = "";
+
   delete body.dataset.scrollLock;
+
   bodyScrollLocked = false;
+
   window.scrollTo(0, bodyScrollY);
 }
 
 function syncBodyScrollLock() {
-  if (visibleModalCount()) lockBodyScroll();
-  else unlockBodyScroll();
+  if (visibleModalCount()) {
+    lockBodyScroll();
+  } else {
+    unlockBodyScroll();
+  }
 }
 
 const modalObserver = new MutationObserver(syncBodyScrollLock);
+
 modalObserver.observe(document.body, {
   childList: true,
   subtree: true,
   attributes: true,
   attributeFilter: ["hidden"],
 });
+
 window.addEventListener("pagehide", unlockBodyScroll);
 
+function ensureTablerCss() {
+  if (document.querySelector('link[data-tabler-css]')) {
+    return;
+  }
+
+  const link = document.createElement("link");
+
+  link.rel = "stylesheet";
+  link.href =
+    "https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css";
+
+  link.dataset.tablerCss = "true";
+
+  document.head.append(link);
+}
+
 export async function ensureCss() {
-  if (document.querySelector("style[data-app-css]")) return;
+  ensureTablerCss();
+
+  if (document.querySelector("style[data-app-css]")) {
+    return;
+  }
+
   try {
-    const response = await fetch("/css/styles.css", { cache: "no-store" });
-    if (!response.ok) return;
+    const response = await fetch(
+      "/css/styles.css",
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      return;
+    }
+
     const style = document.createElement("style");
+
     style.dataset.appCss = "true";
     style.textContent = await response.text();
+
     document.head.append(style);
   } catch {
-    // The page still works without styles; this is only a fallback for broken static routing.
+    // Если CSS временно недоступен,
+    // приложение продолжит работать без него.
   }
 }
 
@@ -114,41 +220,117 @@ export function render(target, html) {
 }
 
 export function formData(form) {
-  return Object.fromEntries(new FormData(form).entries());
+  return Object.fromEntries(
+    new FormData(form).entries(),
+  );
 }
 
 export function numberOrNull(value) {
-  return value === "" || value == null ? null : Number(value);
+  return value === "" || value == null
+    ? null
+    : Number(value);
 }
 
 export function optional(value) {
   const trimmed = String(value ?? "").trim();
-  return trimmed ? trimmed : undefined;
+
+  return trimmed
+    ? trimmed
+    : undefined;
 }
 
-export function setMessage(container, text, type = "error") {
-  const node = container.querySelector("[data-message]");
+export function setMessage(
+  container,
+  text,
+  type = "error",
+) {
+  const node = container.querySelector(
+    "[data-message]",
+  );
+
   if (!node) return;
-  node.className = type === "error" ? "form-error" : "notice";
+
+  node.className =
+    type === "error"
+      ? "form-error"
+      : "notice";
+
   node.textContent = text || "";
 }
 
-export function field(label, name, attrs = "") {
-  return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" ${attrs}></label>`;
+export function field(
+  label,
+  name,
+  attrs = "",
+) {
+  return `
+    <label>
+      <span>${escapeHtml(label)}</span>
+      <input
+        name="${escapeHtml(name)}"
+        ${attrs}
+      >
+    </label>
+  `;
 }
 
-export function selectField(label, name, items, selected = "", placeholder = "Не выбрано") {
+export function selectField(
+  label,
+  name,
+  items,
+  selected = "",
+  placeholder = "Не выбрано",
+) {
   const options = [
     `<option value="">${escapeHtml(placeholder)}</option>`,
+
     ...items.map((item) => {
-      const value = String(item.id ?? item.value);
-      return `<option value="${escapeHtml(value)}" ${String(selected) === value ? "selected" : ""}>${escapeHtml(item.name ?? item.label)}</option>`;
+      const value = String(
+        item.id ?? item.value,
+      );
+
+      return `
+        <option
+          value="${escapeHtml(value)}"
+          ${
+            String(selected) === value
+              ? "selected"
+              : ""
+          }
+        >
+          ${escapeHtml(item.name ?? item.label)}
+        </option>
+      `;
     }),
   ];
-  return `<label><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}">${options.join("")}</select></label>`;
+
+  return `
+    <label>
+      <span>${escapeHtml(label)}</span>
+
+      <select name="${escapeHtml(name)}">
+        ${options.join("")}
+      </select>
+    </label>
+  `;
 }
 
-export function rows(items, empty, mapper) {
-  if (!items?.length) return `<tr><td colspan="6">${escapeHtml(empty)}</td></tr>`;
-  return items.map(mapper).join("");
+export function rows(
+  items,
+  empty,
+  mapper,
+) {
+  if (!items?.length) {
+    return `
+      <tr>
+        <td colspan="6">
+          ${escapeHtml(empty)}
+        </td>
+      </tr>
+    `;
+  }
+
+  return items
+    .map(mapper)
+    .join("");
 }

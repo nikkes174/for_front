@@ -2576,8 +2576,8 @@ body.service-gallery-open { overflow: hidden; }
 .cabinet-history-card, .cabinet-visit-button { border: 0; border-bottom: 1px solid #efefef; border-radius: 0; background: #fff; }
 .cabinet-history-card { padding: 15px 2px; }
 .cabinet-visit-button:hover { border-color: #efefef; background: #fafafa; transform: none; }
-.form-actions button { width: 100%; min-height: 42px; border-radius: 8px; background: #0095f6; font-weight: 700; }
-.form-actions button:hover { background: #1877f2; box-shadow: none; transform: none; }
+.form-actions button { width: 100%; min-height: 42px; border-radius: 8px; background: #4299e1; font-weight: 700; }
+.form-actions button:hover { background: #3182ce; box-shadow: none; transform: none; }
 .cabinet-drawer { background: #fff; color: #262626; }
 .cabinet-drawer-head, .cabinet-nav-link, .cabinet-logout { border-color: #efefef; }
 .cabinet-drawer-head strong, .cabinet-nav-link { color: #262626; }

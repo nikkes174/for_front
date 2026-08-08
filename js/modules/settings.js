@@ -2097,7 +2097,7 @@ function userFilteredListMarkup() {
   return `
     ${userFilterOptions(branches, roles, departments, workplaces)}
     ${userAccessTable(pagedUsersData.pageItems, users.length ? "Пользователи не найдены" : "Пользователей пока нет", memberships, branchMemberships, branches, departments, workplaces, roles)}
-    ${paginationControls(pagedUsersData.currentPage, pagedUsersData.totalPages, filteredUsers.length)}
+    ${userPaginationControls(pagedUsersData.currentPage, pagedUsersData.totalPages)}
   `;
 }
 
@@ -2163,7 +2163,82 @@ function pageSizeControl(pageSize, attr, label) {
     </select></label>
   `;
 }
+function userPaginationControls(currentPage, totalPages) {
+  if (totalPages <= 1) return "";
 
+  const pages = [];
+
+  for (let page = 1; page <= totalPages; page++) {
+    pages.push(`
+      <li class="page-item ${page === currentPage ? "active" : ""}">
+        <button
+          type="button"
+          class="page-link"
+          data-user-page="${page}"
+          ${page === currentPage ? 'aria-current="page"' : ""}
+        >
+          ${page}
+        </button>
+      </li>
+    `);
+  }
+
+  return `
+    <ul class="pagination user-pagination">
+      <li class="page-item ${currentPage <= 1 ? "disabled" : ""}">
+        <button
+          type="button"
+          class="page-link"
+          data-user-page="${currentPage - 1}"
+          ${currentPage <= 1 ? "disabled" : ""}
+          aria-label="Предыдущая страница"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="icon icon-1"
+          >
+            <path d="M15 6l-6 6l6 6"></path>
+          </svg>
+        </button>
+      </li>
+
+      ${pages.join("")}
+
+      <li class="page-item ${currentPage >= totalPages ? "disabled" : ""}">
+        <button
+          type="button"
+          class="page-link"
+          data-user-page="${currentPage + 1}"
+          ${currentPage >= totalPages ? "disabled" : ""}
+          aria-label="Следующая страница"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="icon icon-1"
+          >
+            <path d="M9 6l6 6l-6 6"></path>
+          </svg>
+        </button>
+      </li>
+    </ul>
+  `;
+}
 function paginationControls(currentPage, totalPages, totalItems, options = {}) {
   const pageAttr = options.pageAttr || "data-user-page";
   if (totalPages <= 1 && !options.pageSizeAttr) return "";
