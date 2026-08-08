@@ -1438,8 +1438,8 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 .service-staff-filter input, .service-staff-enabled input { width: 17px; height: 17px; margin: 0; }
 .service-staff-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid #e4e7ec; border-radius: 8px; }
 .service-staff-table { width: 100%; min-width: 950px; border-collapse: collapse; background: #fff; }
-.service-staff-table th, .service-staff-table td { padding: 9px; border-bottom: 1px solid #e4e7ec; text-align: left; vertical-align: middle; }
-.service-staff-table th { background: #f8fafc; color: #667085; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.service-staff-table th, .service-staff-table td { padding: 9px; border-bottom: 1px solid #e3e8f1; text-align: left; vertical-align: middle; }
+.service-staff-table th { background: #fafbfd; color: #667085; font-size: 13px; font-weight: 500; white-space: nowrap; }
 .service-staff-table tbody tr:last-child td { border-bottom: 0; }
 .service-staff-row { transition: opacity .15s ease, background-color .15s ease; }
 .service-staff-row.is-disabled { background: #f8fafc; opacity: .55; }
