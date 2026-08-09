@@ -1223,7 +1223,7 @@ export async function loyalty(ctx, tab = "rules") {
         <nav class="tabs">
           ${visibleTabs.map(([key, title, disabled]) => disabled
             ? `<span class="tab-disabled">${escapeHtml(title)}</span>`
-            : `<a class="${key === activeTab ? "active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
+            : `<a class="btn btn-outline-secondary loyalty-tab-button ${key === activeTab ? "is-active" : ""}" href="/organizations/${ctx.org.id}/loyalty/${key}">${escapeHtml(title)}</a>`).join("")}
         </nav>`;
   if (activeTab === "achievements") {
     const settingsData = await loadSettingsData(ctx.org.id);

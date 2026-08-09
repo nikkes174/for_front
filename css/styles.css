@@ -505,6 +505,32 @@ button:active { transform: translateY(1px); }
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.loyalty-tab-button {
+  background-color: transparent;
+  border-color: #000000;
+  color: #000000;
+  transition:
+    background-color .15s ease,
+    border-color .15s ease,
+    color .15s ease;
+}
+
+.loyalty-tab-button:hover {
+  background-color: #f3f4f6;
+  border-color: #000000;
+}
+
+.loyalty-tab-button.is-active {
+  background-color: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+.loyalty-tab-button.is-active:hover {
+  background-color: #222222;
+  border-color: #222222;
+}
 .link-button { background: transparent; border: 0; color: #172033; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .link-button:hover { color: #2563eb; text-decoration: underline; }
 .copy-icon-button { display: inline-grid; width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 8px; place-items: center; }
@@ -2478,8 +2504,8 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 }
 
 .auth-primary-btn {
-  background-color: #0d6efd;
-  border-color: #0d6efd;
+  background-color: #4299e1;
+  border-color: #4299e1;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -2487,17 +2513,16 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   gap: 8px;
   overflow: hidden;
   transition:
-    background-color 0.15s ease-in-out,
-    border-color 0.15s ease-in-out,
-    color 0.15s ease-in-out;
+    background-color .15s ease,
+    border-color .15s ease;
 }
 .auth-primary-btn:hover {
-  background-color: #3d8bfd;
-  border-color: #3d8bfd;
+  background-color: #63b3ed;
+  border-color: #63b3ed;
 }
 .auth-primary-btn:active {
-  background-color: #0b5ed7;
-  border-color: #0b5ed7;
+  background-color: #3182ce;
+  border-color: #3182ce;
 }
 .auth-primary-btn svg { flex-shrink: 0; }
 .auth-primary-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

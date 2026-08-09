@@ -144,7 +144,7 @@ function authHtml() {
             </svg>
           </span>
           <input class="auth-form-control" name="email" type="email" autocomplete="email" placeholder="Email" required>
-        </div>` : `<label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${isRegister ? 'type="email" autocomplete="email"' : `type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input value="${escapeHtml(loginDraft)}"`} required></label>`}
+        </div>` : ""}
         ${isRegister ? `
         <div class="auth-input-icon">
           <span class="auth-input-icon-addon" aria-hidden="true">
@@ -153,17 +153,8 @@ function authHtml() {
             </svg>
           </span>
           <input class="auth-form-control" name="phone" type="tel" inputmode="tel" autocomplete="tel" data-phone-input placeholder="Телефон">
-        </div>` : ""}
-        ${!isClientLogin ? `
-        <div class="auth-input-icon">
-          <span class="auth-input-icon-addon" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 10a7 7 0 1 1 14 0v4a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" />
-              <path d="M12 15v3" />
-            </svg>
-          </span>
-          <input class="auth-form-control" name="password" type="password" placeholder="Пароль" required>
-        </div>` : ""}
+        </div>` : `<label><span>Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d</span><input name="login" type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input value="${escapeHtml(loginDraft)}" required></label>`}
+        ${!isClientLogin ? '<label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" required></label>' : ""}
         ${isRegister ? `
         <div class="auth-input-icon">
           <span class="auth-input-icon-addon" aria-hidden="true">
