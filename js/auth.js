@@ -6,6 +6,7 @@ let mode = params.get("mode") === "register" || location.pathname === "/register
 let twoFactor = null;
 let loginDraft = "";
 let twoFactorTarget = "/";
+let resetPasswordOpen = false;
 let codeMethodPopoverOpen = false;
 let clientCodeChannel = "";
 let clientCodeOrganizations = [];
@@ -48,13 +49,36 @@ function twoFactorHtml() {
   `;
 }
 
+function resetPasswordHtml() {
+  if (!resetPasswordOpen) return "";
+  return `
+    <div class="modal-backdrop" data-reset-password-modal>
+      <div class="modal-card auth-2fa-card">
+        <div class="modal-head">
+          <h3>Сброс пароля</h3>
+          <button type="button" class="ghost btn-ghost-secondary" data-reset-password-cancel>Закрыть</button>
+        </div>
+        <form class="modal-grid" data-reset-password-form>
+          <label class="modal-full"><span>ID организации</span><input name="organization_id" inputmode="numeric" required autofocus></label>
+          <label class="modal-full"><span>Новый пароль</span><input name="password" type="password" required minlength="8"></label>
+          <button class="primary modal-full auth-primary-btn">Сбросить и назначить</button>
+          <p class="modal-full" data-message></p>
+        </form>
+      </div>
+    </div>`;
+}
+
 function codeMethodPopoverHtml() {
   if (!codeMethodPopoverOpen) return "";
   return `<div class="auth-code-popover" data-auth-code-popover role="dialog" aria-label="Выбор организации">
       <strong>Выберите организацию</strong>
       <label><span>Организация</span>
         <select name="code_organization_id" required>
-          ${clientCodeOrganizations.map((organization) => '<option value="' + organization.id + '" ' + (String(organization.id) === String(clientCodeOrganizationId) ? "selected" : "") + '>' + escapeHtml(organization.name) + '</option>').join("")}
+          ${clientCodeOrganizations.map((organization) => {
+            const channelAvailable = (organization.channels || []).includes(clientCodeChannel);
+            const unavailableLabel = clientCodeChannel === "max" ? "MAX не подключён" : "Telegram не подключён";
+            return '<option value="' + organization.id + '" ' + (String(organization.id) === String(clientCodeOrganizationId) ? "selected" : "") + (channelAvailable ? "" : " disabled") + '>' + escapeHtml(organization.name + (channelAvailable ? "" : ` — ${unavailableLabel}`)) + '</option>';
+          }).join("")}
         </select>
       </label>
       <button type="button" class="primary auth-primary-btn" data-code-organization-continue>Продолжить</button>
@@ -92,6 +116,7 @@ function loginChannelsHtml() {
 
 function authHtml() {
   const isRegister = mode === "register";
+  const isClientLogin = !isRegister && loginContext.is_client_domain;
   return `
     <main class="auth-page">
       <form class="auth-card ${isRegister ? "wide" : ""}" data-auth-form>
@@ -103,18 +128,23 @@ function authHtml() {
         ${isRegister ? '<label><span>\u0418\u043c\u044f</span><input name="name" required></label>' : ""}
         <label><span>${isRegister ? "Email" : "Email \u0438\u043b\u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d"}</span><input name="${isRegister ? "email" : "login"}" ${isRegister ? 'type="email" autocomplete="email"' : `type="text" autocomplete="username" placeholder="введите ваши данные" data-login-phone-input value="${escapeHtml(loginDraft)}"`} required></label>
         ${isRegister ? '<label><span>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" data-phone-input></label>' : ""}
-        ${isRegister ? '<label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" required></label>' : ""}
+        ${!isClientLogin ? '<label><span>\u041f\u0430\u0440\u043e\u043b\u044c</span><input name="password" type="password" required></label>' : ""}
         ${isRegister ? '<label><span>\u041f\u043e\u0432\u0442\u043e\u0440 \u043f\u0430\u0440\u043e\u043b\u044f</span><input name="confirm" type="password" required></label>' : ""}
         <p data-message></p>
         ${isRegister
           ? '<button class="primary auth-primary-btn">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>'
-          : `<div class="auth-login-actions">
+          : isClientLogin ? `<div class="auth-login-actions">
               ${loginChannelsHtml()}
               <button type="button" class="btn btn-4 w-100 auth-primary-btn" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
+            </div>` : `<div class="auth-login-actions">
+              <button class="primary auth-primary-btn">Войти</button>
+              <button type="button" class="btn btn-4 w-100 auth-primary-btn" data-mode="register">Создать аккаунт</button>
+              <button type="button" class="ghost btn-ghost-secondary" data-reset-password-open>Сбросить пароль</button>
             </div>`}
-        ${isRegister ? "" : `<div class="auth-code-popover-wrap">${codeMethodPopoverHtml()}</div>`}
+        ${isClientLogin ? `<div class="auth-code-popover-wrap">${codeMethodPopoverHtml()}</div>` : ""}
       </form>
       ${twoFactorHtml()}
+      ${resetPasswordHtml()}
     </main>
   `;
 }
@@ -163,6 +193,18 @@ root.addEventListener("click", async (event) => {
     return;
   }
 
+  if (event.target.closest("[data-reset-password-cancel]")) {
+    resetPasswordOpen = false;
+    root.querySelector("[data-reset-password-modal]")?.remove();
+    return;
+  }
+
+  if (event.target.closest("[data-reset-password-open]")) {
+    resetPasswordOpen = true;
+    draw();
+    return;
+  }
+
   const channelButton = event.target.closest("[data-auth-channel]");
   if (channelButton) {
     const form = channelButton.closest("[data-auth-form]");
@@ -174,11 +216,12 @@ root.addEventListener("click", async (event) => {
       if (!phone) throw new Error("Укажите телефон");
       clientCodeChannel = channel;
       const result = await api.clientCodeOrganizations({ phone });
-      clientCodeOrganizations = (result.organizations || []).filter((organization) => (organization.channels || []).includes(channel));
-      if (!clientCodeOrganizations.length) {
+      clientCodeOrganizations = result.organizations || [];
+      const availableOrganizations = clientCodeOrganizations.filter((organization) => (organization.channels || []).includes(channel));
+      if (!availableOrganizations.length) {
         throw new Error(channel === "max" ? "Нет организаций с доступным входом через MAX" : "Нет организаций с доступным входом через Telegram");
       }
-      clientCodeOrganizationId = String(clientCodeOrganizations[0].id);
+      clientCodeOrganizationId = String(availableOrganizations[0].id);
       codeMethodPopoverOpen = true;
       draw();
     } catch (error) {
@@ -243,21 +286,43 @@ root.addEventListener("submit", async (event) => {
     return;
   }
 
+  const resetPasswordForm = event.target.closest("[data-reset-password-form]");
+  if (resetPasswordForm) {
+    event.preventDefault();
+    setMessage(resetPasswordForm, "");
+    const data = formData(resetPasswordForm);
+    try {
+      const result = await api.testResetPassword({
+        organization_id: Number(data.organization_id),
+        password: data.password,
+      });
+      setMessage(resetPasswordForm, `Пароль сброшен. Логин: ${result.login || `user #${result.user_id}`}`);
+    } catch (error) {
+      setMessage(resetPasswordForm, error.message);
+    }
+    return;
+  }
+
   const form = event.target.closest("[data-auth-form]");
   if (!form) return;
   event.preventDefault();
   setMessage(form, "");
-  if (mode !== "register") return;
-
   const data = formData(form);
   try {
-    if (data.password !== data.confirm) throw new Error("Пароли не совпадают");
-    saveSession(await api.register({
-      name: data.name,
-      email: data.email || undefined,
-      phone: normalizePhone(data.phone) || undefined,
-      password: data.password,
-    }));
+    if (mode === "register") {
+      if (data.password !== data.confirm) throw new Error("Пароли не совпадают");
+      saveSession(await api.register({
+        name: data.name,
+        email: data.email || undefined,
+        phone: normalizePhone(data.phone) || undefined,
+        password: data.password,
+      }));
+    } else if (!loginContext.is_client_domain) {
+      const login = String(data.login || "").includes("@") ? String(data.login).trim() : normalizePhone(data.login);
+      saveSession(await api.login({ login, password: data.password }));
+    } else {
+      return;
+    }
     location.href = "/";
   } catch (error) {
     setMessage(form, error.message);

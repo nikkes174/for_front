@@ -1,0 +1,713 @@
+- generic [ref=e1]:
+  - link "Перейти к содержимому" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - generic [ref=e6]:
+    - generic [ref=e8]:
+      - navigation "Боковая панель":
+        - generic:
+          - generic:
+            - generic:
+              - button "Открыть боковую панель"
+        - generic:
+          - generic:
+            - link "Новый чат":
+              - /url: /
+          - generic:
+            - button "Найти"
+          - generic:
+            - button "Закрепленное"
+          - generic:
+            - button "Недавние чаты"
+        - generic:
+          - generic:
+            - button "Открыть меню профиля":
+              - generic: МС
+      - generic [ref=e9]:
+        - heading "История чата" [level=2] [ref=e10]
+        - generic [ref=e11]:
+          - navigation "История чата" [ref=e12]:
+            - generic [ref=e15]:
+              - link "Домашняя" [ref=e16] [cursor=pointer]:
+                - /url: /
+                - generic [ref=e17]: ChatGPT Plus
+              - generic [ref=e18]:
+                - button "Найти" [ref=e19] [cursor=pointer]
+                - button "Закрыть боковую панель" [expanded] [ref=e22]
+            - list [ref=e26]:
+              - listitem [ref=e27]:
+                - link "Новый чат Контролировать Shift O" [ref=e114] [cursor=pointer]:
+                  - /url: /
+                  - generic [ref=e115]: Новый чат
+                  - generic [ref=e122]:
+                    - generic "Контролировать" [ref=e123]:
+                      - generic [ref=e124]: Ctrl
+                      - text: +
+                    - generic "Shift" [ref=e125]: +
+                    - generic [ref=e127]: O
+              - listitem
+            - link "Библиотека" [ref=e35] [cursor=pointer]:
+              - /url: /library
+            - link "Запланированное" [ref=e42] [cursor=pointer]:
+              - /url: /scheduled
+            - link "Плагины" [ref=e49] [cursor=pointer]:
+              - /url: /plugins
+            - generic [ref=e56]: Больше
+            - generic [ref=e129]:
+              - button [expanded] [ref=e131] [cursor=pointer]:
+                - heading "Закрепленные" [level=2] [ref=e132]
+              - list [ref=e133]:
+                - listitem [ref=e134]:
+                  - link "Примеры карточек профиля, закрепленный диалог" [ref=e135] [cursor=pointer]:
+                    - /url: /c/6a646967-0d7c-83eb-965d-1929fb7aca8a
+                    - generic [ref=e136]: Примеры карточек профиля
+                    - generic [ref=e147]:
+                      - button "Открепить Примеры карточек профиля" [ref=e148]
+                      - button "Открыть настройки диалога «Примеры карточек профиля»" [ref=e152]
+            - generic [ref=e156]:
+              - generic [ref=e157]:
+                - button [expanded] [ref=e158] [cursor=pointer]:
+                  - heading "Проекты" [level=2] [ref=e159]
+                - generic [ref=e160]:
+                  - button "Упорядочить чаты" [ref=e161] [cursor=pointer]
+                  - button "Новый проект" [ref=e165] [cursor=pointer]
+              - list [ref=e169]:
+                - listitem [ref=e170]:
+                  - generic [ref=e171]:
+                    - button "opencode" [expanded] [ref=e172] [cursor=pointer]
+                    - generic:
+                      - button "Открыть главную страницу проекта" [ref=e186] [cursor=pointer]
+                      - button "Открыть параметры проекта «opencode»" [ref=e190] [cursor=pointer]
+                  - list [ref=e195]:
+                    - listitem [ref=e196]:
+                      - link "Задача замены кнопки, чат в проекте opencode" [ref=e197] [cursor=pointer]:
+                        - /url: /g/g-p-6a75f049d89881918f8e1894a1db078b/c/6a76bdbd-4c6c-83eb-b838-a04f6db8fa15
+                        - generic [ref=e198]: Задача замены кнопки
+                        - generic [ref=e205]:
+                          - button "Закрепить Задача замены кнопки" [ref=e206]
+                          - button "Открыть настройки диалога «Задача замены кнопки»" [ref=e210]
+                    - listitem [ref=e214]:
+                      - link "Изменение клавиатуры в боте, чат в проекте opencode" [ref=e215] [cursor=pointer]:
+                        - /url: /g/g-p-6a75f049d89881918f8e1894a1db078b/c/6a75f433-d9c4-83ed-98ea-c553983f46a0
+                        - generic [ref=e216]: Изменение клавиатуры в боте
+                        - generic [ref=e223]:
+                          - button "Закрепить Изменение клавиатуры в боте" [ref=e224]
+                          - button "Открыть настройки диалога «Изменение клавиатуры в боте»" [ref=e228]
+                - listitem [ref=e232]:
+                  - generic [ref=e233]:
+                    - button "UI" [ref=e234] [cursor=pointer]
+                    - generic:
+                      - button "Открыть главную страницу проекта" [ref=e248] [cursor=pointer]
+                      - button "Открыть параметры проекта «UI»" [ref=e252] [cursor=pointer]
+                - listitem [ref=e256]:
+                  - generic [ref=e257]:
+                    - button "Красный Глобус VPN и настройка" [ref=e258] [cursor=pointer]:
+                      - img "Красный Глобус" [ref=e261]
+                      - generic [ref=e263]: VPN и настройка
+                    - generic:
+                      - button "Открыть главную страницу проекта" [ref=e265] [cursor=pointer]
+                      - button "Открыть параметры проекта «VPN и настройка»" [ref=e269] [cursor=pointer]
+                - listitem [ref=e273]:
+                  - generic [ref=e274]:
+                    - button "Кормилец" [ref=e275] [cursor=pointer]
+                    - generic:
+                      - button "Открыть главную страницу проекта" [ref=e295] [cursor=pointer]
+                      - button "Открыть параметры проекта «Кормилец»" [ref=e299] [cursor=pointer]
+                - listitem [ref=e303]:
+                  - generic [ref=e304]:
+                    - button "Репоизтории" [ref=e305] [cursor=pointer]
+                    - generic:
+                      - button "Открыть главную страницу проекта" [ref=e319] [cursor=pointer]
+                      - button "Открыть параметры проекта «Репоизтории»" [ref=e323] [cursor=pointer]
+                - listitem [ref=e327]:
+                  - button "Показать еще" [ref=e328] [cursor=pointer]
+            - generic [ref=e331]:
+              - generic [ref=e332]:
+                - button [expanded] [ref=e333] [cursor=pointer]:
+                  - heading "Чаты" [level=2] [ref=e334]
+                - generic [ref=e335]:
+                  - button "Упорядочить чаты" [ref=e336] [cursor=pointer]
+                  - link "Новый чат" [ref=e340] [cursor=pointer]:
+                    - /url: /
+              - list [ref=e345]:
+                - listitem [ref=e346]:
+                  - link "Возврат к коммитам" [ref=e347] [cursor=pointer]:
+                    - /url: /c/6a62f3c6-4074-83eb-84b3-188ea9eefc73
+                    - generic [ref=e355]:
+                      - button "Закрепить Возврат к коммитам" [ref=e356]
+                      - button "Открыть настройки диалога «Возврат к коммитам»" [ref=e360]
+                - listitem [ref=e364]:
+                  - link "Изменение email для трафика" [ref=e365] [cursor=pointer]:
+                    - /url: /g/g-6a55ac299a38819189aef3afcba5842b-nastroishchik-x-ray/c/6a77fd76-c884-83eb-a67f-22843f285d7a
+                    - generic [ref=e373]:
+                      - button "Закрепить Изменение email для трафика" [ref=e374]
+                      - button "Открыть настройки диалога «Изменение email для трафика»" [ref=e378]
+                - listitem [ref=e382]:
+                  - link "Частота wifi адаптера" [ref=e383] [cursor=pointer]:
+                    - /url: /c/6a77f943-661c-83ed-bfc1-c8590ac22677
+                    - generic [ref=e391]:
+                      - button "Закрепить Частота wifi адаптера" [ref=e392]
+                      - button "Открыть настройки диалога «Частота wifi адаптера»" [ref=e396]
+                - listitem [ref=e400]:
+                  - link "OpenCode обзор программы" [ref=e401] [cursor=pointer]:
+                    - /url: /c/6a75e07a-5da8-83eb-885a-43d32dc6c88a
+                    - generic [ref=e409]:
+                      - button "Закрепить OpenCode обзор программы" [ref=e410]
+                      - button "Открыть настройки диалога «OpenCode обзор программы»" [ref=e414]
+                - listitem [ref=e418]:
+                  - link "Проблемы с x-ray" [ref=e419] [cursor=pointer]:
+                    - /url: /c/6a719197-62d4-83eb-a8f6-cee4ddd6ccd9
+                    - generic [ref=e427]:
+                      - button "Закрепить Проблемы с x-ray" [ref=e428]
+                      - button "Открыть настройки диалога «Проблемы с x-ray»" [ref=e432]
+                - listitem [ref=e436]:
+                  - link "Список репозиториев с UI" [ref=e437] [cursor=pointer]:
+                    - /url: /c/6a755af0-7e88-83eb-80a8-c70bea377a39
+                    - generic [ref=e445]:
+                      - button "Закрепить Список репозиториев с UI" [ref=e446]
+                      - button "Открыть настройки диалога «Список репозиториев с UI»" [ref=e450]
+                - listitem [ref=e454]:
+                  - link "Создание структуры микросервисов" [ref=e455] [cursor=pointer]:
+                    - /url: /c/6a672f16-41b0-83ed-bda2-87541cc6ef76
+                    - generic [ref=e463]:
+                      - button "Закрепить Создание структуры микросервисов" [ref=e464]
+                      - button "Открыть настройки диалога «Создание структуры микросервисов»" [ref=e468]
+                - listitem [ref=e472]:
+                  - link "Настройка времени в YClients" [ref=e473] [cursor=pointer]:
+                    - /url: /g/g-688f9c1679f481919c597873bd3fd078-yclients-api-master/c/6a62d9be-e4d8-83eb-b268-43b34e353b66
+                    - generic [ref=e481]:
+                      - button "Закрепить Настройка времени в YClients" [ref=e482]
+                      - button "Открыть настройки диалога «Настройка времени в YClients»" [ref=e486]
+                - listitem [ref=e490]:
+                  - link "Объект в Пайтоне" [ref=e491] [cursor=pointer]:
+                    - /url: /c/6a62381f-d400-83ed-8819-cb0b5ce6b75b
+                    - generic [ref=e499]:
+                      - button "Закрепить Объект в Пайтоне" [ref=e500]
+                      - button "Открыть настройки диалога «Объект в Пайтоне»" [ref=e504]
+                - listitem [ref=e508]:
+                  - link "Тема для теории Python" [ref=e509] [cursor=pointer]:
+                    - /url: /g/g-6a620e850d408191afb4628416ad1751-mentor/c/6a620fac-d050-83ed-bb36-40ea19278bb8
+                    - generic [ref=e517]:
+                      - button "Закрепить Тема для теории Python" [ref=e518]
+                      - button "Открыть настройки диалога «Тема для теории Python»" [ref=e522]
+                - listitem [ref=e526]:
+                  - link "Настройка x-ray подключений" [ref=e527] [cursor=pointer]:
+                    - /url: /g/g-6a55ac299a38819189aef3afcba5842b-nastroishchik-x-ray/c/6a55cc87-f768-83eb-9c15-8288c936e498
+                    - generic [ref=e535]:
+                      - button "Закрепить Настройка x-ray подключений" [ref=e536]
+                      - button "Открыть настройки диалога «Настройка x-ray подключений»" [ref=e540]
+                - listitem [ref=e544]:
+                  - link "Изучение архитектуры приложения" [ref=e545] [cursor=pointer]:
+                    - /url: /c/6a51b22b-088c-83eb-93b1-8cca665d0d9c
+                    - generic [ref=e553]:
+                      - button "Закрепить Изучение архитектуры приложения" [ref=e554]
+                      - button "Открыть настройки диалога «Изучение архитектуры приложения»" [ref=e558]
+                - listitem [ref=e562]:
+                  - link "Как получить API-ключ" [ref=e563] [cursor=pointer]:
+                    - /url: /c/6a50a7ed-77b4-83ed-a957-e14b3516fa7a
+                    - generic [ref=e571]:
+                      - button "Закрепить Как получить API-ключ" [ref=e572]
+                      - button "Открыть настройки диалога «Как получить API-ключ»" [ref=e576]
+                - listitem [ref=e580]:
+                  - link "Установка Headroom в Codex" [ref=e581] [cursor=pointer]:
+                    - /url: /c/6a505b89-d1ec-83eb-837e-fda2dec4ef22
+                    - generic [ref=e589]:
+                      - button "Закрепить Установка Headroom в Codex" [ref=e590]
+                      - button "Открыть настройки диалога «Установка Headroom в Codex»" [ref=e594]
+          - button "Михаил Сульдин Plus, открыть меню профиля" [ref=e67] [cursor=pointer]:
+            - generic [ref=e68]:
+              - generic [ref=e69]: МС
+              - generic [ref=e71]:
+                - generic [ref=e72]: Михаил Сульдин
+                - generic [ref=e74]: Plus
+            - button "Скачать приложения" [ref=e79]
+    - generic [ref=e85]:
+      - generic [ref=e86]:
+        - banner:
+          - link "Открыть проект opencode" [ref=e603] [cursor=pointer]:
+            - /url: /g/g-p-6a75f049d89881918f8e1894a1db078b-opencode/project
+            - generic [ref=e604]:
+              - 'img "Цвет по умолчанию: чёрный в светлом режиме, белый в тёмном режиме Папка" [ref=e606]'
+              - generic [ref=e608]: opencode
+          - generic [ref=e89]:
+            - button "Поделиться чатом" [ref=e94] [cursor=pointer]
+            - button "Ещё" [ref=e99] [cursor=pointer]
+      - main [ref=e103]:
+        - generic [ref=e105]:
+          - generic [ref=e609]:
+            - generic [ref=e610]:
+              - generic [ref=e614]:
+                - button "Prompt 1" [ref=e615] [cursor=pointer]
+                - button "Prompt 2" [ref=e616] [cursor=pointer]
+                - button "Prompt 3" [ref=e617] [cursor=pointer]
+                - button "Prompt 4" [ref=e618] [cursor=pointer]
+                - button "Prompt 5" [ref=e619] [cursor=pointer]
+                - button "Prompt 6" [ref=e620] [cursor=pointer]
+                - button "Prompt 7" [ref=e621] [cursor=pointer]
+                - button "Prompt 8" [ref=e622] [cursor=pointer]
+                - button "Prompt 9" [ref=e623] [cursor=pointer]
+                - button "Prompt 10" [ref=e624] [cursor=pointer]
+                - button "Prompt 11" [ref=e625] [cursor=pointer]
+                - button "Prompt 12" [ref=e626] [cursor=pointer]
+                - button "Prompt 13" [ref=e627] [cursor=pointer]
+                - button "Prompt 14" [ref=e628] [cursor=pointer]
+                - button "Prompt 15" [ref=e629] [cursor=pointer]
+                - button "Prompt 16" [ref=e630] [cursor=pointer]
+                - button "Prompt 17" [ref=e631] [cursor=pointer]
+                - button "Prompt 18" [ref=e632] [cursor=pointer]
+                - button "Prompt 19" [ref=e633] [cursor=pointer]
+                - button "Prompt 20" [ref=e634] [cursor=pointer]
+                - button "Prompt 21" [ref=e635] [cursor=pointer]
+                - button "Prompt 22" [ref=e636] [cursor=pointer]
+                - button "Prompt 23" [ref=e637] [cursor=pointer]
+                - button "Prompt 24" [ref=e638] [cursor=pointer]
+                - button "Prompt 25" [ref=e639] [cursor=pointer]
+              - generic [ref=e649]:
+                - heading "Вы сказали:" [level=4] [ref=e650]
+                - generic [ref=e655]:
+                  - img "Не удалось загрузить изображение" [ref=e660]
+                  - generic [ref=e665]:
+                    - paragraph [ref=e668]:
+                      - text: "теперь надо сделать чтобы фон кнопки войти , продолжить , Подтвердить Вход был цвета фона в кабинете пользователя в котором пишется имя организации . иконку у макса заменить на : <svg xmlns=\""
+                      - link "http://www.w3.org/2000/svg" [ref=e669] [cursor=pointer]:
+                        - /url: http://www.w3.org/2000/svg
+                      - text: "\" viewBox=\"0 0 720 720\"><path fill=\"#fff\" d=\"M350.4,9.6C141.8,20.5,4.1,184.1,12.8,390.4c3.8,90.3,40.1,168,48.7,253.7,2.2,22.2-4.2,49.6,21.4,59.3,31.5,11.9,79.8-8.1,106.2-26.4,9-6.1,17.6-13.2,24.2-22,27.3,18.1,53.2,35.6,85.7,43.4,143.1,34.3,299.9-44.2,369.6-170.3C799.6,291.2,622.5-4.6,350.4,9.6h0ZM269.4,504c-11.3,8.8-22.2,20.8-34.7,27.7-18.1,9.7-23.7-.4-30.5-16.4-21.4-50.9-24-137.6-11.5-190.9,16.8-72.5,72.9-136.3,150-143.1,78-6.9,150.4,32.7,183.1,104.2,72.4,159.1-112.9,316.2-256.4,218.6h0Z\"/></svg> иконку телеграмма : <?xml version=\"1.0\" encoding=\"utf-8\"?><!-- Uploaded to: SVG Repo,"
+                      - link "www.svgrepo.com" [ref=e670] [cursor=pointer]:
+                        - /url: http://www.svgrepo.com
+                      - text: ", Generator: SVG Repo Mixer Tools --> <svg xmlns=\""
+                      - link "http://www.w3.org/2000/svg" [ref=e671] [cursor=pointer]:
+                        - /url: http://www.w3.org/2000/svg
+                      - text: "\" aria-label=\"Telegram\" role=\"img\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"15%\" fill=\"#37aee2\"/><path fill=\"#c8daea\" d=\"M199 404c-11 0-10-4-13-14l-32-105 245-144\"/><path fill=\"#a9c9dd\" d=\"M199 404c7 0 11-4 16-8l45-43-56-34\"/><path fill=\"#f6fbfe\" d=\"M204 319l135 99c14 9 26 4 30-14l55-258c5-22-9-32-24-25L79 245c-21 8-21 21-4 26l83 26 190-121c9-5 17-3 11 4\"/></svg>"
+                    - button "Развернуть" [ref=e672] [cursor=pointer]
+              - generic [ref=e683]:
+                - heading "Вы сказали:" [level=4] [ref=e684]
+                - generic [ref=e686]:
+                  - generic [ref=e689]:
+                    - generic [ref=e691]:
+                      - img "Не удалось загрузить изображение" [ref=e694]
+                      - img "Не удалось загрузить изображение" [ref=e699]
+                    - generic [ref=e704]:
+                      - paragraph [ref=e707]:
+                        - text: "правки которые надо сделать : на окне убрать кнопку войти Создать аккаунт перекрасить в цвет кнопки Продолжить и перенести под кнопки Войти через макс и войти через телеграмм сами 3 кнопки стелать в столбец фон у иконки макса перекрасить в черный цвет сделать чтобы иконки и надписи кнопок не выходили за рамку На форме регистрации фон кнопки создать аккаунт покрасить в цвет кнопки Продолжить кнопку Создать аккаунт покрасить в цвет кнопки Продолжить кнопка продолжить цвет шрифта сделать Черным, а то не видно Потвердить вход тоже сделать цвет шрифта черным Сформируй задания для"
+                        - strong [ref=e708]: OpenCode — исполнителя
+                      - button "Развернуть" [ref=e709] [cursor=pointer]
+                  - generic [ref=e714]:
+                    - group "Действия с вашим сообщением":
+                      - button "Скопировать сообщение"
+                      - button "Поделиться промптом"
+                      - button "Редактировать сообщение"
+              - generic [ref=e747]:
+                - heading "ChatGPT сказал:" [level=4] [ref=e748]
+                - generic [ref=e750]:
+                  - generic [ref=e754]:
+                    - paragraph [ref=e755]: Понял задачу.
+                    - paragraph [ref=e756]: "В этой связке:"
+                    - list [ref=e757]:
+                      - listitem [ref=e758]:
+                        - paragraph [ref=e759]:
+                          - strong [ref=e760]: Я
+                          - text: — анализирую текущий frontend, определяю какие кнопки являются вторичными/серого фона, принимаю архитектурные решения.
+                      - listitem [ref=e761]:
+                        - paragraph [ref=e762]:
+                          - strong [ref=e763]: OpenCode
+                          - text: "— только исполнитель: меняет код по заданию, делает commit/push и отдаёт результат на ревью."
+                      - listitem [ref=e764]:
+                        - paragraph [ref=e765]: Проверку принимаю я.
+                    - paragraph [ref=e766]:
+                      - text: Сейчас не буду заставлять OpenCode самому искать архитектуру. Он должен сделать именно миграцию существующих серых кнопок в единый стиль
+                      - code [ref=e767]: btn-ghost-secondary
+                      - text: ", сохранив тексты и логику."
+                    - separator [ref=e768]
+                    - heading "Готовое задание для OpenCode:" [level=1] [ref=e769]
+                    - generic [ref=e778]:
+                      - button "Копировать" [ref=e779] [cursor=pointer]
+                      - code [ref=e788]: "Репозиторий: https://github.com/nikkes174/for_front Ветка: frontend-export Ты исполнитель. Не принимай архитектурных решений самостоятельно. Твоя задача: заменить визуальный стиль вторичных серых кнопок frontend-приложения на единый стиль ghost-secondary. После выполнения: - commit; - push в frontend-export; - вернуть TASK_RESULT для ревью. ==================================================== Цель ==================================================== Во frontend сейчас есть кнопки с серым фоном, которые выглядят как стандартные административные кнопки. Нужно привести их к более современному SaaS-стилю: ghost secondary button: - прозрачный фон; - тонкая/невидимая рамка; - спокойный серый текст; - лёгкий hover background; - medium font-weight; - компактный размер. ВАЖНО: Меняется только внешний вид. Сохранять: - текст кнопки; - назначение кнопки; - click handlers; - data-* атрибуты; - JS-логику; - API; - порядок кнопок. ==================================================== Эталонный стиль ==================================================== Создать или использовать единый CSS класс: .btn-ghost-secondary Стиль: ```css .btn-ghost-secondary { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border-radius: 6px; background: transparent; border: 1px solid transparent; color: #667085; font-size: 14px; font-weight: 500; line-height: 20px; cursor: pointer; transition: background-color .15s ease, color .15s ease, border-color .15s ease; } .btn-ghost-secondary:hover { background-color: #f2f4f7; color: #344054; } .btn-ghost-secondary:focus { outline: none; background-color: #eaecf0; } .btn-ghost-secondary:active { background-color: #e4e7ec; } .btn-ghost-secondary:disabled { opacity: .5; cursor: not-allowed; }"
+                    - paragraph [ref=e789]: "Если в проекте уже есть похожий класс:"
+                    - list [ref=e790]:
+                      - listitem [ref=e791]:
+                        - paragraph [ref=e792]: не создавать дубль;
+                      - listitem [ref=e793]:
+                        - paragraph [ref=e794]: аккуратно объединить стили.
+                    - heading "==================================================== Что считать серой кнопкой" [level=1] [ref=e795]
+                    - paragraph [ref=e796]: "Найти во frontend:"
+                    - paragraph [ref=e797]: "Кнопки, у которых:"
+                    - list [ref=e798]:
+                      - listitem [ref=e799]:
+                        - paragraph [ref=e800]: серый background;
+                      - listitem [ref=e801]:
+                        - paragraph [ref=e802]:
+                          - code [ref=e803]: .secondary
+                          - text: ;
+                      - listitem [ref=e804]:
+                        - paragraph [ref=e805]:
+                          - code [ref=e806]: .ghost
+                          - text: ;
+                      - listitem [ref=e807]:
+                        - paragraph [ref=e808]:
+                          - code [ref=e809]: .muted
+                          - text: ;
+                      - listitem [ref=e810]:
+                        - paragraph [ref=e811]:
+                          - code [ref=e812]: .outline
+                          - text: ;
+                      - listitem [ref=e813]:
+                        - paragraph [ref=e814]:
+                          - code [ref=e815]: .btn-secondary
+                          - text: ;
+                      - listitem [ref=e816]:
+                        - paragraph [ref=e817]:
+                          - code [ref=e818]: .btn-light
+                          - text: ;
+                      - listitem [ref=e819]:
+                        - paragraph [ref=e820]: "локальные стили с:"
+                    - paragraph [ref=e821]: "background: #f2f4f7 #eaecf0 #e4e7ec #f8fafc серые rgb/rgba значения"
+                    - paragraph [ref=e822]: "Особенно проверить:"
+                    - list [ref=e823]:
+                      - listitem [ref=e824]:
+                        - paragraph [ref=e825]: модальные окна;
+                      - listitem [ref=e826]:
+                        - paragraph [ref=e827]: формы;
+                      - listitem [ref=e828]:
+                        - paragraph [ref=e829]: отмена/назад/сброс;
+                      - listitem [ref=e830]:
+                        - paragraph [ref=e831]: дополнительные действия;
+                      - listitem [ref=e832]:
+                        - paragraph [ref=e833]: вторичные действия рядом с primary.
+                    - heading "==================================================== Ограничения" [level=1] [ref=e834]
+                    - paragraph [ref=e835]: "НЕ менять:"
+                    - list [ref=e836]:
+                      - listitem [ref=e837]:
+                        - paragraph [ref=e838]: основные primary кнопки;
+                      - listitem [ref=e839]:
+                        - paragraph [ref=e840]: кнопки оплаты;
+                      - listitem [ref=e841]:
+                        - paragraph [ref=e842]: подтверждения;
+                      - listitem [ref=e843]:
+                        - paragraph [ref=e844]: опасные delete/remove кнопки;
+                      - listitem [ref=e845]:
+                        - paragraph [ref=e846]: красные warning кнопки;
+                      - listitem [ref=e847]:
+                        - paragraph [ref=e848]: auth-primary-btn;
+                      - listitem [ref=e849]:
+                        - paragraph [ref=e850]: таблицы;
+                      - listitem [ref=e851]:
+                        - paragraph [ref=e852]: бизнес-логику.
+                    - paragraph [ref=e853]: "Например:"
+                    - paragraph [ref=e854]: "Оставить:"
+                    - generic [ref=e863]:
+                      - button "Копировать" [ref=e864] [cursor=pointer]
+                      - code [ref=e873]: Сохранить Создать Подтвердить Оплатить Продолжить
+                    - paragraph [ref=e874]: как есть, если это primary action.
+                    - paragraph [ref=e875]: "Изменять:"
+                    - generic [ref=e884]:
+                      - button "Копировать" [ref=e885] [cursor=pointer]
+                      - code [ref=e894]: Отмена Назад Сбросить Закрыть Отменить выбор Дополнительно
+                    - paragraph [ref=e895]: если сейчас они являются серыми secondary actions.
+                    - heading "==================================================== Файлы" [level=1] [ref=e896]
+                    - paragraph [ref=e897]: "Работать только в frontend scope:"
+                    - paragraph [ref=e898]: "разрешены:"
+                    - list [ref=e899]:
+                      - listitem [ref=e900]:
+                        - paragraph [ref=e901]: css/styles.css
+                      - listitem [ref=e902]:
+                        - paragraph [ref=e903]: css/cabinet.css
+                      - listitem [ref=e904]:
+                        - paragraph [ref=e905]: js/modules/*.js
+                      - listitem [ref=e906]:
+                        - paragraph [ref=e907]: js/auth.js
+                    - paragraph [ref=e908]: "Не менять:"
+                    - list [ref=e909]:
+                      - listitem [ref=e910]:
+                        - paragraph [ref=e911]: backend;
+                      - listitem [ref=e912]:
+                        - paragraph [ref=e913]: js/api.js.
+                    - heading "==================================================== Правила замены" [level=1] [ref=e914]
+                    - paragraph [ref=e915]: "Если сейчас:"
+                    - generic [ref=e921]:
+                      - generic [ref=e923]:
+                        - generic [ref=e924]: HTML
+                        - generic [ref=e927]:
+                          - group "Вид блока кода" [ref=e928]:
+                            - button "Код" [pressed] [ref=e930] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e934] [cursor=pointer]
+                          - button "Копировать" [ref=e937] [cursor=pointer]
+                      - code [ref=e950]: <button class="btn secondary"> Отмена </button>
+                    - paragraph [ref=e951]: "или:"
+                    - generic [ref=e957]:
+                      - generic [ref=e959]:
+                        - generic [ref=e960]: HTML
+                        - generic [ref=e963]:
+                          - group "Вид блока кода" [ref=e964]:
+                            - button "Код" [pressed] [ref=e966] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e970] [cursor=pointer]
+                          - button "Копировать" [ref=e973] [cursor=pointer]
+                      - code [ref=e986]: <button class="ghost"> Назад </button>
+                    - paragraph [ref=e987]: "или:"
+                    - generic [ref=e993]:
+                      - generic [ref=e995]:
+                        - generic [ref=e996]: HTML
+                        - generic [ref=e999]:
+                          - group "Вид блока кода" [ref=e1000]:
+                            - button "Код" [pressed] [ref=e1002] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e1006] [cursor=pointer]
+                          - button "Копировать" [ref=e1009] [cursor=pointer]
+                      - code [ref=e1022]: <button class="btn btn-secondary"> Сбросить </button>
+                    - paragraph [ref=e1023]: заменить только классами.
+                    - paragraph [ref=e1024]: "Например:"
+                    - paragraph [ref=e1025]: "Было:"
+                    - generic [ref=e1031]:
+                      - generic [ref=e1033]:
+                        - generic [ref=e1034]: HTML
+                        - generic [ref=e1037]:
+                          - group "Вид блока кода" [ref=e1038]:
+                            - button "Код" [pressed] [ref=e1040] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e1044] [cursor=pointer]
+                          - button "Копировать" [ref=e1047] [cursor=pointer]
+                      - code [ref=e1060]: <button class="btn btn-secondary"> Отмена </button>
+                    - paragraph [ref=e1061]: "Стало:"
+                    - generic [ref=e1067]:
+                      - generic [ref=e1069]:
+                        - generic [ref=e1070]: HTML
+                        - generic [ref=e1073]:
+                          - group "Вид блока кода" [ref=e1074]:
+                            - button "Код" [pressed] [ref=e1076] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e1080] [cursor=pointer]
+                          - button "Копировать" [ref=e1083] [cursor=pointer]
+                      - code [ref=e1096]: <button class="btn-ghost-secondary"> Отмена </button>
+                    - paragraph [ref=e1097]: "Но если на кнопке есть:"
+                    - list [ref=e1098]:
+                      - listitem [ref=e1099]:
+                        - paragraph [ref=e1100]: data attributes;
+                      - listitem [ref=e1101]:
+                        - paragraph [ref=e1102]: onclick;
+                      - listitem [ref=e1103]:
+                        - paragraph [ref=e1104]: дополнительные JS hooks;
+                    - paragraph [ref=e1105]: их сохранить.
+                    - paragraph [ref=e1106]: "Пример:"
+                    - paragraph [ref=e1107]: "Было:"
+                    - generic [ref=e1113]:
+                      - generic [ref=e1115]:
+                        - generic [ref=e1116]: HTML
+                        - generic [ref=e1119]:
+                          - group "Вид блока кода" [ref=e1120]:
+                            - button "Код" [pressed] [ref=e1122] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e1126] [cursor=pointer]
+                          - button "Копировать" [ref=e1129] [cursor=pointer]
+                      - code [ref=e1142]: <button data-close-modal class="secondary-button" > Закрыть </button>
+                    - paragraph [ref=e1143]: "Стало:"
+                    - generic [ref=e1149]:
+                      - generic [ref=e1151]:
+                        - generic [ref=e1152]: HTML
+                        - generic [ref=e1155]:
+                          - group "Вид блока кода" [ref=e1156]:
+                            - button "Код" [pressed] [ref=e1158] [cursor=pointer]
+                            - button "Предварительный просмотр" [ref=e1162] [cursor=pointer]
+                          - button "Копировать" [ref=e1165] [cursor=pointer]
+                      - code [ref=e1178]: <button data-close-modal class="btn-ghost-secondary" > Закрыть </button>
+                    - heading "==================================================== SVG / icon buttons" [level=1] [ref=e1179]
+                    - paragraph [ref=e1180]: "Кнопки только с иконкой:"
+                    - list [ref=e1181]:
+                      - listitem [ref=e1182]:
+                        - paragraph [ref=e1183]: delete icon;
+                      - listitem [ref=e1184]:
+                        - paragraph [ref=e1185]: close icon;
+                      - listitem [ref=e1186]:
+                        - paragraph [ref=e1187]: toolbar icon;
+                    - paragraph [ref=e1188]: не менять автоматически.
+                    - paragraph [ref=e1189]: Их рассматривать отдельно.
+                    - paragraph [ref=e1190]: Менять только кнопки с текстом.
+                    - heading "==================================================== Проверка после изменений" [level=1] [ref=e1191]
+                    - paragraph [ref=e1192]: "Выполнить:"
+                    - generic [ref=e1198]:
+                      - generic [ref=e1200]:
+                        - generic [ref=e1201]: Bash
+                        - button "Копировать" [ref=e1205] [cursor=pointer]
+                      - code [ref=e1218]: git diff --check
+                    - paragraph [ref=e1219]: "Если менялся JS:"
+                    - generic [ref=e1225]:
+                      - generic [ref=e1227]:
+                        - generic [ref=e1228]: Bash
+                        - button "Копировать" [ref=e1232] [cursor=pointer]
+                      - code [ref=e1245]: node --check изменённые-js-файлы
+                    - paragraph [ref=e1246]: "Проверить:"
+                    - list [ref=e1247]:
+                      - listitem [ref=e1248]:
+                        - paragraph [ref=e1249]: Названия кнопок не изменились.
+                      - listitem [ref=e1250]:
+                        - paragraph [ref=e1251]: Click handlers не изменились.
+                      - listitem [ref=e1252]:
+                        - paragraph [ref=e1253]: data-* не изменились.
+                      - listitem [ref=e1254]:
+                        - paragraph [ref=e1255]: Primary кнопки не затронуты.
+                      - listitem [ref=e1256]:
+                        - paragraph [ref=e1257]: Delete/danger кнопки не затронуты.
+                      - listitem [ref=e1258]:
+                        - paragraph [ref=e1259]: auth-primary-btn не затронут.
+                      - listitem [ref=e1260]:
+                        - paragraph [ref=e1261]: Backend отсутствует в diff.
+                      - listitem [ref=e1262]:
+                        - paragraph [ref=e1263]: js/api.js отсутствует в diff.
+                    - heading "==================================================== TASK_RESULT" [level=1] [ref=e1264]
+                    - paragraph [ref=e1265]: "Вернуть:"
+                    - paragraph [ref=e1266]: TASK_RESULT
+                    - paragraph [ref=e1267]: "Branch:"
+                    - paragraph [ref=e1268]: "Commit:"
+                    - paragraph [ref=e1269]: "Changed files:"
+                    - paragraph [ref=e1270]: "Что изменено:"
+                    - list [ref=e1271]:
+                      - listitem [ref=e1272]:
+                        - paragraph [ref=e1273]: Какие кнопки переведены в btn-ghost-secondary
+                      - listitem [ref=e1274]:
+                        - paragraph [ref=e1275]: Какие файлы изменены
+                      - listitem [ref=e1276]:
+                        - paragraph [ref=e1277]: Какие кнопки сознательно не менялись
+                    - paragraph [ref=e1278]: "Tests:"
+                    - paragraph [ref=e1279]: git diff --check
+                    - paragraph [ref=e1280]: "node --check:"
+                    - paragraph [ref=e1281]: "git diff --stat:"
+                    - paragraph [ref=e1282]: После этого остановиться и ждать ревью.
+                    - generic [ref=e1291]:
+                      - button "Копировать" [ref=e1292] [cursor=pointer]
+                      - code [ref=e1301]: "--- Я специально не указал ему \"замени все серые кнопки подряд\", потому что в проекте есть опасная зона: **серые кнопки не всегда secondary**. Например: - disabled; - таблицы; - фильтры; - переключатели; - danger actions. Задача выше заставляет его менять только текстовые вторичные действия, а не ломать UI-систему."
+                  - generic [ref=e1302]:
+                    - group "Действия с ответом":
+                      - button "Копировать ответ"
+                      - button "Оценить ответ"
+                      - button "Добавить в источники проекта"
+                      - generic:
+                        - button "Сменить модель"
+                      - button "Больше действий"
+                      - button "Источники"
+              - generic [ref=e1305]:
+                - heading "Вы сказали:" [level=4] [ref=e1306]
+                - generic [ref=e1308]:
+                  - generic [ref=e1309]: ты уже неправильно начал , ты должен просмотреть репозщиторий который я сейчас скинул и указать ему конкретные файлы и места где и какие делать правки , чтобы он сам ничего не искал и не исследовал
+                  - generic [ref=e1314]:
+                    - group "Действия с вашим сообщением":
+                      - button "Скопировать сообщение"
+                      - button "Поделиться промптом"
+                      - button "Редактировать сообщение"
+              - generic [ref=e1317]:
+                - heading "ChatGPT сказал:" [level=4] [ref=e1318]
+                - generic [ref=e1326]:
+                  - generic [ref=e1332]:
+                    - button "Поиск выполнен на 2 сайтах" [ref=e1333] [cursor=pointer]
+                    - generic: Поиск выполнен на 2 сайтах
+                  - generic [ref=e1339]:
+                    - button "Проверил стили серых кнопок проекта" [ref=e1340] [cursor=pointer]
+                    - generic: Проверил стили серых кнопок проекта
+                  - generic [ref=e1346]:
+                    - button "Поиск выполнен на 1 сайте" [ref=e1347] [cursor=pointer]
+                    - generic: Поиск выполнен на 1 сайте
+                  - generic [ref=e1353]:
+                    - button "Проверил загрузку файла через curl" [ref=e1354] [cursor=pointer]
+                    - generic: Проверил загрузку файла через curl
+                  - generic [ref=e1360]:
+                    - button "Поиск выполнен на 1 сайте" [ref=e1361] [cursor=pointer]
+                    - generic: Поиск выполнен на 1 сайте
+                  - generic [ref=e1367]:
+                    - button "Проверил ghost-кнопки и журнал неудачного клонирования" [ref=e1368] [cursor=pointer]
+                    - generic: Проверил ghost-кнопки и журнал неудачного клонирования
+                  - generic [ref=e1377]:
+                    - button "Поиск по raw.githubusercontent.com" [ref=e1378] [cursor=pointer]
+                    - generic: Поиск по raw.githubusercontent.com
+              - generic [ref=e1381]:
+                - heading "Вы сказали:" [level=4] [ref=e1382]
+                - generic [ref=e1384]:
+                  - generic [ref=e1385]: ты уже неправильно начал , ты должен просмотреть репозщиторий который я сейчас скинул и указать ему конкретные файлы и места где и какие делать правки , чтобы он сам ничего не искал и не исследовал
+                  - generic [ref=e1390]:
+                    - group "Действия с вашим сообщением":
+                      - button "Скопировать сообщение"
+                      - button "Поделиться промптом"
+                      - button "Редактировать сообщение"
+                      - generic:
+                        - button "Предыдущий ответ" [disabled]
+                        - generic: 1/2
+                        - button "Следующий ответ"
+              - generic [ref=e1393]:
+                - heading "ChatGPT сказал:" [level=4] [ref=e1394]
+                - generic [ref=e1396]:
+                  - generic [ref=e1397]:
+                    - button "Обработка заняла 1m 15s" [ref=e1402] [cursor=pointer]
+                    - generic [ref=e1407]:
+                      - paragraph [ref=e1408]:
+                        - text: Да, теперь я просмотрел
+                        - strong [ref=e1409]:
+                          - text: актуальную ветку
+                          - code [ref=e1410]: frontend-export
+                        - text: и ниже даю OpenCode уже не задачу «найди сам», а конкретный список файлов и конкретных элементов, которые менять.
+                      - paragraph [ref=e1411]:
+                        - text: Сейчас основной серый стиль задаёт
+                        - code [ref=e1412]: ".ghost { background: #eef2f7; ... }"
+                        - text: в
+                        - code [ref=e1413]: css/styles.css
+                        - text: . Кроме него в
+                        - code [ref=e1414]: finance.js
+                        - text: используются текстовые
+                        - code [ref=e1415]: .secondary
+                        - text: "-кнопки. При этом есть элементы, которые технически тоже серые, но являются календарными карточками, event cards, icon-only controls или состояниями — их под общий button-style переводить нельзя."
+                        - link "GitHub +1" [ref=e1419] [cursor=pointer]:
+                          - /url: https://github.com/nikkes174/for_front/blob/frontend-export/css/styles.css
+                          - generic [ref=e1421]:
+                            - generic [ref=e1422]: GitHub
+                            - generic [ref=e1425]: "+1"
+                      - heading "Готовое задание для OpenCode:" [level=2] [ref=e1426]
+                      - generic [ref=e1435]:
+                        - button "Копировать" [ref=e1436] [cursor=pointer]
+                        - code [ref=e1445]: "Репозиторий: https://github.com/nikkes174/for_front Рабочая ветка: frontend-export Работай поверх текущего HEAD ветки frontend-export. Ты — только исполнитель. Архитектурные решения и scope уже определены ниже. Не исследуй проект для выбора того, какие кнопки менять. Меняй только перечисленные ниже элементы. После изменений: commit + push в frontend-export, верни TASK_RESULT и остановись. ==================================================== ЦЕЛЬ ==================================================== Привести существующие текстовые secondary/ghost actions с серым фоном к единому стилю: btn-ghost-secondary Названия кнопок, data-* атрибуты, href, обработчики и назначение не менять. ==================================================== 1. css/styles.css ==================================================== Файл: css/styles.css Сейчас около существующих: .ghost { background: #eef2f7; color: #172033; } .ghost:hover { background: #e2e8f0; } добавить НОВЫЙ самостоятельный класс: .btn-ghost-secondary Использовать следующий стиль: .btn-ghost-secondary { display: inline-flex; align-items: center; justify-content: center; height: 36px; min-height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #667085; font-size: 14px; font-weight: 500; line-height: 20px; cursor: pointer; transition: background-color .15s ease, color .15s ease, border-color .15s ease; } .btn-ghost-secondary:hover { background-color: #f2f4f7; color: #344054; } .btn-ghost-secondary:focus-visible { outline: 2px solid #9cc3ff; outline-offset: 2px; background-color: #eaecf0; } .btn-ghost-secondary:active { background-color: #e4e7ec; } .btn-ghost-secondary:disabled { opacity: .5; cursor: not-allowed; } ВАЖНО: Не изменять глобальный .ghost. Он остаётся для: - icon-only controls; - booking arrows; - copy buttons; - специальных компактных элементов. Новый класс применяется только к перечисленным ниже текстовым secondary actions. ==================================================== 2. js/auth.js ==================================================== Файл: js/auth.js ---------------------------------------------------- 2.1 twoFactorHtml() ---------------------------------------------------- Сейчас: <button type=\"button\" class=\"ghost\" data-2fa-cancel> Закрыть </button> Изменить на: class=\"ghost btn-ghost-secondary\" Текст: Закрыть оставить. ---------------------------------------------------- 2.2 authHtml() — register mode ---------------------------------------------------- В блоке: isRegister ? `<div class=\"auth-tabs\"> ...` есть кнопка: <button type=\"button\" class=\"ghost\" data-mode=\"login\"> Войти </button> Добавить: btn-ghost-secondary Итоговый класс: class=\"ghost btn-ghost-secondary\" Текст и data-mode не менять. ==================================================== 3. js/modules/clients.js ==================================================== Файл: js/modules/clients.js ---------------------------------------------------- 3.1 clientTable() ---------------------------------------------------- Кнопка имени клиента: <button type=\"button\" class=\"ghost\" data-open-client=\"...\" > должна получить: class=\"ghost btn-ghost-secondary\" ФИО и data-open-client сохранить. ---------------------------------------------------- 3.2 clientListMarkup() ---------------------------------------------------- Пагинация. Четыре варианта: Назад enabled Назад disabled Вперед enabled Вперед disabled Сейчас используются: class=\"ghost pagination-link\" или: class=\"ghost\" Добавить btn-ghost-secondary всем четырём. Например: class=\"ghost pagination-link btn-ghost-secondary\" и: class=\"ghost btn-ghost-secondary\" Тексты: Назад Вперед не менять. ---------------------------------------------------- 3.3 authLinkClientLabel() ---------------------------------------------------- Кнопка открытия клиента в списке сгенерированных ссылок: class=\"ghost\" → class=\"ghost btn-ghost-secondary\" ФИО и data-open-client не менять. ---------------------------------------------------- 3.4 clientAuthLinksList() ---------------------------------------------------- Текстовая кнопка: Удалить с: data-delete-auth-link сейчас имеет class=\"ghost\". Добавить: btn-ghost-secondary То есть: class=\"ghost btn-ghost-secondary\" Не менять delete-handler. ---------------------------------------------------- 3.5 НЕ МЕНЯТЬ В clients.js ---------------------------------------------------- НЕ переводить на новый стиль: - .copy-icon-button; - .client-delete-icon-button; - .client-delete-button; - .modal-close-icon. В частности кнопки копирования ссылки вида: class=\"ghost copy-icon-button\" оставить как есть. Они icon-only и имеют собственную геометрию 40x40. ==================================================== 4. js/modules/booking.js ==================================================== Файл: js/modules/booking.js Перевести только следующие ТЕКСТОВЫЕ ghost buttons. ---------------------------------------------------- 4.1 Удаление фотографии комментария ---------------------------------------------------- В service-image-previews: <button type=\"button\" class=\"ghost\" data-remove-booking-visit-photo > Удалить </button> Добавить: btn-ghost-secondary Название и handler сохранить. ---------------------------------------------------- 4.2 bookingSlotIntervalSettings() ---------------------------------------------------- Кнопка: Применить с: data-save-booking-slot-interval Добавить: btn-ghost-secondary. ---------------------------------------------------- 4.3 Основной toolbar календаря ---------------------------------------------------- Кнопка: Календарь с: data-booking-calendar-toggle Добавить: btn-ghost-secondary. ---------------------------------------------------- 4.4 НЕ МЕНЯТЬ в booking.js ---------------------------------------------------- Оставить прежними: - ‹ и › внутри booking-picker-head; - ‹ и › с data-booking-period-navigation; - booking-online-copy; - booking-grid-create; - booking-event-point; - booking-event-indicator; - booking-event-submenu-item; - calendar day buttons. Причина: это компактные icon/navigation/calendar controls, а не обычные secondary action buttons. Не применять к ним height/padding нового класса. ==================================================== 5. js/modules/settings.js ==================================================== Файл: js/modules/settings.js ---------------------------------------------------- 5.1 achievementConditionsFields() ---------------------------------------------------- Кнопка: Добавить условие с: data-add-achievement-condition Сейчас: class=\"ghost\" Изменить на: class=\"ghost btn-ghost-secondary\" ---------------------------------------------------- 5.2 user booking blocks ---------------------------------------------------- Кнопка: Добавить период с: data-add-user-booking-block Сейчас: class=\"ghost user-booking-block-add\" Изменить на: class=\"ghost user-booking-block-add btn-ghost-secondary\" ---------------------------------------------------- 5.3 product actual amount ---------------------------------------------------- Кнопка: Добавить склад с: data-add-product-amount Сейчас: class=\"ghost product-add-amount\" Изменить на: class=\"ghost product-add-amount btn-ghost-secondary\" ---------------------------------------------------- 5.4 Не менять ---------------------------------------------------- Не менять: - modal-close-icon; - delete icon buttons; - кнопки удаления; - Excel preview close icon; - service staff controls. ==================================================== 6. js/modules/finance.js ==================================================== Файл: js/modules/finance.js В этом модуле secondary actions используют class=\"secondary\". Сохранить существующий class secondary и ДОБАВИТЬ btn-ghost-secondary. Это важно для существующих finance-specific selectors/state styles. ---------------------------------------------------- 6.1 financeTableMarkup() ---------------------------------------------------- Кнопка общего плана: ${row.plan_enabled ? \"Убрать общий\" : \"Поставить общий\"} Сейчас: class=\"secondary finance-plan-toggle ...\" Сделать: class=\"secondary finance-plan-toggle btn-ghost-secondary ...\" Не менять .is-active. ---------------------------------------------------- 6.2 financeTableMarkup() ---------------------------------------------------- Кнопка индивидуального плана: Изменить индивидуальный или Создать индивидуальный Сейчас: class=\"secondary finance-individual-plan-button ...\" Добавить: btn-ghost-secondary Не менять динамический текст или .is-active. ---------------------------------------------------- 6.3 individualPlanModal() ---------------------------------------------------- Кнопка: + Добавить переменную data-finance-individual-add Добавить: btn-ghost-secondary. ---------------------------------------------------- 6.4 additionalPlanCardMarkup() ---------------------------------------------------- Кнопка: + Добавить переменную в план data-finance-additional-rule-add Добавить: btn-ghost-secondary. ---------------------------------------------------- 6.5 additionalPlansModal() ---------------------------------------------------- Кнопка: + Создать дополнительный план data-finance-additional-create Добавить: btn-ghost-secondary. ---------------------------------------------------- 6.6 finance() / finance-plan-head-actions ---------------------------------------------------- Кнопка: Дополнительные планы data-finance-additional-open Добавить: btn-ghost-secondary. ---------------------------------------------------- 6.7 Active finance states ---------------------------------------------------- НЕ удалять существующие CSS: .finance-plan-toggle.is-active .finance-individual-plan-button.is-active Их active-state должен продолжать иметь собственный цвет: - общий план — синий active state; - индивидуальный — фиолетовый active state. Проверить каскад после добавления btn-ghost-secondary. Если новый класс перекрывает active background, порядок CSS не перестраивать глобально. Использовать более специфичный существующий state selector так, чтобы .is-active оставался визуально главным. ---------------------------------------------------- 6.8 НЕ МЕНЯТЬ finance danger/buttons ---------------------------------------------------- Не менять: Удалить план client-delete-icon-button primary Save buttons Рассчитать Сохранить ставки Сохранить план Сохранить дополнительные планы ==================================================== 7. js/modules/loyalty.js ==================================================== Файл: js/modules/loyalty.js ---------------------------------------------------- 7.1 loyalty client search ---------------------------------------------------- Ссылка-кнопка: Сбросить Сейчас: <a class=\"ghost pagination-link\" ...> Сбросить </a> Добавить: btn-ghost-secondary Итог: class=\"ghost pagination-link btn-ghost-secondary\" href сохранить. ---------------------------------------------------- 7.2 loyalty pagination ---------------------------------------------------- Все варианты: Назад Вперед enabled <a> и disabled <button> получают btn-ghost-secondary. Сохранить: - href; - pagination-link; - disabled. ---------------------------------------------------- 7.3 rulesSection() ---------------------------------------------------- Кнопка: ${L.apply} с: data-apply-rule добавить: btn-ghost-secondary. ---------------------------------------------------- 7.4 rulesSection() ---------------------------------------------------- Кнопка: Применить ко всем с: data-apply-rule-all добавить: btn-ghost-secondary. ---------------------------------------------------- 7.5 НЕ МЕНЯТЬ loyalty controls ---------------------------------------------------- Не менять: - client-delete-button; - loyalty-rule-settings icon button; - modal-close-icon; - primary create/save actions. ==================================================== 8. ЧТО ЕЩЁ НЕ МЕНЯТЬ ==================================================== Я отдельно проверил следующие серые элементы — они НЕ относятся к этой миграции. Не менять: css/styles.css: - .catalog-excel-upload - .catalog-excel-export - .notification-channels-trigger - .booking-event-submenu-item - .event-row-create - .tabs - .tab-disabled Это: - label/a controls; - selectors; - event states; - navigation/tabs, а не обычные secondary action buttons. Также не менять: js/modules/catalog.js js/modules/notifications.js js/modules/tasks.js js/modules/onboarding.js js/modules/dashboard.js js/modules/breakdown.js Для этой задачи правок там не требуется. ==================================================== 9. ФАЙЛЫ, КОТОРЫЕ ДОЛЖНЫ БЫТЬ В DIFF ==================================================== Ожидаемые изменённые файлы: css/styles.css js/auth.js js/modules/clients.js js/modules/booking.js js/modules/settings.js js/modules/finance.js js/modules/loyalty.js Других файлов в diff быть не должно. ==================================================== 10. ЛОГИКА ==================================================== Не менять: - текст кнопок; - data-*; - href; - disabled; - onclick/event delegation; - API; - состояние; - бизнес-логику; - backend; - js/api.js. Разрешены только: 1. новый CSS-класс; 2. добавление этого CSS-класса перечисленным controls; 3. минимальная CSS-коррекция finance .is-active, только если она нужна для сохранения существующего active-state. ==================================================== 11. ПРОВЕРКИ ==================================================== Выполнить: git diff --check node --check js/auth.js node --check js/modules/clients.js node --check js/modules/booking.js node --check js/modules/settings.js node --check js/modules/finance.js node --check js/modules/loyalty.js Дополнительно проверить через rg: - btn-ghost-secondary присутствует только в согласованных местах; - data-* атрибуты не менялись; - тексты controls не менялись; - copy-icon-button не получил btn-ghost-secondary; - modal-close-icon не получил btn-ghost-secondary; - client-delete-button/client-delete-icon-button не получили btn-ghost-secondary; - primary buttons не получили btn-ghost-secondary. ==================================================== 12. COMMIT ==================================================== После проверок: commit push в frontend-export Вернуть: TASK_RESULT Branch: Commit: Changed files: Изменённые controls по файлам: - auth.js: - clients.js: - booking.js: - settings.js: - finance.js: - loyalty.js: CSS: - btn-ghost-secondary: Сохранённые специальные controls: - icon-only: - danger: - finance active states: Tests: - git diff --check: - node --check: git diff --stat: После этого ОСТАНОВИТЬСЯ. Следующие решения принимает архитектор/reviewer."
+                      - paragraph [ref=e1446]:
+                        - text: Я специально оставил существующий
+                        - code [ref=e1447]: .ghost
+                        - text: и finance
+                        - code [ref=e1448]: .secondary
+                        - text: в классах и
+                        - strong [ref=e1449]: добавляю новый визуальный класс поверх них
+                        - text: . Это безопаснее, потому что в проекте уже есть специализированные селекторы вроде
+                        - code [ref=e1450]: .booking-picker-head .ghost
+                        - text: ", а у Finance есть отдельные"
+                        - code [ref=e1451]: .is-active
+                        - text: состояния. Если просто массово переименовать
+                        - code [ref=e1452]: .ghost
+                        - text: ", можно сломать размеры календарных controls или активные состояния финансовых кнопок."
+                        - link "GitHub +1" [ref=e1456] [cursor=pointer]:
+                          - /url: https://github.com/nikkes174/for_front/blob/frontend-export/js/modules/booking.js
+                          - generic [ref=e1458]:
+                            - generic [ref=e1459]: GitHub
+                            - generic [ref=e1462]: "+1"
+                      - paragraph [ref=e1463]:
+                        - text: "Также я исключил из задачи серые элементы, которые внешне похожи на кнопки, но выполняют другую UI-роль:"
+                        - code [ref=e1464]: catalog-excel-*
+                        - text: ", tabs, event-state controls, calendar buttons и icon-only controls. Их нельзя механически прогонять через"
+                        - code [ref=e1465]: 36px / 0 14px
+                        - text: ", иначе появятся побочные изменения layout."
+                        - link "GitHub +1" [ref=e1469] [cursor=pointer]:
+                          - /url: https://raw.githubusercontent.com/nikkes174/for_front/frontend-export/css/styles.css
+                          - generic [ref=e1471]:
+                            - generic [ref=e1472]: GitHub
+                            - generic [ref=e1475]: "+1"
+                  - generic [ref=e1476]:
+                    - group "Действия с ответом":
+                      - button "Копировать ответ"
+                      - button "Оценить ответ"
+                      - button "Добавить в источники проекта"
+                      - generic:
+                        - button "Сменить модель"
+                      - button "Больше действий"
+            - generic [ref=e1477]: ChatGPT может допускать ошибки. Рекомендуем проверять важную информацию.
+          - generic:
+            - generic:
+              - generic:
+                - button
+            - generic [ref=e109]:
+              - generic [ref=e1489]:
+                - button "Добавить файлы и другое" [ref=e1492] [cursor=pointer]
+                - textbox "Чат с ChatGPT" [active] [ref=e1495]:
+                  - paragraph [ref=e1496]: Задайте вопрос ChatGPT
+                - generic [ref=e1497]:
+                  - button "Средний" [ref=e1501] [cursor=pointer]
+                  - generic [ref=e1507]:
+                    - button "Начало диктовки" [ref=e1508] [cursor=pointer]
+                    - button "Запустить голосовой режим" [ref=e1511] [cursor=pointer]
+              - button [ref=e110]
+              - button [ref=e111]
+  - alert [ref=e112]
+  - status [ref=e113]
