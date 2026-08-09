@@ -2478,18 +2478,81 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 }
 
 .auth-primary-btn {
-  background-color: var(--auth-primary-color);
-  border-color: var(--auth-primary-color);
-  color: #000;
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   overflow: hidden;
+  transition:
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out,
+    color 0.15s ease-in-out;
 }
-.auth-primary-btn:hover { opacity: .9; }
+.auth-primary-btn:hover {
+  background-color: #3d8bfd;
+  border-color: #3d8bfd;
+}
+.auth-primary-btn:active {
+  background-color: #0b5ed7;
+  border-color: #0b5ed7;
+}
 .auth-primary-btn svg { flex-shrink: 0; }
 .auth-primary-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.auth-register-form .auth-input-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-register-form .auth-input-icon-addon {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.auth-register-form .auth-input-icon-addon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.auth-register-form .auth-form-control {
+  width: 100%;
+  height: 40px;
+  padding: 8px 12px 8px 42px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.auth-register-form .auth-form-control:focus {
+  border-color: #4299e1;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(66,153,225,.15);
+}
+
+.auth-register-form .auth-primary-btn,
+.auth-register-form .auth-tabs .primary {
+  background-color: #4299e1;
+  border-color: #4299e1;
+  color: #ffffff;
+  transition:
+    background-color .15s ease,
+    border-color .15s ease;
+}
+
+.auth-register-form .auth-primary-btn:hover,
+.auth-register-form .auth-tabs .primary:hover {
+  background-color: #63b3ed;
+  border-color: #63b3ed;
+}
 
 .auth-login-actions {
   display: flex;
