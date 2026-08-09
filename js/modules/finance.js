@@ -114,11 +114,11 @@ function financeTableMarkup(rows) {
         ${sortedRows.length ? sortedRows.map((row) => `<tr class="${row.is_active ? "" : "is-inactive"}">
           <td><strong>${escapeHtml(row.name)}</strong>${row.is_active ? "" : "<small>Неактивен</small>"}</td>
           <td><div class="finance-plan-actions">
-            <button type="button" class="btn btn-outline-secondary finance-plan-toggle" data-finance-plan-toggle data-employee-id="${row.employee_id}" data-enabled="${row.plan_enabled ? "false" : "true"}">${row.plan_enabled ? "Убрать общий" : "Поставить общий"}</button>
             <label class="finance-additional-assignment"><span>Доп. план</span><select data-finance-additional-assignment data-employee-id="${row.employee_id}">
               <option value="">Без доп. плана</option>
               ${financeState.additionalPlans.map((plan) => `<option value="${escapeHtml(plan.id)}" ${plan.id === row.additional_plan_id ? "selected" : ""}>${escapeHtml(plan.name)}</option>`).join("")}
             </select></label>
+            <button type="button" class="btn btn-outline-secondary finance-plan-toggle" data-finance-plan-toggle data-employee-id="${row.employee_id}" data-enabled="${row.plan_enabled ? "false" : "true"}">${row.plan_enabled ? "Убрать общий" : "Поставить общий"}</button>
             <button type="button" class="btn btn-outline-secondary finance-individual-plan-button" data-finance-individual-open data-employee-id="${row.employee_id}" data-employee-name="${escapeHtml(row.name)}">${row.has_individual_plan ? "Изменить индивидуальный" : "Создать индивидуальный"}</button>
           </div></td>
           <td>${Number(row.visits_count || 0)}</td>
