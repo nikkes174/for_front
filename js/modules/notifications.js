@@ -120,7 +120,7 @@ export function bindNotifications(root, ctx = {}) {
       const url = URL.createObjectURL(file);
       return `<figure><img src="${url}" data-object-url="${url}" alt="${escapeHtml(file.name)}"><button type="button" data-remove-notification-image="${index}" aria-label="Убрать изображение">&times;</button></figure>`;
     }).join("");
-    preview.innerHTML = storedUrls.map((url) => '<figure><img src="' + escapeHtml(url) + '" alt="\u0412\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0438"></figure>').join("") + preview.innerHTML;
+    preview.innerHTML = storedUrls.map((url, index) => '<figure><img src="' + escapeHtml(url) + '" alt="\u0412\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0440\u0430\u0441\u0441\u044b\u043b\u043a\u0438"><button type="button" data-remove-notification-stored-image="' + index + '" aria-label="\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435">&times;</button></figure>').join("") + preview.innerHTML;
   }
 
   function syncNotificationTitle(input) {
@@ -155,6 +155,16 @@ export function bindNotifications(root, ctx = {}) {
       files.splice(Number(removeImage.dataset.removeNotificationImage), 1);
       notificationFiles.set(form, files);
       renderNotificationImages(form);
+      return;
+    }
+    const removeStoredImage = event.target.closest("[data-remove-notification-stored-image]");
+    if (removeStoredImage) {
+      const form = removeStoredImage.closest("[data-notification-form]");
+      const storedUrls = notificationImageUrls.get(form) || [];
+      storedUrls.splice(Number(removeStoredImage.dataset.removeNotificationStoredImage), 1);
+      notificationImageUrls.set(form, storedUrls);
+      renderNotificationImages(form);
+      updateNotificationForm(form);
       return;
     }
     const editHistory = event.target.closest("[data-notification-history-edit]");
