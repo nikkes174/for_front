@@ -414,6 +414,39 @@ button:active { transform: translateY(1px); }
 }
 .ghost { background: #eef2f7; color: #172033; }
 .ghost:hover { background: #e2e8f0; }
+.btn-ghost-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #667085;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+.btn-ghost-secondary:hover {
+  background-color: #f2f4f7;
+  color: #344054;
+}
+.btn-ghost-secondary:focus-visible {
+  outline: 2px solid #9cc3ff;
+  outline-offset: 2px;
+  background-color: #eaecf0;
+}
+.btn-ghost-secondary:active {
+  background-color: #e4e7ec;
+}
+.btn-ghost-secondary:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
 .link-button { background: transparent; border: 0; color: #172033; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .link-button:hover { color: #2563eb; text-decoration: underline; }
 .copy-icon-button { display: inline-grid; width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 8px; place-items: center; }

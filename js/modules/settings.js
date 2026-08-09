@@ -297,7 +297,7 @@ function achievementConditionsFields(conditions = [], includeAddButton = true) {
     <div class="achievement-builder modal-full">
       <div class="achievement-builder-head">
         <b>Условия</b>
-        ${includeAddButton ? `<button type="button" class="ghost" data-add-achievement-condition>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435</button>` : ""}
+        ${includeAddButton ? `<button type="button" class="ghost btn-ghost-secondary" data-add-achievement-condition>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435</button>` : ""}
       </div>
       <div class="achievement-conditions" data-achievement-conditions>
       ${rows.map((condition) => achievementConditionRow(condition)).join("")}
@@ -578,7 +578,7 @@ function userBookingBlocksField(item) {
       <div class="user-booking-blocks" data-user-booking-blocks>
         ${blocks.map((block) => userBookingBlockRow(block)).join("")}
       </div>
-      <button type="button" class="ghost user-booking-block-add" data-add-user-booking-block>Добавить период</button>
+      <button type="button" class="ghost user-booking-block-add btn-ghost-secondary" data-add-user-booking-block>Добавить период</button>
     </div>
   `;
 }
@@ -698,7 +698,7 @@ function productItemActualAmountsFields(items = []) {
       <div class="achievement-conditions" data-product-amounts>
         ${rows.map((item) => productItemActualAmountRow(item)).join("")}
       </div>
-      <button type="button" class="ghost product-add-amount" data-add-product-amount>Добавить склад</button>
+      <button type="button" class="ghost product-add-amount btn-ghost-secondary" data-add-product-amount>Добавить склад</button>
     </div>
   `;
 }

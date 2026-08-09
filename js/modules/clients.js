@@ -249,7 +249,7 @@ function clientTable(items, ctx, search, pageSize, sort, direction) {
       <tbody>
         ${rows(items, "Клиентов пока нет.", (item) => `
           <tr>
-            <td><button type="button" class="ghost" data-open-client="${escapeHtml(item.id)}">${escapeHtml(clientFullName(item))}</button></td>
+            <td><button type="button" class="ghost btn-ghost-secondary" data-open-client="${escapeHtml(item.id)}">${escapeHtml(clientFullName(item))}</button></td>
             <td>${escapeHtml(item.primary_phone || no)}</td>
             <td>${escapeHtml(date(item.birth_date) || notSpecified)}</td>
             <td>${escapeHtml(statusLabel(item.status))}</td>
@@ -290,8 +290,8 @@ function clientListMarkup(ctx, filters) {
       <span>Страница ${escapeHtml(currentPage)} из ${escapeHtml(pageCount)}</span>
       <div>
         ${clientPageSizeControl(pageSize)}
-        ${currentPage > 1 ? `<button type="button" class="ghost pagination-link" data-client-page-link data-client-page="${currentPage - 1}">Назад</button>` : `<button class="ghost" disabled>Назад</button>`}
-        ${hasNextPage ? `<button type="button" class="ghost pagination-link" data-client-page-link data-client-page="${currentPage + 1}">Вперед</button>` : `<button class="ghost" disabled>Вперед</button>`}
+        ${currentPage > 1 ? `<button type="button" class="ghost pagination-link btn-ghost-secondary" data-client-page-link data-client-page="${currentPage - 1}">Назад</button>` : `<button class="ghost btn-ghost-secondary" disabled>Назад</button>`}
+        ${hasNextPage ? `<button type="button" class="ghost pagination-link btn-ghost-secondary" data-client-page-link data-client-page="${currentPage + 1}">Вперед</button>` : `<button class="ghost btn-ghost-secondary" disabled>Вперед</button>`}
       </div>
     </div>
   `;
@@ -402,7 +402,7 @@ function authLinkClientLabel(item, clients) {
   if (!item.client_id) return "\u0411\u0435\u0437 \u043a\u043b\u0438\u0435\u043d\u0442\u0430";
   const client = clients.find((candidate) => String(candidate.id) === String(item.client_id));
   if (!client) return "\u041a\u043b\u0438\u0435\u043d\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d";
-  return `<button type="button" class="ghost" data-open-client="${escapeHtml(client.id)}">${escapeHtml(clientFullName(client))}</button>`;
+  return `<button type="button" class="ghost btn-ghost-secondary" data-open-client="${escapeHtml(client.id)}">${escapeHtml(clientFullName(client))}</button>`;
 }
 
 function clientAuthLinksList(items, clients) {
@@ -415,7 +415,7 @@ function clientAuthLinksList(items, clients) {
           <b>${escapeHtml(authLinkStatusLabel(item))}</b>
           <span>${escapeHtml(dateTime(item.created_at) || "")}</span>
           <div class="auth-link-actions">
-            <button type="button" class="ghost" data-delete-auth-link="${escapeHtml(item.id)}">\u0423\u0434\u0430\u043b\u0438\u0442\u044c</button>
+            <button type="button" class="ghost btn-ghost-secondary" data-delete-auth-link="${escapeHtml(item.id)}">\u0423\u0434\u0430\u043b\u0438\u0442\u044c</button>
           </div>
         </div>
       `)}

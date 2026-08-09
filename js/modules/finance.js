@@ -114,12 +114,12 @@ function financeTableMarkup(rows) {
         ${sortedRows.length ? sortedRows.map((row) => `<tr class="${row.is_active ? "" : "is-inactive"}">
           <td><strong>${escapeHtml(row.name)}</strong>${row.is_active ? "" : "<small>Неактивен</small>"}</td>
           <td><div class="finance-plan-actions">
-            <button type="button" class="secondary finance-plan-toggle ${row.plan_enabled ? "is-active" : ""}" data-finance-plan-toggle data-employee-id="${row.employee_id}" data-enabled="${row.plan_enabled ? "false" : "true"}">${row.plan_enabled ? "Убрать общий" : "Поставить общий"}</button>
+            <button type="button" class="secondary finance-plan-toggle btn-ghost-secondary ${row.plan_enabled ? "is-active" : ""}" data-finance-plan-toggle data-employee-id="${row.employee_id}" data-enabled="${row.plan_enabled ? "false" : "true"}">${row.plan_enabled ? "Убрать общий" : "Поставить общий"}</button>
             <label class="finance-additional-assignment"><span>Доп. план</span><select data-finance-additional-assignment data-employee-id="${row.employee_id}">
               <option value="">Без доп. плана</option>
               ${financeState.additionalPlans.map((plan) => `<option value="${escapeHtml(plan.id)}" ${plan.id === row.additional_plan_id ? "selected" : ""}>${escapeHtml(plan.name)}</option>`).join("")}
             </select></label>
-            <button type="button" class="secondary finance-individual-plan-button ${row.has_individual_plan ? "is-active" : ""}" data-finance-individual-open data-employee-id="${row.employee_id}" data-employee-name="${escapeHtml(row.name)}">${row.has_individual_plan ? "Изменить индивидуальный" : "Создать индивидуальный"}</button>
+            <button type="button" class="secondary finance-individual-plan-button btn-ghost-secondary ${row.has_individual_plan ? "is-active" : ""}" data-finance-individual-open data-employee-id="${row.employee_id}" data-employee-name="${escapeHtml(row.name)}">${row.has_individual_plan ? "Изменить индивидуальный" : "Создать индивидуальный"}</button>
           </div></td>
           <td>${Number(row.visits_count || 0)}</td>
           <td>${Number(row.clients_count || 0)}<small>повторных: ${Number(row.returning_clients_count || 0)}</small></td>
@@ -206,7 +206,7 @@ function individualPlanModal(plan, employeeId, masterName) {
           ${visibleRules.map((rule) => individualRuleMarkup(rule)).join("")}
         </div>
         <div class="finance-individual-add-row">
-          <button type="button" class="secondary" data-finance-individual-add>+ Добавить переменную</button>
+          <button type="button" class="secondary btn-ghost-secondary" data-finance-individual-add>+ Добавить переменную</button>
         </div>
         <div class="finance-individual-footer">
           <button type="button" class="danger" data-finance-individual-delete>Удалить план</button>
@@ -235,7 +235,7 @@ function additionalPlanCardMarkup(plan = {}) {
       <div class="finance-individual-rules" data-finance-additional-rules>
         ${rules.map((rule) => individualRuleMarkup(rule)).join("")}
       </div>
-      <button type="button" class="secondary finance-additional-rule-add" data-finance-additional-rule-add>+ Добавить переменную в план</button>
+      <button type="button" class="secondary finance-additional-rule-add btn-ghost-secondary" data-finance-additional-rule-add>+ Добавить переменную в план</button>
     </section>
   `;
 }
@@ -255,7 +255,7 @@ function additionalPlansModal(plans) {
           ${plans.map((plan) => additionalPlanCardMarkup(plan)).join("")}
         </div>
         <div class="finance-additional-footer">
-          <button type="button" class="secondary" data-finance-additional-create>+ Создать дополнительный план</button>
+          <button type="button" class="secondary btn-ghost-secondary" data-finance-additional-create>+ Создать дополнительный план</button>
           <button type="button" class="primary" data-finance-additional-save>Сохранить дополнительные планы</button>
         </div>
       </div>
@@ -338,7 +338,7 @@ export async function finance(ctx) {
               </div>
             </div>
             <div class="finance-plan-head-actions">
-              <button type="button" class="secondary" data-finance-additional-open>Дополнительные планы</button>
+              <button type="button" class="secondary btn-ghost-secondary" data-finance-additional-open>Дополнительные планы</button>
               <button type="button" class="primary" data-finance-save-rules>Сохранить план</button>
             </div>
           </div>

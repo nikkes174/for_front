@@ -838,7 +838,7 @@ function clientSelector(orgId, tab, clients, selectedClient, filters, hasNextPag
       <form class="client-search" data-loyalty-client-search>
         <label><span>Поиск</span><input name="q" value="${escapeHtml(filters.query)}" placeholder="Фамилия, телефон или email"></label>
         <button class="primary">Найти</button>
-        ${filters.query ? `<a class="ghost pagination-link" href="${loyaltyPageUrl(orgId, tab, { query: "" }, 1)}">Сбросить</a>` : ""}
+        ${filters.query ? `<a class="ghost pagination-link btn-ghost-secondary" href="${loyaltyPageUrl(orgId, tab, { query: "" }, 1)}">Сбросить</a>` : ""}
       </form>
       <div class="entity-list">
         ${clients.length ? clients.map((client) => `
@@ -851,8 +851,8 @@ function clientSelector(orgId, tab, clients, selectedClient, filters, hasNextPag
       <div class="pagination">
         <span>Страница ${escapeHtml(filters.page)}</span>
         <div>
-          ${filters.page > 1 ? `<a class="ghost pagination-link" href="${loyaltyPageUrl(orgId, tab, filters, filters.page - 1)}">Назад</a>` : `<button class="ghost" disabled>Назад</button>`}
-          ${hasNextPage ? `<a class="ghost pagination-link" href="${loyaltyPageUrl(orgId, tab, filters, filters.page + 1)}">Вперед</a>` : `<button class="ghost" disabled>Вперед</button>`}
+          ${filters.page > 1 ? `<a class="ghost pagination-link btn-ghost-secondary" href="${loyaltyPageUrl(orgId, tab, filters, filters.page - 1)}">Назад</a>` : `<button class="ghost btn-ghost-secondary" disabled>Назад</button>`}
+          ${hasNextPage ? `<a class="ghost pagination-link btn-ghost-secondary" href="${loyaltyPageUrl(orgId, tab, filters, filters.page + 1)}">Вперед</a>` : `<button class="ghost btn-ghost-secondary" disabled>Вперед</button>`}
         </div>
       </div>
     </div>
@@ -890,8 +890,8 @@ function transitionRulesSection(ctx, rules, levels, selectedClient) {
       <table><tbody>${rows(transitionRules, "Правил перехода пока нет.", (item) => {
         const threshold = item.usage_restrictions?.purchase_amount_gt ?? item.usage_restrictions?.profit_amount_gt ?? item.usage_restrictions?.conditions?.[0]?.value ?? "";
         const targetLevel = item.client_level || "Следующий уровень";
-        const apply = selectedClient ? `<button type="button" class="ghost" data-apply-rule="${escapeHtml(item.id)}" data-transition-rule="1">${L.apply}</button>` : "";
-        const applyAll = canCreate(ctx, "rules") ? `<button type="button" class="ghost" data-apply-rule-all="${escapeHtml(item.id)}">Применить ко всем</button>` : "";
+        const apply = selectedClient ? `<button type="button" class="ghost btn-ghost-secondary" data-apply-rule="${escapeHtml(item.id)}" data-transition-rule="1">${L.apply}</button>` : "";
+        const applyAll = canCreate(ctx, "rules") ? `<button type="button" class="ghost btn-ghost-secondary" data-apply-rule-all="${escapeHtml(item.id)}">Применить ко всем</button>` : "";
         const deleteAction = canDelete(ctx, "rule") ? `<button type="button" class="client-delete-button" data-loyalty-delete-kind="rule" data-loyalty-delete="${escapeHtml(item.id)}">Удалить</button>` : "";
         return `<tr class="loyalty-transition-rule-row"><td>${escapeHtml(`Сумма покупок > ${threshold}`)}</td><td>${escapeHtml(targetLevel)}</td><td class="transition-rule-actions">${apply}</td><td class="actions"><div class="loyalty-rule-actions-popover"><button type="button" class="loyalty-rule-settings" aria-label="Действия правила" title="Действия правила"><img src="/fronted/icons/settings_org.svg" alt=""></button><div class="loyalty-rule-actions-menu">${applyAll}${deleteAction}</div></div></td></tr>`;
       })}</tbody></table>

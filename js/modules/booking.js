@@ -530,7 +530,7 @@ function bookingVisitCommentAlbum(visit) {
   return `<div class="visit-photo-album modal-full" data-visit-photo-album data-visit-photo-stage="comment" data-existing-images-count="${photos.length}">
     <div class="service-image-album-head"><strong>Фото к комментарию</strong><small>До 10 изображений</small></div>
     <label class="photo-upload-control"><input name="visit_comment_photos" type="file" accept="image/*" multiple hidden><span class="photo-upload-button">Добавить изображения</span></label>
-    <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview" data-visit-photo-id="${escapeHtml(photo.id)}"><img src="/crm-api/client-history/visits/${escapeHtml(visit.id)}/photos/comment/${escapeHtml(photo.id)}" alt="Фото к комментарию"><button type="button" class="ghost" data-remove-booking-visit-photo data-photo-id="${escapeHtml(photo.id)}">Удалить</button></figure>`).join("")}</div>
+    <div class="service-image-previews" data-visit-photo-previews>${photos.map((photo) => `<figure class="service-image-preview" data-visit-photo-id="${escapeHtml(photo.id)}"><img src="/crm-api/client-history/visits/${escapeHtml(visit.id)}/photos/comment/${escapeHtml(photo.id)}" alt="Фото к комментарию"><button type="button" class="ghost btn-ghost-secondary" data-remove-booking-visit-photo data-photo-id="${escapeHtml(photo.id)}">Удалить</button></figure>`).join("")}</div>
   </div>`;
 }
 
@@ -618,7 +618,7 @@ function bookingSlotIntervalSettings(data) {
     <strong>\u0428\u0430\u0433 \u043e\u043d\u043b\u0430\u0439\u043d-\u0437\u0430\u043f\u0438\u0441\u0438</strong>
     <label><span>\u0427\u0430\u0441\u044b</span><input type="number" min="0" max="23" step="1" value="${Math.floor(interval / 60)}" data-booking-slot-hours></label>
     <label><span>\u041c\u0438\u043d\u0443\u0442\u044b</span><input type="number" min="0" max="59" step="1" value="${interval % 60}" data-booking-slot-minutes></label>
-    <button type="button" class="ghost" data-save-booking-slot-interval>\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c</button>
+    <button type="button" class="ghost btn-ghost-secondary" data-save-booking-slot-interval>\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c</button>
   </div>`;
 }
 
@@ -692,7 +692,7 @@ export async function booking(ctx) {
         </div>
         <div class="booking-nav">
         <button type="button" class="ghost" data-booking-period-navigation="-1">‹</button>
-        <button type="button" class="ghost" data-booking-calendar-toggle>Календарь</button>
+        <button type="button" class="ghost btn-ghost-secondary" data-booking-calendar-toggle>Календарь</button>
         <button type="button" class="ghost" data-booking-period-navigation="1">›</button>
         <strong>${rangeStart.getDate()} ${MONTH_NAMES[rangeStart.getMonth()]} — ${rangeEnd.getDate()} ${MONTH_NAMES[rangeEnd.getMonth()]}</strong>
         ${bookingSlotIntervalSettings(data)}

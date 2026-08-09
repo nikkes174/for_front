@@ -34,7 +34,7 @@ function twoFactorHtml() {
       <div class="modal-card auth-2fa-card auth-code-card">
         <div class="modal-head">
           <h3>\u041a\u043e\u0434 \u0432\u0445\u043e\u0434\u0430 \u0447\u0435\u0440\u0435\u0437 ${label}</h3>
-          <button type="button" class="ghost" data-2fa-cancel>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
+          <button type="button" class="ghost btn-ghost-secondary" data-2fa-cancel>\u0417\u0430\u043a\u0440\u044b\u0442\u044c</button>
         </div>
         <form class="modal-grid" data-2fa-form>
           <p class="modal-full">${statusText}</p>
@@ -97,7 +97,7 @@ function authHtml() {
       <form class="auth-card ${isRegister ? "wide" : ""}" data-auth-form>
         <h1>${isRegister ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f" : "\u0412\u0445\u043e\u0434"}</h1>
         ${isRegister ? `<div class="auth-tabs">
-          <button type="button" class="ghost" data-mode="login">\u0412\u043e\u0439\u0442\u0438</button>
+          <button type="button" class="ghost btn-ghost-secondary" data-mode="login">\u0412\u043e\u0439\u0442\u0438</button>
           <button type="button" class="primary" data-mode="register">\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0430\u043a\u043a\u0430\u0443\u043d\u0442</button>
         </div>` : ""}
         ${isRegister ? '<label><span>\u0418\u043c\u044f</span><input name="name" required></label>' : ""}
