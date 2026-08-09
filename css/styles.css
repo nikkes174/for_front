@@ -506,31 +506,6 @@ button:active { transform: translateY(1px); }
   cursor: not-allowed;
 }
 
-.loyalty-tab-button {
-  background-color: transparent;
-  border-color: #000000;
-  color: #000000;
-  transition:
-    background-color .15s ease,
-    border-color .15s ease,
-    color .15s ease;
-}
-
-.loyalty-tab-button:hover {
-  background-color: #f3f4f6;
-  border-color: #000000;
-}
-
-.loyalty-tab-button.is-active {
-  background-color: #000000;
-  border-color: #000000;
-  color: #ffffff;
-}
-
-.loyalty-tab-button.is-active:hover {
-  background-color: #222222;
-  border-color: #222222;
-}
 .link-button { background: transparent; border: 0; color: #172033; cursor: pointer; font: inherit; font-weight: 700; padding: 0; text-align: left; }
 .link-button:hover { color: #2563eb; text-decoration: underline; }
 .copy-icon-button { display: inline-grid; width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 8px; place-items: center; }
@@ -1160,6 +1135,40 @@ button:active { transform: translateY(1px); }
   background: #1f2937;
   border-color: #1f2937;
   color: #fff;
+}
+
+.tabs a.loyalty-tab-button {
+  padding: 9px 16px;
+  border: 1px solid #6b7280;
+  border-radius: 6px;
+  background-color: transparent;
+  color: #6b7280;
+  text-decoration: none;
+  transform: none;
+  transition:
+    background-color .15s ease,
+    border-color .15s ease,
+    color .15s ease;
+}
+
+.tabs a.loyalty-tab-button:hover {
+  background-color: #6b7280;
+  border-color: #6b7280;
+  color: #ffffff;
+  transform: none;
+}
+
+.tabs a.loyalty-tab-button.is-active {
+  background-color: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+.tabs a.loyalty-tab-button.is-active:hover {
+  background-color: #222222;
+  border-color: #222222;
+  color: #ffffff;
+  transform: none;
 }
 .subpanel table .actions { vertical-align: middle; }
 .loyalty-rules-section table .loyalty-rule-row {
