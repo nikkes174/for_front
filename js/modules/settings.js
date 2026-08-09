@@ -2566,7 +2566,7 @@ async function openEntityModal(type, item) {
         <form class="modal-grid${type === "user" ? " user-profile-form" : ""}${isServiceProfile ? " service-profile-form" : ""}${type === "org" ? " organization-profile-form" : ""}" data-entity-edit data-type="${escapeHtml(type)}" data-id="${escapeHtml(item.id)}">
           ${modalFields(type, modalItem)}
           <p data-message></p>
-          <button class="primary${type === "achievement" ? " settings-achievement-save" : ""}">Сохранить</button>
+          <button class="primary standard-save-button${type === "achievement" ? " settings-achievement-save" : ""}">Сохранить</button>
         </form>
       </div>
     </div>

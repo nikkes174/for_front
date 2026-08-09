@@ -432,7 +432,7 @@ function bookingHoverCard(event) {
     </fieldset>
     <div><b>Детали</b><p>${clock(event.start, event.branch_id)}–${clock(event.end, event.branch_id)}</p><p>${durationLabel(event.duration_seconds)}</p></div>
     <label><span>Статус</span>${statusSelect(event)}</label>
-    <button type="button" class="primary booking-hover-save" data-save-booking-hover>Сохранить</button>
+    <button type="button" class="primary booking-hover-save standard-save-button" data-save-booking-hover>Сохранить</button>
   </aside>`;
 }
 

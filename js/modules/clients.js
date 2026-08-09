@@ -1369,7 +1369,7 @@ function modal(client) {
             ${readonly("Достижения", (client.achievements || []).map((item) => item.name).join(", "))}
           </div>
           ${selectedClientReferralLinkBlock(state.selectedClient.personalReferralSource)}
-          <div class="client-level-save-field"><button type="button" class="primary" data-client-level-save disabled>Сохранить</button></div>
+          <div class="client-level-save-field"><button type="button" class="primary standard-save-button" data-client-level-save disabled>Сохранить</button></div>
           <form class="inline-form compact" data-client-bonus-op data-permission="loyalty.transactions.create">
             ${selectField("Операция", "transaction_type", Object.entries(bonusTransactionTypes).map(([value, label]) => ({ value, label })), state.bonusTransactionType)}
             ${selectField("Тип бонусов", "bonus_type", bonusTypeOptions(client.bonusTypes, loyaltyBonusType), loyaltyBonusType)}

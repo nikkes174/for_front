@@ -2138,6 +2138,18 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   border-radius: 7px;
   justify-self: start;
 }
+.standard-save-button {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  justify-self: start;
+  flex: 0 0 100px;
+}
 
 .service-profile-modal {
   overflow-x: hidden;
