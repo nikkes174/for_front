@@ -271,13 +271,18 @@
   width: min(430px, calc(100vw - 24px));
 }
 
-.cabinet-public-booking-mode .cabinet-topbar,
 .cabinet-public-booking-mode .cabinet-my-bookings {
   display: none;
 }
 
 .cabinet-public-booking-mode .cabinet-content {
-  padding-top: 64px;
+  padding-top: 0;
+}
+
+@media (min-width: 641px) {
+  .cabinet-public-booking-mode [data-cabinet-view="client_booking"]::before {
+    display: none;
+  }
 }
 
 .cabinet-booking-loader {
@@ -1119,10 +1124,6 @@
 
 [data-cabinet-view="client_booking"] .cabinet-booking-branch-meta {
   grid-column: 1;
-}
-
-.cabinet-public-booking-mode [data-cabinet-view="client_booking"] {
-  margin-top: 0;
 }
 
 .cabinet-booking-brand label {
@@ -2270,10 +2271,6 @@ body.service-gallery-open { overflow: hidden; }
 }
 
 @media (max-width: 640px) {
-  .cabinet-public-booking-mode .cabinet-content {
-    padding-top: 56px;
-  }
-
   [data-cabinet-view="client_booking"] {
     margin-top: 40px;
     padding-top: 56px;
@@ -2284,10 +2281,6 @@ body.service-gallery-open { overflow: hidden; }
     left: 24px;
     width: 80px;
     height: 80px;
-  }
-
-  .cabinet-public-booking-mode [data-cabinet-view="client_booking"] {
-    margin-top: 0;
   }
 
   .cabinet-branch-reviews-profile {

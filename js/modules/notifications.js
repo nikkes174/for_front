@@ -220,8 +220,9 @@ export function bindNotifications(root, ctx = {}) {
     }
     form.querySelector("[data-notification-counter]").textContent = `${message.length} / ${MAX_MESSAGE_LENGTH}`;
     form.querySelector("[data-notification-submit]").disabled = !title.trim() || !message.trim() || !channels.length;
-    const clearButton = form.querySelector("[data-notification-clear]");
-    if (clearButton) clearButton.hidden = !title.trim() || !message.trim();
+    const clearButton = form.closest(".subpanel")?.querySelector("[data-notification-clear]");
+    const hasImages = (notificationFiles.get(form) || []).length || (notificationImageUrls.get(form) || []).length;
+    if (clearButton) clearButton.hidden = !title.trim() && !message.trim() && !hasImages;
   }
 
   root.addEventListener("keydown", (event) => {
@@ -266,6 +267,11 @@ export function bindNotifications(root, ctx = {}) {
     if (!form) return;
     form.elements.title.value = "";
     form.elements.message.value = "";
+    notificationFiles.set(form, []);
+    notificationImageUrls.set(form, []);
+    const imageInput = form.querySelector("[data-notification-images]");
+    if (imageInput) imageInput.value = "";
+    renderNotificationImages(form);
     syncNotificationTitle(form.elements.title);
     syncNotificationComposer(form.elements.message);
     updateNotificationForm(form);

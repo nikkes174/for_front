@@ -232,7 +232,7 @@ function clientSortUrl(ctx, search, pageSize, sort, currentSort, currentDirectio
 function clientTableHeader(ctx, search, pageSize, sort, direction, key, label) {
   const marker = sort === key ? (direction === "asc" ? "↑" : "↓") : "";
   const nextDirection = sort === key && direction === "asc" ? "desc" : "asc";
-  return `<button type="button" class="table-sort" data-client-sort-link data-client-sort="${escapeHtml(key)}" data-client-direction="${nextDirection}" aria-label="Сортировать по: ${escapeHtml(label)}"><span class="table-sort-label">${escapeHtml(label)}</span>${marker ? `<span class="table-sort-marker" aria-hidden="true">${marker}</span>` : ""}</button>`;
+  return `<button type="button" class="table-sort" style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%;" data-client-sort-link data-client-sort="${escapeHtml(key)}" data-client-direction="${nextDirection}" aria-label="Сортировать по: ${escapeHtml(label)}"><span class="table-sort-label" style="grid-column: 2;">${escapeHtml(label)}${marker ? `<span class="table-sort-marker" style="margin-left: 6px;" aria-hidden="true">${marker}</span>` : ""}</span></button>`;
 }
 
 function clientTable(items, ctx, search, pageSize, sort, direction) {

@@ -102,7 +102,7 @@ function sortedFinanceRows(rows) {
 function financeTableHeader(key, label) {
   const marker = financeState.tableSort === key ? (financeState.tableDirection === "asc" ? "↑" : "↓") : "";
   const nextDirection = financeState.tableSort === key && financeState.tableDirection === "asc" ? "desc" : "asc";
-  return `<button type="button" class="finance-table-sort table-sort" data-finance-table-sort="${key}" data-finance-table-direction="${nextDirection}" aria-label="Сортировать по: ${escapeHtml(label)}"><span class="table-sort-label">${escapeHtml(label)}</span>${marker ? `<span class="table-sort-marker" aria-hidden="true">${marker}</span>` : ""}</button>`;
+  return `<button type="button" class="finance-table-sort table-sort" style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%;" data-finance-table-sort="${key}" data-finance-table-direction="${nextDirection}" aria-label="Сортировать по: ${escapeHtml(label)}"><span class="table-sort-label" style="grid-column: 2;">${escapeHtml(label)}${marker ? `<span class="table-sort-marker" style="margin-left: 6px;" aria-hidden="true">${marker}</span>` : ""}</span></button>`;
 }
 
 function financeTableMarkup(rows) {
