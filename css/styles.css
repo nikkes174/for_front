@@ -1583,6 +1583,36 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 .service-image-preview button { padding: 5px 7px; font-size: 12px; }
 .service-image-preview .client-delete-icon-button { padding: 8px; }
 .service-image-preview .client-delete-icon-button img { width: 24px; height: 24px; border: 0; background: transparent; }
+.service-image-preview .service-image-remove-button {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
+  display: inline-grid;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 92%);
+  color: #dc2626;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 22%);
+}
+.service-image-preview .service-image-remove-button:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.service-image-preview .service-image-remove-button:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
 .service-staff-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .service-staff-editor-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .service-staff-filter, .service-staff-enabled { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; cursor: pointer; }

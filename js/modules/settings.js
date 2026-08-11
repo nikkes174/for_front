@@ -707,7 +707,7 @@ function serviceImageAlbumField(item) {
       <span class="photo-upload-button">Добавить изображения</span>
     </label>
     <div class="service-image-previews" data-service-image-previews>
-      ${images.map((image) => `<figure class="service-image-preview" data-service-image-id="${escapeHtml(image.id || "")}"><img src="${escapeHtml(image.path)}" alt="Изображение услуги">${image.id ? `<button type="button" class="client-delete-icon-button" data-remove-service-image data-image-id="${escapeHtml(image.id)}" aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>` : ""}</figure>`).join("")}
+      ${images.map((image) => `<figure class="service-image-preview" data-service-image-id="${escapeHtml(image.id || "")}"><img src="${escapeHtml(image.path)}" alt="Изображение услуги">${image.id ? `<button type="button" class="service-image-remove-button" data-remove-service-image data-image-id="${escapeHtml(image.id)}" aria-label="Удалить изображение" title="Удалить изображение">×</button>` : ""}</figure>`).join("")}
     </div>
   </div>`;
 }
@@ -880,7 +880,6 @@ function productItemExtraFields(item) {
     <label><span>Скидка</span><input name="discount" type="number" step="0.01" min="0" value="${escapeHtml(item.discount ?? "")}"></label>
     <label><span>Длительность</span><span class="service-duration-inputs"><input name="service_duration_hours" type="number" min="0" step="1" value="${escapeHtml(durationHours)}"><i>ч</i><input name="service_duration_minutes" type="number" min="0" max="59" step="1" value="${escapeHtml(durationMinutes)}"><i>мин</i></span></label>
     <label><span>Внешний ID</span><input name="api_id" value="${escapeHtml(item.api_id || "")}"></label>
-    ${serviceImageAlbumField(item)}
     ${productItemStaffFields(item)}
     <label class="modal-full"><span>Комментарий</span><input name="comment" value="${escapeHtml(item.comment || "")}"></label>
   `;
@@ -2460,6 +2459,7 @@ function modalFields(type, item) {
       <option value="true" ${item.active ? "selected" : ""}>Да</option>
       <option value="false" ${!item.active ? "selected" : ""}>Нет</option>
     </select></label>
+    ${productItemCategory(item)?.type === "service" ? serviceImageAlbumField(item) : ""}
   `;
   if (type === "achievement") return `
     ${achievementPhotoField(item)}
@@ -3191,16 +3191,17 @@ export function bindSettings(root, ctx) {
   const previewServiceImages = (input) => {
     const album = input.closest("[data-service-image-album]");
     const previews = album?.querySelector("[data-service-image-previews]");
+    if (!album || !previews) return;
+    previews.querySelectorAll("[data-service-image-pending]").forEach((preview) => preview.remove());
     const files = [...(input.files || [])];
+    if (!files.length) return;
     const existing = Number(album?.dataset.existingImagesCount || 0);
-    if (!album || !previews || !files.length) return;
     if (existing + files.length > 10) {
       input.value = "";
       alert("Можно добавить не более 10 изображений услуги.");
       return;
     }
-    previews.querySelectorAll("[data-service-image-pending]").forEach((preview) => preview.remove());
-    previews.insertAdjacentHTML("beforeend", files.map((file) => `<figure class="service-image-preview" data-service-image-pending><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр изображения услуги"></figure>`).join(""));
+    previews.insertAdjacentHTML("beforeend", files.map((file, index) => `<figure class="service-image-preview" data-service-image-pending data-file-index="${index}"><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр изображения услуги"><button type="button" class="service-image-remove-button" data-remove-pending-service-image data-file-index="${index}" aria-label="Убрать выбранное изображение" title="Убрать выбранное изображение">×</button></figure>`).join(""));
   };
 
   root.addEventListener("click", async (event) => {
@@ -3762,6 +3763,23 @@ export function bindSettings(root, ctx) {
       } catch (error) {
         alert(error.message);
       }
+      return;
+    }
+
+    const removePendingServiceImage = event.target.closest("[data-remove-pending-service-image]");
+    if (removePendingServiceImage) {
+      const album = removePendingServiceImage.closest("[data-service-image-album]");
+      const input = album?.querySelector('input[name="service_images"]');
+      const removeIndex = Number(removePendingServiceImage.dataset.fileIndex);
+      if (!input || !Number.isInteger(removeIndex)) return;
+      const transfer = new DataTransfer();
+      [...input.files].forEach((file, index) => {
+        if (index !== removeIndex) {
+          transfer.items.add(file);
+        }
+      });
+      input.files = transfer.files;
+      previewServiceImages(input);
       return;
     }
 
