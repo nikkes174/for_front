@@ -404,11 +404,11 @@ function achievementPhotoField(item) {
   const photoUrl = achievementPhotoUrl(item);
   return `
     <div class="achievement-photo-field">
+      ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Фото достижения" class="achievement-photo-preview">` : ""}
       <label class="photo-upload-control">
         <input name="photo_file" type="file" accept="image/*" hidden>
         <span class="photo-upload-button">${photoUrl ? "Заменить фото" : "Добавить фото"}</span>
       </label>
-      ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Фото достижения" class="achievement-photo-preview">` : ""}
     </div>
   `;
 }
@@ -2463,7 +2463,7 @@ function modalFields(type, item) {
   `;
   if (type === "achievement") return `
     ${achievementPhotoField(item)}
-    <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
+    <label class="achievement-name-field"><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
     <label><span>Клиент должен выполнить</span><select name="logic">
       ${ACHIEVEMENT_LOGIC_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.logic === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
     </select></label>
@@ -3165,13 +3165,21 @@ export function bindSettings(root, ctx) {
       if (photoButton) photoButton.textContent = "Заменить фото";
       return;
     }
-    const preview = input.closest(".achievement-photo-field")?.querySelector(".achievement-photo-preview");
+    const photoField = input.closest(".achievement-photo-field");
+    const preview = photoField?.querySelector(".achievement-photo-preview");
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
     if (preview) {
       preview.src = previewUrl;
     } else {
-      input.closest(".achievement-photo-field")?.insertAdjacentHTML("beforeend", `<img src="${escapeHtml(previewUrl)}" alt="Фото достижения" class="achievement-photo-preview">`);
+      const previewMarkup = `<img src="${escapeHtml(previewUrl)}" alt="Фото достижения" class="achievement-photo-preview">`;
+      const photoControl = photoField?.querySelector(".photo-upload-control");
+
+      if (input.closest('[data-entity-edit][data-type="achievement"]') && photoControl) {
+        photoControl.insertAdjacentHTML("beforebegin", previewMarkup);
+      } else {
+        photoField?.insertAdjacentHTML("beforeend", previewMarkup);
+      }
     }
     const photoButton = input.closest(".photo-upload-control")?.querySelector(".photo-upload-button");
     if (photoButton) photoButton.textContent = "Заменить фото";

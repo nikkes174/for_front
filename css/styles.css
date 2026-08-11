@@ -2451,6 +2451,18 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   gap: 8px;
 }
 
+[data-entity-edit][data-type="achievement"] .achievement-name-field {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
+[data-entity-edit][data-type="achievement"] .achievement-photo-field {
+  grid-column: 2;
+  grid-row: 1 / span 4;
+  align-self: start;
+}
+
 .achievement-photo-preview {
   display: block;
   width: 132px;
@@ -2479,6 +2491,11 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   .topbar-title { width: 100%; }
   .modal-grid { grid-template-columns: 1fr; }
   .achievement-photo-field { grid-column: 1; grid-row: auto; justify-items: start; }
+  [data-entity-edit][data-type="achievement"] .achievement-name-field,
+  [data-entity-edit][data-type="achievement"] .achievement-photo-field {
+    grid-column: 1;
+    grid-row: auto;
+  }
   .organization-profile-form .organization-name-field,
   .organization-profile-form .achievement-photo-field { grid-column: 1; grid-row: auto; }
 }
