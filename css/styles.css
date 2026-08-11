@@ -310,8 +310,8 @@ button:active { transform: translateY(1px); }
 .booking-nav button[data-booking-period-navigation]:focus-visible,
 .booking-nav button[data-booking-period-navigation]:active {
   border-color: #4299e1;
-  background: transparent;
-  color: #4299e1;
+  background: #4299e1;
+  color: #ffffff;
 }
 .booking-slot-settings { display: flex; align-items: end; gap: 6px; margin-left: 10px; }
 .booking-slot-settings strong { display: flex; align-self: end; align-items: center; width: auto; min-height: 34px; font-size: 12px; white-space: nowrap; }
@@ -333,8 +333,8 @@ button:active { transform: translateY(1px); }
 .booking-picker-head button[data-booking-picker-month]:focus-visible,
 .booking-picker-head button[data-booking-picker-month]:active {
   border-color: #4299e1;
-  background: transparent;
-  color: #4299e1;
+  background: #4299e1;
+  color: #ffffff;
 }
 .booking-picker-weekdays, .booking-picker-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
 .booking-picker-weekdays { color: #667085; font-size: 11px; }
