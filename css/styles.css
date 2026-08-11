@@ -1511,6 +1511,8 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 .notification-composer-toolbar .notification-submit svg { width: 18px; height: 18px; }
 
 .event-row-create > td:first-child > button,
+.event-row-client-create > td:first-child > button,
+.event-client-create-button,
 .event-row-complete > td:first-child > button,
 .event-row-cancel > td:first-child > button,
 .event-row-review > td:first-child > button {
@@ -1521,7 +1523,7 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 }
 .event-row-create > td:first-child > button { border-color: #d0d5dd; background: #f2f4f7; }
 .event-row-client-create > td:first-child > button,
-.event-client-create-button { border-color: #86efac !important; background: transparent !important; }
+.event-client-create-button { border: 1px solid #86efac !important; background: transparent !important; }
 .event-row-complete > td:first-child > button { border-color: #86efac; background: #dcfce7; }
 .event-row-cancel > td:first-child > button { border-color: #fca5a5; background: #fee2e2; }
 .event-row-storage > td:first-child > button { border-color: #f59f00; background: #f59f00; color: #fff; }
