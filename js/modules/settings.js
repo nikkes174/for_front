@@ -703,7 +703,7 @@ function serviceImageAlbumField(item) {
   return `<div class="service-image-album modal-full" data-service-image-album data-existing-images-count="${images.length}">
     <div class="service-image-album-head"><strong>Изображения услуги</strong><small>До 10 изображений</small></div>
     <label class="photo-upload-control">
-      <input name="service_images" type="file" accept="image/*" multiple hidden>
+      <input name="service_images" type="file" accept="image/*" multiple hidden data-service-images-input>
       <span class="photo-upload-button">Добавить изображения</span>
     </label>
     <div class="service-image-previews" data-service-image-previews>
@@ -3204,6 +3204,12 @@ export function bindSettings(root, ctx) {
     previews.insertAdjacentHTML("beforeend", files.map((file, index) => `<figure class="service-image-preview" data-service-image-pending data-file-index="${index}"><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр изображения услуги"><button type="button" class="service-image-remove-button" data-remove-pending-service-image data-file-index="${index}" aria-label="Убрать выбранное изображение" title="Убрать выбранное изображение">×</button></figure>`).join(""));
   };
 
+  document.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-service-images-input]");
+    if (!input) return;
+    previewServiceImages(input);
+  }, true);
+
   root.addEventListener("click", async (event) => {
     if (event.target.closest("[data-storage-event-modal-close]") || event.target.matches("[data-storage-event-modal]")) { root.querySelector("[data-storage-event-modal]")?.remove(); return; }
     const button = event.target.closest("[data-open-storage-event]");
@@ -3900,10 +3906,6 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.matches('[data-entity-edit][data-type="user"] [name="user_photo_file"]')) {
       previewAchievementPhoto(event.target);
-      return;
-    }
-    if (event.target.matches('[data-entity-edit][data-type="productItem"] [name="service_images"]')) {
-      previewServiceImages(event.target);
       return;
     }
     if (event.target.matches('[data-event-visit-edit] [name="visit_before_photos"], [data-event-visit-edit] [name="visit_after_photos"], [data-event-visit-edit] [name="visit_comment_photos"]')) {
