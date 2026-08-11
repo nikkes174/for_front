@@ -18,6 +18,7 @@ const REGISTRATION_FIELD_NAMES = [
   "email",
 ];
 const DEFAULT_CLIENT_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
+const CLIENT_FIELD_SECTION_PREFIX = "client_field_";
 
 function showLoyaltyToast(message) {
   document.querySelector("[data-loyalty-toast]")?.remove();
@@ -454,7 +455,7 @@ function clientCardSectionsStorageKey(orgId) {
 
 function normalizeClientCardSections(sections) {
   if (!Array.isArray(sections)) return [...DEFAULT_CLIENT_CARD_SECTIONS];
-  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
+  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || name === "client_fields_configured" || (String(name).startsWith(CLIENT_FIELD_SECTION_PREFIX) && REGISTRATION_FIELD_NAMES.includes(String(name).slice(CLIENT_FIELD_SECTION_PREFIX.length))) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
 }
 
 function enabledClientCardSections(orgId) {
@@ -937,25 +938,26 @@ function cardOrganizationAccess(ctx, key) {
   `;
 }
 
-function cardBlockSettings(ctx, key, enabled = true) {
+function cardBlockSettings(ctx, key, enabled = true, extraContent = "") {
   const registrationField = key.startsWith("reg_") ? key.slice(4) : "";
   const clientCardSection = registrationField ? "" : key;
   return `
     <div class="card-block-settings">
       <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}> \u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c</label>
       ${cardOrganizationAccess(ctx, key)}
+      ${extraContent}
     </div>
   `;
 }
 
-function cardConfigBlock(ctx, key, title, preview, enabled = true) {
+function cardConfigBlock(ctx, key, title, preview, enabled = true, extraContent = "") {
   return `
     <div class="card-config-block" draggable="true" data-card-config-block="${escapeHtml(key)}">
       <div>
         <h4>${escapeHtml(title)}</h4>
         <div class="card-preview">${preview}</div>
       </div>
-      ${cardBlockSettings(ctx, key, enabled)}
+      ${cardBlockSettings(ctx, key, enabled, extraContent)}
     </div>
   `;
 }
@@ -1045,13 +1047,21 @@ function registrationBlocks(ctx) {
   }).join("");
 }
 
+function clientCabinetFieldsSelect(enabledSections) {
+  const labels = { last_name: "Фамилия", first_name: "Имя", middle_name: "Отчество", phone: "Номер телефона", gender: "Пол", telegram_id: "Telegram ID", max_id: "Max ID", vk_id: "VK ID", email: "Email" };
+  const configured = enabledSections.includes("client_fields_configured");
+  const selectedFields = REGISTRATION_FIELD_NAMES.filter((field) => !configured || enabledSections.includes(`${CLIENT_FIELD_SECTION_PREFIX}${field}`));
+  const summary = selectedFields.length === REGISTRATION_FIELD_NAMES.length ? "Все поля" : (selectedFields.map((field) => labels[field]).join(", ") || "Не выбрано");
+  return `<label class="card-access"><span>Поля пользователя</span><details class="checkbox-select"><summary>${escapeHtml(summary)}</summary>${REGISTRATION_FIELD_NAMES.map((field) => `<label class="checkbox"><input type="checkbox" data-client-profile-field value="${escapeHtml(field)}" ${selectedFields.includes(field) ? "checked" : ""}> ${escapeHtml(labels[field] || field)}</label>`).join("")}</details></label>`;
+}
+
 function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
   const level = selectedClient?.client_level || metric?.client_level || metric?.loyalty_level || levels?.[0]?.name || L.notSet;
   const enabledSections = enabledClientCardSections(ctx.org?.id);
   const blocks = [
     {
       key: "client_name",
-      html: cardConfigBlock(ctx, "client_name", "\u0424\u0418\u041e", `<b>${escapeHtml(selectedClient ? clientName(selectedClient) : L.notSelected)}</b>`, enabledSections.includes("client_name")),
+      html: cardConfigBlock(ctx, "client_name", "Данные пользователя", "Поля, которые пользователь видит и меняет", enabledSections.includes("client_name"), clientCabinetFieldsSelect(enabledSections)),
     },
     {
       key: "client_level",
@@ -1665,6 +1675,8 @@ export function bindLoyalty(root, ctx) {
       const sections = [...root.querySelectorAll("[data-card-config-block] [data-client-card-section]")]
         .filter((input) => input.checked)
         .map((input) => input.dataset.clientCardSection);
+      const profileFields = [...root.querySelectorAll("[data-client-profile-field]:checked")].map((input) => `${CLIENT_FIELD_SECTION_PREFIX}${input.value}`);
+      sections.push("client_fields_configured", ...profileFields);
       await api.updateClientCardSections(ctx.org.id, sections);
       saveEnabledClientCardSections(ctx.org.id, sections);
       loyaltyState.clientCardSections = sections;
