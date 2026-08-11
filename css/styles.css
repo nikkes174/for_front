@@ -2526,12 +2526,44 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .organization-bot-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .organization-bot-heading h3, .organization-bot-heading p { margin: 0; }
 .organization-bot-heading p { margin-top: 4px; color: #667085; }
-.organization-bot-status { border-radius: 999px; padding: 5px 9px; background: #eef1f5; color: #667085; font-size: 12px; }
-.organization-bot-status.is-active { background: #e8f7ef; color: #157347; }
+.organization-bot-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
 
+.organization-bot-status.bg-danger-soft {
+  background: #fef3f2;
+}
 
-.organization-bot-status { background: #fff0f1; color: #c62828; }
-.organization-bot-status.is-active { background: #e8f7ef; color: #157347; }
+.organization-bot-status.border-danger-subtle {
+  border-color: #fecdca;
+}
+
+.organization-bot-status.text-fg-danger-strong {
+  color: #b42318;
+}
+
+.organization-bot-status.bg-success-soft {
+  background: #ecfdf3;
+}
+
+.organization-bot-status.border-success-subtle {
+  border-color: #a6f4c5;
+}
+
+.organization-bot-status.text-fg-success-strong {
+  color: #067647;
+}
 .organization-bot-actions { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; }
 .organization-bot-token { display: grid; gap: 5px; min-width: 160px; color: #51637b; font-size: 12px; }
 .organization-bot-token input { height: 40px; }

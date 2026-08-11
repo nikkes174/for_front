@@ -2904,7 +2904,10 @@ function organizationBotsSettingsMarkup(ctx, bots) {
               return `<article class="organization-bot-card">
                 <div class="organization-bot-heading">
                   <div><h3>${label}</h3><p>${bot ? escapeHtml(bot.bot_name || "Бот подключён") : "Бот не подключён"}</p></div>
-                  <span class="organization-bot-status ${bot?.is_active ? "is-active" : ""}">${bot?.is_active ? "Включён" : "Выключен"}</span>
+                  <span class="organization-bot-status ${bot?.is_active
+                    ? "bg-success-soft border border-success-subtle text-fg-success-strong text-xs font-medium px-1.5 py-0.5 rounded-full"
+                    : "bg-danger-soft border border-danger-subtle text-fg-danger-strong text-xs font-medium px-1.5 py-0.5 rounded-full"
+                  }">${bot?.is_active ? "Включён" : "Выключен"}</span>
                 </div>
                 <form class="organization-bot-actions" data-bot-save data-platform="${platform}">
                   <label class="organization-bot-token"><span>Токен бота</span><input name="token" type="password" autocomplete="off" required placeholder="${bot ? escapeHtml(bot.token_hint) : "Вставьте токен"}"></label>
