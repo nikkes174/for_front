@@ -268,6 +268,39 @@ button:active { transform: translateY(1px); }
 .booking-online-copy { display: inline-grid; flex: 0 0 auto; width: 28px; height: 28px; min-width: 28px; padding: 5px; place-items: center; }
 .booking-online-copy img { width: 16px; height: 16px; }
 .booking-nav { position: relative; z-index: 30; }
+.booking-nav .booking-calendar-toggle {
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid #4299e1;
+  border-radius: 6px;
+  background-color: transparent;
+  color: #4299e1;
+  text-decoration: none;
+  transform: none;
+  transition:
+    background-color .15s ease,
+    border-color .15s ease,
+    color .15s ease;
+}
+.booking-nav .booking-calendar-toggle:hover {
+  border-color: #4299e1;
+  background-color: #4299e1;
+  color: #ffffff;
+  transform: none;
+}
+.booking-nav .booking-calendar-toggle.is-active {
+  border-color: #4299e1;
+  background-color: #4299e1;
+  color: #ffffff;
+}
+.booking-nav .booking-calendar-toggle.is-active:hover,
+.booking-nav .booking-calendar-toggle.is-active:focus-visible,
+.booking-nav .booking-calendar-toggle.is-active:active {
+  border-color: #4299e1;
+  background-color: #4299e1;
+  color: #ffffff;
+  transform: none;
+}
 .booking-nav button[data-booking-period-navigation] {
   border: 1px solid #4299e1;
   background: transparent;

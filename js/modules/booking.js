@@ -137,6 +137,20 @@ function renderDatePicker(root) {
   root.querySelector("[data-booking-date-picker]").hidden = wasHidden;
 }
 
+function setDatePickerOpen(scope, isOpen) {
+  const picker = scope.querySelector("[data-booking-date-picker]");
+  const toggle = scope.querySelector("[data-booking-calendar-toggle]");
+
+  if (picker) {
+    picker.hidden = !isOpen;
+  }
+
+  if (toggle) {
+    toggle.classList.toggle("is-active", isOpen);
+    toggle.setAttribute("aria-expanded", String(isOpen));
+  }
+}
+
 function cachedDays(data) {
   const start = new Date(`${data.date_from}T00:00:00`);
   const end = new Date(`${data.date_to}T00:00:00`);
@@ -692,7 +706,7 @@ export async function booking(ctx) {
         </div>
         <div class="booking-nav">
         <button type="button" class="ghost" data-booking-period-navigation="-1">‹</button>
-        <button type="button" class="ghost btn-ghost-secondary" data-booking-calendar-toggle>Календарь</button>
+        <button type="button" class="btn btn-outline-secondary booking-calendar-toggle" data-booking-calendar-toggle aria-expanded="false">Календарь</button>
         <button type="button" class="ghost" data-booking-period-navigation="1">›</button>
         <strong>${rangeStart.getDate()} ${MONTH_NAMES[rangeStart.getMonth()]} — ${rangeEnd.getDate()} ${MONTH_NAMES[rangeEnd.getMonth()]}</strong>
         ${bookingSlotIntervalSettings(data)}
@@ -723,9 +737,18 @@ export function bindBooking(root, ctx) {
     document.body.dataset.bookingDatePickerOutsideBound = "true";
     document.addEventListener("click", (event) => {
       const picker = document.querySelector("[data-booking-date-picker]");
+
       if (!picker || picker.hidden) return;
-      if (event.target.closest("[data-booking-date-picker], [data-booking-calendar-toggle]")) return;
-      picker.hidden = true;
+
+      if (
+        event.target.closest(
+          "[data-booking-date-picker], [data-booking-calendar-toggle]"
+        )
+      ) {
+        return;
+      }
+
+      setDatePickerOpen(document, false);
     });
   }
   root.addEventListener("click", async (event) => {
@@ -871,24 +894,29 @@ export function bindBooking(root, ctx) {
     }
     if (event.target.closest("[data-booking-calendar-toggle]")) {
       const picker = root.querySelector("[data-booking-date-picker]");
+
       if (picker) {
         if (picker.hidden) {
           bookingState.draftDateFrom = "";
           bookingState.draftDateTo = "";
-          bookingState.pickerMonth = new Date(`${bookingState.dateFrom || localIsoDate(bookingState.weekStart || new Date())}T00:00:00`);
+          bookingState.pickerMonth = new Date(
+            `${bookingState.dateFrom || localIsoDate(bookingState.weekStart || new Date())}T00:00:00`
+          );
+
           renderDatePicker(root);
-          root.querySelector("[data-booking-date-picker]").hidden = false;
+          setDatePickerOpen(root, true);
         } else {
-          picker.hidden = true;
+          setDatePickerOpen(root, false);
         }
       }
+
       return;
     }
     const monthButton = event.target.closest("[data-booking-picker-month]");
     if (monthButton) {
       bookingState.pickerMonth = new Date(bookingState.pickerMonth.getFullYear(), bookingState.pickerMonth.getMonth() + Number(monthButton.dataset.bookingPickerMonth), 1);
       renderDatePicker(root);
-      root.querySelector("[data-booking-date-picker]").hidden = false;
+      setDatePickerOpen(root, true);
       return;
     }
     const dayButton = event.target.closest("[data-booking-picker-date]");
@@ -904,7 +932,7 @@ export function bindBooking(root, ctx) {
         bookingState.draftDateTo = value;
       }
       renderDatePicker(root);
-      root.querySelector("[data-booking-date-picker]").hidden = false;
+      setDatePickerOpen(root, true);
       return;
     }
     if (event.target.closest("[data-booking-date-apply]")) {
