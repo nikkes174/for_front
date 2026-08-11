@@ -22,6 +22,19 @@ function resetState(organizationId) {
   state.itemKey = "";
 }
 
+function normalizePeriod() {
+  const dateFrom = new Date(`${state.dateFrom}T00:00:00`);
+  const dateTo = new Date(`${state.dateTo}T00:00:00`);
+  const maxDays = 366;
+  if (Number.isNaN(dateFrom.getTime()) || Number.isNaN(dateTo.getTime()) || dateFrom > dateTo || (dateTo - dateFrom) / 86400000 > maxDays) {
+    const end = Number.isNaN(dateTo.getTime()) ? new Date() : dateTo;
+    const start = new Date(end);
+    start.setDate(start.getDate() - maxDays);
+    state.dateFrom = isoDate(start);
+    state.dateTo = isoDate(end);
+  }
+}
+
 function money(value) {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency", currency: "RUB", minimumFractionDigits: 2, maximumFractionDigits: 2,
@@ -51,6 +64,7 @@ function rowItemKey(row) {
 
 export async function breakdown(ctx) {
   resetState(ctx.org.id);
+  normalizePeriod();
   const [branches, users, categories, catalog, report] = await Promise.all([
     api.branches(ctx.org.id).catch(() => []),
     api.users(ctx.org.id, 500).catch(() => []),
@@ -78,6 +92,10 @@ export async function breakdown(ctx) {
   const totalQuantity = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
   const totalAmount = rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
   const visitsCount = new Set(rows.map((row) => row.visit_id).filter(Boolean)).size;
+  const productTurnover = allRows.filter((row) => row.item_type === "product")
+    .reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+  const serviceTurnover = allRows.filter((row) => row.item_type === "service")
+    .reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
 
   return `
     <section class="finance-page breakdown-page">
@@ -94,6 +112,8 @@ export async function breakdown(ctx) {
       </div>
 
       <div class="finance-summary">
+        <div class="stat finance-salary-stat"><span>Оборот по товарам</span><strong>${state.itemType === "all" ? money(productTurnover) : "—"}</strong></div>
+        <div class="stat finance-salary-stat"><span>Оборот по услугам</span><strong>${state.itemType === "all" ? money(serviceTurnover) : "—"}</strong></div>
         <div class="stat"><span>Визитов</span><strong>${visitsCount}</strong></div>
         <div class="stat"><span>Количество</span><strong>${quantity(totalQuantity)}</strong></div>
         <div class="stat finance-salary-stat"><span>Сумма продаж</span><strong>${money(totalAmount)}</strong></div>
@@ -153,6 +173,7 @@ export function bindBreakdown(root, ctx) {
     if (!event.target.closest("[data-breakdown-apply]")) return;
     state.dateFrom = root.querySelector("[data-breakdown-date-from]")?.value || state.dateFrom;
     state.dateTo = root.querySelector("[data-breakdown-date-to]")?.value || state.dateTo;
+    normalizePeriod();
     state.branchId = root.querySelector("[data-breakdown-branch]")?.value || "";
     state.itemType = root.querySelector("[data-breakdown-type]")?.value || "all";
     state.itemKey = root.querySelector("[data-breakdown-item]")?.value || "";

@@ -34,6 +34,10 @@ export async function request(path, options = {}) {
 
     if (!response.ok) throw new ApiError(await errorMessage(response), response.status);
     if (response.status === 204) return null;
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new ApiError("Сервер вернул страницу вместо данных. Обновите страницу и войдите снова.", response.status);
+    }
     return response.json();
   } finally {
     window.dispatchEvent(new CustomEvent("ajax:end"));
@@ -145,6 +149,24 @@ export const api = {
   createDepartments: (body) => request("/organizations/departments/bulk", { method: "POST", body: JSON.stringify(body) }),
   updateDepartment: (id, body) => request(`/organizations/departments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteDepartment: (id) => request(`/organizations/departments/${id}`, { method: "DELETE" }),
+  storageSubdivisions: (orgId) => request(`/organizations/${orgId}/storage-subdivisions`, { cache: "no-store" }),
+  createStorageSubdivision: (body) => request("/organizations/storage-subdivisions", { method: "POST", body: JSON.stringify(body) }),
+  updateStorageSubdivision: (id, body) => request(`/organizations/storage-subdivisions/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteStorageSubdivision: (id) => request(`/organizations/storage-subdivisions/${id}`, { method: "DELETE" }),
+  deleteStorageSubdivision: (id) => request(`/organizations/storage-subdivisions/${id}`, { method: "DELETE" }),
+  deleteStorageSubdivision: (id) => request(`/organizations/storage-subdivisions/${id}`, { method: "DELETE" }),
+  deleteStorageSubdivision: (id) => request(`/organizations/storage-subdivisions/${id}`, { method: "DELETE" }),
+  storages: (orgId) => request(`/organizations/${orgId}/storages`, { cache: "no-store" }),
+  createStorage: (body) => request("/organizations/storages", { method: "POST", body: JSON.stringify(body) }),
+  updateStorage: (id, body) => request(`/organizations/storages/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteStorage: (id) => request(`/organizations/storages/${id}`, { method: "DELETE" }),
+  storageProducts: (storageId, query = "") => {
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("query", query.trim());
+    const suffix = params.toString() ? `?${params}` : "";
+    return request(`/organizations/storages/${storageId}/products${suffix}`, { cache: "no-store" });
+  },
+  transferStorageProducts: (storageId, body) => request(`/organizations/storages/${storageId}/transfer`, { method: "POST", body: JSON.stringify(body) }),
   organizationBots: (orgId) => request(`/bots/organizations/${orgId}`, { cache: "no-store" }),
   saveOrganizationBot: (orgId, platform, body) => request(`/bots/organizations/${orgId}/${platform}`, { method: "PUT", body: JSON.stringify(body) }),
   toggleOrganizationBot: (orgId, platform, enabled) => request(`/bots/organizations/${orgId}/${platform}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
@@ -193,7 +215,7 @@ export const api = {
   grantTemporaryAccess: (body) => request("/users-access/temporary-accesses", { method: "POST", body: JSON.stringify(body) }),
   setTwoFactorAuth: (body) => request("/users-access/two-factor-auth", { method: "POST", body: JSON.stringify(body) }),
   auditLogs: (orgId) => request(`/audit${orgId ? `?organization_id=${orgId}` : ""}`),
-  events: (orgId) => request(`/events${orgId ? `?organization_id=${orgId}` : ""}`),
+  events: (orgId) => request(`/events${orgId ? `?organization_id=${orgId}` : ""}`, { cache: "no-store" }),
 
   clients: (orgId, filters = {}) => {
     const params = new URLSearchParams({ organization_id: orgId });
@@ -269,6 +291,7 @@ export const api = {
     return upload("/crm-api/client-communications/push/images", data);
   },
   pushNotificationJobs: (organizationId) => request(`/crm-api/client-communications/push/send-jobs?organization_id=${organizationId}`, { cache: "no-store" }),
+  stopPushNotificationJob: (jobId, organizationId) => request(`/crm-api/client-communications/push/send-jobs/${encodeURIComponent(jobId)}/stop?organization_id=${organizationId}`, { method: "POST" }),
   deletePushNotificationJob: (jobId, organizationId) => request(`/crm-api/client-communications/push/send-jobs/${encodeURIComponent(jobId)}?organization_id=${organizationId}`, { method: "DELETE" }),
 
   rules: (orgId) => request(`/loyalty-api/organizations/${orgId}/rules`),
@@ -279,6 +302,7 @@ export const api = {
   applyRuleToAll: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   startApplyRuleToAllJob: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all-jobs`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   workerJobs: (organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`),
+  stopWorkerJob: (jobId, organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs/${encodeURIComponent(jobId)}/stop?organization_id=${organizationId}`, { method: "POST" }),
   applyLevelTransitions: (clientId, organizationId) => request(`/loyalty-api/client-bonuses/clients/${clientId}/apply-level-transitions`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   setClientLevel: (clientId, organizationId, clientLevel, autoLevelTransitionDisabled = false) => request(`/loyalty-api/client-bonuses/clients/${clientId}/level`, { method: "PUT", body: JSON.stringify({ organization_id: organizationId, client_level: clientLevel || null, auto_level_transition_disabled: autoLevelTransitionDisabled }) }),
   bonusLevels: (orgId) => request(`/loyalty-api/organizations/${orgId}/bonus-levels`),

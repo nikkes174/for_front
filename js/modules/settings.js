@@ -516,6 +516,10 @@ function branchWorkSchedulePayload(data) {
 function productItemStaffFields(item) {
   const users = cache.users || [];
   if (!users.length) return "";
+  const branches = cache.branches || [];
+  const roles = cache.roles || [];
+  const departments = cache.departments || [];
+  const workplaces = cache.workplaces || [];
   const pairsByMaster = new Map((item.master_services || []).map((pair) => [String(pair.master_id), pair]));
   const selectedMasterIds = new Set([
     ...pairsByMaster.keys(),
@@ -527,9 +531,18 @@ function productItemStaffFields(item) {
         <strong>Сотрудники, оказывающие услугу</strong>
         <div class="service-staff-editor-actions">
           <label class="service-staff-filter"><input type="checkbox" data-select-all-service-staff ${users.length && users.every((user) => selectedMasterIds.has(String(user.id))) ? "checked" : ""}> <span>Выбрать всех</span></label>
-          <label class="service-staff-filter"><input type="checkbox" data-hide-inactive-service-staff> <span>Скрыть неактивных</span></label>
         </div>
       </div>
+      <form class="inline-form compact">
+        <label><span>Поиск сотрудника</span><input type="search" placeholder="Имя или фамилия" data-service-staff-search></label>
+      </form>
+      <form class="inline-form compact">
+        <label><span>Филиал</span><select data-service-staff-filter-branch><option value="">Все филиалы</option>${branches.map((branch) => `<option value="${escapeHtml(branch.id)}">${escapeHtml(branch.name)}</option>`).join("")}</select></label>
+        <label><span>Роль</span><select data-service-staff-filter-role><option value="">Все роли</option>${roles.map((role) => `<option value="${escapeHtml(role.id)}">${escapeHtml(role.name)}</option>`).join("")}</select></label>
+        <label><span>Должность</span><select data-service-staff-filter-department><option value="">Все должности</option>${departments.map((department) => `<option value="${escapeHtml(department.id)}">${escapeHtml(department.name)}</option>`).join("")}</select></label>
+        <label><span>Рабочее место</span><select data-service-staff-filter-workplace><option value="">Все рабочие места</option>${workplaces.map((workplace) => `<option value="${escapeHtml(workplace.id)}">${escapeHtml(workplace.name)}</option>`).join("")}</select></label>
+        <label class="checkbox"><input type="checkbox" data-hide-inactive-service-staff> Скрыть неактивных</label>
+      </form>
       <div class="service-staff-table-wrap">
         <table class="service-staff-table app-table">
           <thead><tr><th>Оказывает услугу</th><th>Сотрудник</th><th>Цена от</th><th>Цена до</th><th>Длительность</th><th>Тех. перерыв, мин</th></tr></thead>
@@ -629,12 +642,33 @@ function syncServiceStaffRow(row) {
   row.querySelectorAll("input:not([data-master-service-enabled])").forEach((input) => {
     input.disabled = !enabled;
   });
-  const hideInactive = row.closest("[data-service-staff-editor]")?.querySelector("[data-hide-inactive-service-staff]")?.checked;
-  row.hidden = Boolean(hideInactive && !enabled);
+}
+
+function serviceStaffMatchesFilters(user, editor) {
+  const memberships = userMemberships(user, cache.branchMemberships || []);
+  const roleIds = userRoleIds(user, cache.memberships || [], cache.branchMemberships || []).map(String);
+  const searchQuery = editor?.querySelector("[data-service-staff-search]")?.value.trim().toLowerCase() || "";
+  const branchId = editor?.querySelector("[data-service-staff-filter-branch]")?.value || "";
+  const roleId = editor?.querySelector("[data-service-staff-filter-role]")?.value || "";
+  const departmentId = editor?.querySelector("[data-service-staff-filter-department]")?.value || "";
+  const workplaceId = editor?.querySelector("[data-service-staff-filter-workplace]")?.value || "";
+  const hideInactive = editor?.querySelector("[data-hide-inactive-service-staff]")?.checked;
+  const fullName = [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ").toLowerCase();
+  if (searchQuery && !fullName.includes(searchQuery)) return false;
+  if (hideInactive && !user.is_active) return false;
+  if (branchId && !memberships.some((item) => String(item.branch_id) === String(branchId))) return false;
+  if (roleId && !roleIds.includes(String(roleId))) return false;
+  if (departmentId && !memberships.some((item) => String(item.department_id) === String(departmentId))) return false;
+  if (workplaceId && !memberships.some((item) => String(item.workplace_id) === String(workplaceId))) return false;
+  return true;
 }
 
 function syncServiceStaffTable(editor) {
   editor?.querySelectorAll("[data-master-service-row]").forEach(syncServiceStaffRow);
+  editor?.querySelectorAll("[data-master-service-row]").forEach((row) => {
+    const user = (cache.users || []).find((item) => String(item.id) === String(row.dataset.masterId));
+    row.hidden = !user || !serviceStaffMatchesFilters(user, editor);
+  });
   const selectAll = editor?.querySelector("[data-select-all-service-staff]");
   const toggles = [...(editor?.querySelectorAll("[data-master-service-enabled]") || [])];
   if (selectAll) {
@@ -678,43 +712,37 @@ function serviceImageAlbumField(item) {
   </div>`;
 }
 
-function productItemActualAmountRow(item = {}) {
+function productItemActualAmountRow(storage, item) {
   return `
-    <div class="achievement-condition-row" data-product-amount-row>
-      <label><span>ID склада</span><input name="actual_amount_storage_id" type="number" step="1" min="0" value="${escapeHtml(item.storage_id ?? "")}"></label>
-      <label><span>Количество</span><input name="actual_amount_value" type="number" step="0.01" min="0" value="${escapeHtml(item.amount ?? "")}"></label>
-      <button type="button" class="client-delete-icon-button" data-remove-product-amount aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>
+    <div class="achievement-condition-row product-storage-select-row" data-product-amount-row>
+      <label><input type="checkbox" data-product-amount-storage value="${Number(storage.id)}" ${item ? "checked" : ""}> <span>${escapeHtml(storage.name)}</span></label>
+      <label><span>Количество</span><input name="actual_amount_value" type="number" step="0.01" min="0" value="${escapeHtml(item?.amount ?? "")}"></label>
     </div>
   `;
 }
 
 function productItemActualAmountsFields(items = []) {
-  const rows = items.length ? items : [{}];
+  const amountsByStorage = new Map((items || []).map((item) => [String(item.storage_id), item]));
+  const storages = cache.storages || [];
   return `
     <div class="achievement-builder modal-full">
       <div class="achievement-builder-head">
         <b>Остатки по складам</b>
       </div>
-      <div class="achievement-conditions" data-product-amounts>
-        ${rows.map((item) => productItemActualAmountRow(item)).join("")}
-      </div>
-      <button type="button" class="ghost product-add-amount btn-ghost-secondary" data-add-product-amount>Добавить склад</button>
+      <label class="modal-full"><span>Склады</span><details class="product-storage-multiselect"><summary>Выберите склады</summary><div class="achievement-conditions" data-product-amounts>${storages.length ? storages.map((storage) => productItemActualAmountRow(storage, amountsByStorage.get(String(storage.id)))).join("") : "<p>Сначала создайте склад.</p>"}</div></details></label>
     </div>
   `;
 }
 
 function parseActualAmounts(form) {
   if (!form) return null;
-  const formObject = new FormData(form);
-  const storageIds = formObject.getAll("actual_amount_storage_id");
-  const amounts = formObject.getAll("actual_amount_value");
-  const result = storageIds
-    .map((storageId, index) => ({
-      storage_id: numberOrNull(storageId),
-      amount: numberOrNull(amounts[index]),
-    }))
-    .filter((item) => item.storage_id !== null || item.amount !== null);
-  if (result.some((item) => item.storage_id === null || item.amount === null)) {
+  const result = [...form.querySelectorAll("[data-product-amount-row]")]
+    .filter((row) => row.querySelector("[data-product-amount-storage]")?.checked)
+    .map((row) => ({
+      storage_id: numberOrNull(row.querySelector("[data-product-amount-storage]")?.value),
+      amount: numberOrNull(row.querySelector("[name='actual_amount_value']")?.value),
+    }));
+  if (result.some((item) => item.amount === null)) {
     throw new Error("Для каждого остатка заполните и склад, и количество.");
   }
   return result.length ? result : null;
@@ -1207,7 +1235,16 @@ function openReviewTextModal(item) {
   `);
 }
 
+function storageEventDetailsHtml(item) {
+  const payload = item.payload || {};
+  if ((item.event_type || item.event_name) === "storage_transfer") return escapeHtml(`Товар: ${payload.product_title || "—"}; количество: ${payload.amount ?? 0}; ${payload.source_storage_name || "—"} → ${payload.destination_storage_name || "—"}`);
+  const branch = (cache.branches || []).find((row) => String(row.id) === String(item.branch_id || payload.branch_id));
+  const employee = (cache.users || []).find((row) => String(row.id) === String(item.actor_id || payload.employee_id));
+  return escapeHtml(`Причина: ${payload.reason || "Визит"}; филиал: ${branch?.name || "—"}; сотрудник: ${employee ? userLabelById(employee.id) : "—"}; товар: ${payload.product_title || "—"}; количество: ${payload.amount ?? 0}`);
+}
+
 function eventDetailsHtml(item) {
+  if (item.entity_type === "warehouse") return storageEventDetailsHtml(item);
   if (item.entity_type === "client_review") return reviewEventDetailsHtml(item);
   if (item.entity_type === "client_visit") return eventVisitDetailsHtml(item);
   if (item.entity_type === "client" || item.client_id || item.payload?.client_id) return clientEventDetailsHtml(item);
@@ -1461,6 +1498,21 @@ function userWorkplaceOptions(branchId = "", departmentId = "", selectedWorkplac
   return options.join("");
 }
 
+function workplaceEmployeesMarkup(workplaceId) {
+  const employeeIds = new Set((cache.branchMemberships || [])
+    .filter((membership) => String(membership.workplace_id) === String(workplaceId))
+    .map((membership) => String(membership.user_id)));
+  const employees = (cache.users || []).filter((user) => employeeIds.has(String(user.id)));
+  return `
+    <div class="modal-full workplace-employees">
+      <span>Сотрудники</span>
+      ${employees.length
+        ? `<ul>${employees.map((user) => `<li>${escapeHtml([user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") || user.email || user.phone || `Сотрудник #${user.id}`)}</li>`).join("")}</ul>`
+        : "<p>К рабочему месту пока не привязаны сотрудники.</p>"}
+    </div>
+  `;
+}
+
 function syncWorkplaceForm(scope) {
   const form = scope.closest("[data-workplace-create]") || scope;
   const branch = form.querySelector('[name="branch_id"]');
@@ -1541,6 +1593,7 @@ export async function loadSettingsData(orgId) {
     branchMemberships,
     auditLogs,
     events,
+    storages,
   ] = await Promise.all([
     api.organizations().catch(() => []),
     api.branches(orgId).catch(() => []),
@@ -1560,6 +1613,7 @@ export async function loadSettingsData(orgId) {
     api.branchMemberships(orgId).catch(() => []),
     api.auditLogs(orgId).catch(() => []),
     api.events(orgId).catch(() => []),
+    api.storages(orgId).catch(() => []),
   ]);
   const rolePermissions = Object.fromEntries(await Promise.all(
     roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
@@ -1616,6 +1670,7 @@ export async function loadSettingsData(orgId) {
     rolePermissions,
     auditLogs,
     events,
+    storages,
   };
 }
 
@@ -1718,11 +1773,24 @@ function auditEntityCell(item) {
   return escapeHtml(humanizeCode(entityType));
 }
 
+function isClientCreateEvent(item) {
+  const entityType = String(item.entity_type || "").toLowerCase();
+  if (entityType === "client_visit" || entityType === "client_review") return false;
+  const value = [item.entity_type, item.event_type, item.event_name, item.name, item.action, item.status]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return eventActionType(item) === "create" && /client|\u043a\u043b\u0438\u0435\u043d\u0442/.test(value);
+}
+
 function eventNameCell(item) {
-  const label = humanizeCode(item.event_type || item.event_name || item.name);
-  if (item.entity_type === "client_review") {
-    return `<button type="button" class="ghost" data-open-event-review="${escapeHtml(item.id)}">Отзыв</button>`;
-  }
+  const eventCode = String(item.event_type || item.event_name || item.name || "").toLowerCase();
+  const isStorageEvent = item.entity_type === "warehouse";
+  const label = isStorageEvent ? (/transfer|\u043f\u0435\u0440\u0435\u043d\u043e\u0441/.test(eventCode) ? "\u041f\u0435\u0440\u0435\u043d\u043e\u0441 \u0442\u043e\u0432\u0430\u0440\u0430" : "\u0421\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0441\u043e \u0441\u043a\u043b\u0430\u0434\u0430") : humanizeCode(item.event_type || item.event_name || item.name);
+  const normalizedLabel = String(label).trim().toLowerCase().replace(/\s+/g, " ");
+  if (isStorageEvent) return `<button type="button" class="ghost storage-event-button" data-open-storage-event="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
+  if (isClientCreateEvent(item) || normalizedLabel === "\u043a\u043b\u0438\u0435\u043d\u0442 \u0441\u043e\u0437\u0434\u0430\u043d\u0438\u0435") return `<button type="button" class="ghost event-client-create-button">${escapeHtml(label)}</button>`;
+  if (item.entity_type === "client_review") return `<button type="button" class="ghost" data-open-event-review="${escapeHtml(item.id)}">\u041e\u0442\u0437\u044b\u0432</button>`;
   if (item.entity_type !== "client_visit") return escapeHtml(label);
   return `<button type="button" class="ghost" data-open-event-visit="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
 }
@@ -1732,6 +1800,7 @@ function eventActionType(item) {
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
+  if (item.entity_type === "warehouse" || /storage|storrage|warehouse/.test(value)) return "movement";
   if (/cancel|cancelled|void|отмен/.test(value)) return "cancel";
   if (/create|created|register|создан/.test(value)) return "create";
   if (/complete|completed|perform|paid|accrual|write_off|соверш|заверш|оплат|начисл/.test(value)) return "complete";
@@ -1741,6 +1810,8 @@ function eventActionType(item) {
 function eventRowClass(item) {
   if (item.entity_type === "client_review") return "event-row-review";
   const type = eventActionType(item);
+  if (isClientCreateEvent(item)) return "event-row-client-create";
+  if (type === "movement") return "event-row-storage";
   return type ? `event-row-${type}` : "";
 }
 
@@ -1749,6 +1820,7 @@ function eventsFilterPanel() {
     { value: "create", label: "Создание" },
     { value: "complete", label: "Завершение" },
     { value: "cancel", label: "Отмена" },
+      { value: "movement", label: "Действия по складу" },
   ];
   const selected = options.filter((item) => eventTypeFilters.has(item.value)).map((item) => item.label).join(", ") || "\u0412\u0441\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f";
   return `<div class="events-filter-control"><span>\u0424\u0438\u043b\u044c\u0442\u0440 \u043f\u043e \u0442\u0438\u043f\u0443</span><details class="branch-multiselect-dropdown"><summary><span>${escapeHtml(selected)}</span></summary><div class="branch-multiselect-options">${options.map((item) => `<label class="checkbox"><input type="checkbox" data-event-type-filter value="${item.value}" ${eventTypeFilters.has(item.value) ? "checked" : ""}> ${item.label}</label>`).join("")}</div></details></div>`;
@@ -2422,6 +2494,7 @@ function modalFields(type, item) {
   if (type === "workplace") return `
     <label><span>Название</span><input name="name" value="${escapeHtml(item.name)}" required></label>
     ${selectField("Подразделение", "department_id", cache.departments, item.department_id)}
+    ${workplaceEmployeesMarkup(item.id)}
   `;
   if (type === "module") return `
     <label><span>Название модуля</span><input name="module_name" value="${escapeHtml(item.module_name)}" required></label>
@@ -3130,7 +3203,30 @@ export function bindSettings(root, ctx) {
     previews.insertAdjacentHTML("beforeend", files.map((file) => `<figure class="service-image-preview" data-service-image-pending><img src="${escapeHtml(URL.createObjectURL(file))}" alt="Предпросмотр изображения услуги"></figure>`).join(""));
   };
 
+  root.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-storage-event-modal-close]") || event.target.matches("[data-storage-event-modal]")) { root.querySelector("[data-storage-event-modal]")?.remove(); return; }
+    const button = event.target.closest("[data-open-storage-event]");
+    if (!button) return;
+    const item = (cache.events || []).find((row) => String(row.id) === String(button.dataset.openStorageEvent));
+    const storageId = item?.payload?.source_storage_id || item?.entity_id;
+    if (!storageId) return;
+    root.querySelector("[data-storage-event-modal]")?.remove();
+    root.insertAdjacentHTML("beforeend", `<div class="modal-backdrop" data-storage-event-modal><div class="modal-card"><div class="modal-head"><h3>Доступные остатки товаров склада</h3><button type="button" class="modal-close-icon" data-storage-event-modal-close aria-label="Закрыть">×</button></div><div data-storage-event-products>Загрузка...</div></div></div>`);
+    try {
+      const products = await api.storageProducts(Number(storageId));
+      const node = root.querySelector("[data-storage-event-products]");
+      if (node) node.innerHTML = products.length ? `<div class="table-wrap"><table class="app-table"><thead><tr><th>\u0422\u043e\u0432\u0430\u0440</th><th>\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e</th></tr></thead><tbody>${products.map((product) => `<tr><td>${escapeHtml(product.title)}</td><td>${escapeHtml(product.amount ?? 0)}</td></tr>`).join("")}</tbody></table></div>` : "\u041d\u0430 \u0441\u043a\u043b\u0430\u0434\u0435 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0442\u043e\u0432\u0430\u0440\u043e\u0432.";
+    } catch (error) {
+      const node = root.querySelector("[data-storage-event-products]");
+      if (node) node.textContent = error.message;
+    }
+  });
+
   root.addEventListener("input", (event) => {
+    if (event.target.matches("[data-service-staff-search]")) {
+      syncServiceStaffTable(event.target.closest("[data-service-staff-editor]"));
+      return;
+    }
     if (event.target.matches("[data-user-search]")) {
       userSearchQuery = event.target.value || "";
       userPage = 1;
@@ -3765,6 +3861,10 @@ export function bindSettings(root, ctx) {
       return;
     }
     if (event.target.matches("[data-hide-inactive-service-staff]")) {
+      syncServiceStaffTable(event.target.closest("[data-service-staff-editor]"));
+      return;
+    }
+    if (event.target.matches("[data-service-staff-filter-branch], [data-service-staff-filter-role], [data-service-staff-filter-department], [data-service-staff-filter-workplace]")) {
       syncServiceStaffTable(event.target.closest("[data-service-staff-editor]"));
       return;
     }

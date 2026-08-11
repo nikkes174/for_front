@@ -62,6 +62,7 @@ const SETTINGS_MENU_SECTIONS = [
 const CATALOG_MENU_SECTIONS = [
   { slug: "products", label: "Товары", permissions: ["settings.categories.view", "settings.items.view"] },
   { slug: "services", label: "Услуги", permissions: ["settings.categories.view", "settings.items.view"] },
+  { slug: "warehouse", label: "Склад", permissions: ["settings.items.view"] },
 ];
 
 const LOYALTY_MENU_SECTIONS = [
@@ -102,7 +103,7 @@ function route() {
   if (parts[0] === "login" || parts[0] === "register") return { page: "auth" };
   if (parts[0] === "onboarding") return { page: "onboarding" };
   if (parts[0] !== "organizations") return { page: "home" };
-  return { page: parts[2] || "dashboard", orgId: Number(parts[1]), extra: parts[3] || "" };
+  return { page: parts[2] || "dashboard", orgId: Number(parts[1]), extra: parts[3] || "", subpage: parts[4] || "" };
 }
 
 
@@ -1020,7 +1021,7 @@ function navigate(path) {
 }
 
 function reload() {
-  draw({ live: true });
+  return draw({ live: true });
 }
 
 async function restoreStoredSession() {
@@ -1079,7 +1080,7 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "settings" && !canAny(SETTINGS_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "catalog" && !canAny(["settings.categories.view", "settings.items.view"])) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
-  if (routeInfo.page === "catalog") return ["Товары и услуги", await catalog(ctx, routeInfo.extra || "products")];
+  if (routeInfo.page === "catalog") return ["Товары и услуги", await catalog(ctx, routeInfo.extra || "products", routeInfo.subpage || "")];
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
   if (routeInfo.page === "notifications") return ["Лояльность", await loyalty(ctx, "notifications")];
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];

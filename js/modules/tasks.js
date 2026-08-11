@@ -7,6 +7,7 @@ const statusLabels = {
   queued: "В очереди",
   running: "В работе",
   completed: "Готово",
+  stopped: "Остановлена",
   failed: "Ошибка",
 };
 
@@ -42,6 +43,16 @@ function progressBar(job) {
   `;
 }
 
+function isPushJob(job) {
+  return ["push_broadcast", "push_notification", "send_push_notification", "notification_broadcast"].includes(job.type);
+}
+
+function stopButton(job) {
+  if (!["queued", "running"].includes(job.status)) return "";
+  const type = isPushJob(job) ? "push" : "worker";
+  return `<button type="button" class="client-delete-button" data-task-stop="${escapeHtml(job.id)}" data-task-type="${type}">Остановить</button>`;
+}
+
 function taskRows(jobs) {
   return jobs.length
     ? jobs.map((job) => `
@@ -52,9 +63,10 @@ function taskRows(jobs) {
         <td>${escapeHtml(jobResult(job))}</td>
         <td>${escapeHtml(job.message || "-")}</td>
         <td>${escapeHtml(formatDate(job.updated_at))}</td>
+        <td>${stopButton(job)}</td>
       </tr>
     `).join("")
-    : `<tr><td colspan="6">Фоновых задач пока нет.</td></tr>`;
+    : `<tr><td colspan="7">Фоновых задач пока нет.</td></tr>`;
 }
 
 async function loadJobs(orgId) {
@@ -80,6 +92,7 @@ export async function tasks(ctx) {
             <th>Результат</th>
             <th>Сообщение</th>
             <th>Обновлено</th>
+            <th></th>
           </tr>
         </thead>
         <tbody data-task-jobs>${taskRows(jobs)}</tbody>
@@ -91,6 +104,20 @@ export async function tasks(ctx) {
 export function bindTasks(root, ctx) {
   let isRefreshing = false;
   if (refreshTimer) window.clearInterval(refreshTimer);
+  root.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-task-stop]");
+    if (!button) return;
+    button.disabled = true;
+    try {
+      if (button.dataset.taskType === "push") await api.stopPushNotificationJob(button.dataset.taskStop, ctx.org.id);
+      else await api.stopWorkerJob(button.dataset.taskStop, ctx.org.id);
+      const tableBody = root.querySelector("[data-task-jobs]");
+      if (tableBody) tableBody.innerHTML = taskRows(await loadJobs(ctx.org.id));
+    } catch (error) {
+      button.disabled = false;
+      console.error(error);
+    }
+  });
   refreshTimer = window.setInterval(async () => {
     const tableBody = root.querySelector("[data-task-jobs]");
     if (!location.pathname.includes("/tasks") || !tableBody || isRefreshing) return;

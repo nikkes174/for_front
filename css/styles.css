@@ -1171,6 +1171,22 @@ button:active { transform: translateY(1px); }
   transform: none;
 }
 .subpanel table .actions { vertical-align: middle; }
+.warehouse-actions-popover { position: relative; display: inline-flex; }
+.warehouse-actions-settings { display: inline-grid; width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 8px; place-items: center; border: 0; border-radius: 7px; background: transparent; }
+.warehouse-actions-settings:hover { background: #eef2f7; }
+.warehouse-actions-settings img { display: block; width: 24px; height: 24px; }
+.warehouse-actions-menu { position: absolute; z-index: 20; top: 0; right: calc(100% - 1px); display: none; gap: 8px; min-width: max-content; padding: 8px; border: 1px solid #dce3ee; border-radius: 8px; background: #fff; box-shadow: 0 10px 24px rgb(16 24 40 / 16%); }
+.warehouse-actions-popover:hover .warehouse-actions-menu, .warehouse-actions-popover:focus-within .warehouse-actions-menu, .warehouse-actions-popover.is-open .warehouse-actions-menu { display: flex; }
+.warehouse-actions-menu .client-delete-button { white-space: nowrap; }
+.warehouse-product-results { display: grid; gap: 8px; max-height: 280px; overflow: auto; }
+.warehouse-product-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 100px; gap: 8px; align-items: center; min-width: 0; }
+.product-storage-multiselect { position: relative; }
+.product-storage-multiselect summary { min-height: 40px; padding: 10px 12px; border: 1px solid #dce3ee; border-radius: 8px; background: #fff; cursor: pointer; }
+.product-storage-multiselect[open] summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.product-storage-multiselect .achievement-conditions { padding: 10px; border: 1px solid #dce3ee; border-top: 0; border-radius: 0 0 8px 8px; background: #fff; }
+.product-storage-select-row { grid-template-columns: minmax(0, 1fr) minmax(120px, .6fr); }
+.product-storage-select-row input[type="checkbox"] { width: 14px; min-width: 14px; height: 14px; margin: 0 6px 0 0; vertical-align: middle; }
+@media (max-width: 640px) { .warehouse-create-form { grid-template-columns: 1fr; } .warehouse-product-row { grid-template-columns: auto minmax(0, 1fr); } .warehouse-actions-menu { right: 0; top: 100%; } }
 .loyalty-rules-section table .loyalty-rule-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
@@ -1504,8 +1520,12 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
   text-align: center;
 }
 .event-row-create > td:first-child > button { border-color: #d0d5dd; background: #f2f4f7; }
+.event-row-client-create > td:first-child > button,
+.event-client-create-button { border-color: #86efac !important; background: transparent !important; }
 .event-row-complete > td:first-child > button { border-color: #86efac; background: #dcfce7; }
 .event-row-cancel > td:first-child > button { border-color: #fca5a5; background: #fee2e2; }
+.event-row-storage > td:first-child > button { border-color: #f59f00; background: #f59f00; color: #fff; }
+.storage-event-button { border-color: #f59f00 !important; background: #f59f00 !important; color: #fff !important; }
 .event-row-review > td:first-child > button { border-color: #facc15; background: #fef3c7; }
 
 .product-create-submit {
