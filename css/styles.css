@@ -1178,6 +1178,8 @@ button:active { transform: translateY(1px); }
 .warehouse-actions-menu { position: absolute; z-index: 20; top: 0; right: calc(100% - 1px); display: none; gap: 8px; min-width: max-content; padding: 8px; border: 1px solid #dce3ee; border-radius: 8px; background: #fff; box-shadow: 0 10px 24px rgb(16 24 40 / 16%); }
 .warehouse-actions-popover:hover .warehouse-actions-menu, .warehouse-actions-popover:focus-within .warehouse-actions-menu, .warehouse-actions-popover.is-open .warehouse-actions-menu { display: flex; }
 .warehouse-actions-menu .client-delete-button { white-space: nowrap; }
+.warehouse-subdivision-actions { width: 56px; min-width: 56px; text-align: right; }
+.warehouse-subdivision-actions .client-delete-icon-button { margin-left: auto; }
 .warehouse-product-results { display: grid; gap: 8px; max-height: 280px; overflow: auto; }
 .warehouse-product-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 100px; gap: 8px; align-items: center; min-width: 0; }
 .product-storage-multiselect { position: relative; }
