@@ -119,9 +119,9 @@ function datePickerMarkup(rangeStart = new Date(), rangeEnd = rangeStart) {
   }).join("");
   return `<div class="booking-date-picker" data-booking-date-picker hidden>
     <div class="booking-picker-head">
-      <button type="button" class="ghost" data-booking-picker-month="-1">‹</button>
+      <button type="button" class="primary" data-booking-picker-month="-1">‹</button>
       <strong>${MONTH_NAMES[month.getMonth()]} ${month.getFullYear()}</strong>
-      <button type="button" class="ghost" data-booking-picker-month="1">›</button>
+      <button type="button" class="primary" data-booking-picker-month="1">›</button>
     </div>
     <div class="booking-picker-weekdays"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
     <div class="booking-picker-days">${dayButtons}</div>
@@ -705,9 +705,9 @@ export async function booking(ctx) {
           </button>
         </div>
         <div class="booking-nav">
-        <button type="button" class="ghost" data-booking-period-navigation="-1">‹</button>
-        <button type="button" class="btn btn-outline-secondary booking-calendar-toggle" data-booking-calendar-toggle aria-expanded="false">Календарь</button>
-        <button type="button" class="ghost" data-booking-period-navigation="1">›</button>
+        <button type="button" class="primary" data-booking-period-navigation="-1">‹</button>
+        <button type="button" class="primary booking-calendar-toggle" data-booking-calendar-toggle aria-expanded="false">Календарь</button>
+        <button type="button" class="primary" data-booking-period-navigation="1">›</button>
         <strong>${rangeStart.getDate()} ${MONTH_NAMES[rangeStart.getMonth()]} — ${rangeEnd.getDate()} ${MONTH_NAMES[rangeEnd.getMonth()]}</strong>
         ${bookingSlotIntervalSettings(data)}
         ${datePickerMarkup(rangeStart, rangeEnd)}
