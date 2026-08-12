@@ -1506,7 +1506,24 @@ function workplaceEmployeesMarkup(workplaceId) {
     <div class="modal-full workplace-employees">
       <span>Сотрудники</span>
       ${employees.length
-        ? `<ul>${employees.map((user) => `<li>${escapeHtml([user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") || user.email || user.phone || `Сотрудник #${user.id}`)}</li>`).join("")}</ul>`
+        ? `<ul>${employees.map((user) => {
+    const userName = [user.last_name, user.first_name, user.middle_name]
+      .filter(Boolean)
+      .join(" ") || user.email || user.phone || `Сотрудник #${user.id}`;
+
+    return `
+      <li>
+        <button
+          type="button"
+          class="workplace-employee-link"
+          data-open-workplace-employee
+          data-user-id="${escapeHtml(user.id)}"
+        >
+          ${escapeHtml(userName)}
+        </button>
+      </li>
+    `;
+  }).join("")}</ul>`
         : "<p>К рабочему месту пока не привязаны сотрудники.</p>"}
     </div>
   `;
@@ -3751,6 +3768,15 @@ export function bindSettings(root, ctx) {
   document.addEventListener("click", async (event) => {
     if (handleAchievementConditionClick(event)) return;
     if (handleProductAmountClick(event)) return;
+
+    const workplaceEmployeeButton = event.target.closest("[data-open-workplace-employee]");
+    if (workplaceEmployeeButton) {
+      const user = findEntity("user", workplaceEmployeeButton.dataset.userId);
+      if (user) {
+        await openEntityModal("user", user);
+      }
+      return;
+    }
 
     if (event.target.matches("[data-event-visit-modal]")) {
       selectedEventVisit = null;

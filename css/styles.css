@@ -2564,6 +2564,31 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .organization-bot-status.text-fg-success-strong {
   color: #067647;
 }
+
+.workplace-employee-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4299e1;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workplace-employee-link:hover {
+  background: transparent;
+  color: #3182ce;
+  text-decoration: underline;
+}
+
+.workplace-employee-link:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid #4299e1;
+  outline-offset: 3px;
+}
 .organization-bot-actions { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; }
 .organization-bot-token { display: grid; gap: 5px; min-width: 160px; color: #51637b; font-size: 12px; }
 .organization-bot-token input { height: 40px; }
