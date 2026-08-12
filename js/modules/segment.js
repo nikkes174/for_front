@@ -11,6 +11,18 @@ const SEGMENT_VARIABLES = [
   { key: "notifications_enabled", label: "Включены уведомления", columnLabel: "Уведомления", type: "boolean" },
   { key: "birth_date", label: "Дата рождения", columnLabel: "Дата рождения", type: "date" },
 ];
+
+const segmentState = {
+  organizationId: null,
+  clients: [],
+  selectedVariables: [],
+  search: "",
+  sort: "name",
+  direction: "asc",
+  page: 1,
+  pageSize: 10,
+};
+
 function formatClientName(client) {
   if (!client) return "";
   const fullName = [client.last_name, client.first_name, client.middle_name]
@@ -655,4 +667,3 @@ function renderTableContent(container) {
   `;
 }
 
-export { segment, bindSegment };

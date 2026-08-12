@@ -1491,7 +1491,7 @@ export async function clients(ctx) {
   const search = filters.search;
   const selectedClientId = params.get("client_id") || "";
   const [items, branches, departments, workplaces, users, memberships, branchMemberships, roles, segments, productCategories, productItems, registrationLink] = await Promise.all([
-    api.clients(ctx.org.id, { offset: 0, limit: 10000 }).catch(() => []),
+    api.clients(ctx.org.id, { offset: 0, limit: 1000 }).catch(() => []),
     api.branches(ctx.org.id).catch(() => []),
     api.departments(ctx.org.id).catch(() => []),
     api.workplaces(ctx.org.id).catch(() => []),
