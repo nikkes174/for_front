@@ -453,21 +453,74 @@ function clientCardSectionsStorageKey(orgId) {
   return `${CLIENT_CARD_SECTIONS_STORAGE_PREFIX}${orgId || "default"}`;
 }
 
+function isClientProfileConfigSection(section) {
+  const name = String(section || "");
+
+  return name === "client_fields_configured"
+    || (
+      name.startsWith(CLIENT_FIELD_SECTION_PREFIX)
+      && REGISTRATION_FIELD_NAMES.includes(
+        name.slice(CLIENT_FIELD_SECTION_PREFIX.length)
+      )
+    );
+}
+
+function storedClientCardSections(orgId) {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(clientCardSectionsStorageKey(orgId)) || "null"
+    );
+
+    return Array.isArray(saved)
+      ? normalizeClientCardSections(saved)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeClientCardSections(sections) {
   if (!Array.isArray(sections)) return [...DEFAULT_CLIENT_CARD_SECTIONS];
   return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || name === "client_fields_configured" || (String(name).startsWith(CLIENT_FIELD_SECTION_PREFIX) && REGISTRATION_FIELD_NAMES.includes(String(name).slice(CLIENT_FIELD_SECTION_PREFIX.length))) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
 }
 
 function enabledClientCardSections(orgId) {
+  const storedSections = storedClientCardSections(orgId);
+
   if (Array.isArray(loyaltyState.clientCardSections)) {
-    return normalizeClientCardSections(loyaltyState.clientCardSections);
+    const apiSections = normalizeClientCardSections(
+      loyaltyState.clientCardSections
+    );
+
+    const apiHasProfileConfiguration = apiSections.includes(
+      "client_fields_configured"
+    );
+
+    if (apiHasProfileConfiguration) {
+      return apiSections;
+    }
+
+    const storedProfileSections = (storedSections || [])
+      .filter(isClientProfileConfigSection);
+
+    if (
+      storedProfileSections.includes("client_fields_configured")
+    ) {
+      return [
+        ...new Set([
+          ...apiSections,
+          ...storedProfileSections,
+        ]),
+      ];
+    }
+
+    return apiSections;
   }
-  try {
-    const saved = JSON.parse(localStorage.getItem(clientCardSectionsStorageKey(orgId)) || "null");
-    if (Array.isArray(saved)) return normalizeClientCardSections(saved);
-  } catch {
-    // Ignore broken local settings and fall back to defaults.
+
+  if (storedSections) {
+    return storedSections;
   }
+
   return [...DEFAULT_CLIENT_CARD_SECTIONS];
 }
 
