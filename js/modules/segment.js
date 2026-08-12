@@ -120,6 +120,82 @@ function getVariableConfig(key) {
   return SEGMENT_VARIABLES.find((v) => v.key === key);
 }
 
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function getClientValue(client, key) {
+  switch (key) {
+    case "visits_count":
+      return firstDefined(
+        client.visits_count,
+        client.visit_count,
+        client.total_visits,
+        client.metrics?.visits_count,
+        client.metric?.visits_count
+      );
+
+    case "spent_amount":
+      return firstDefined(
+        client.spent_amount,
+        client.total_spent,
+        client.purchase_amount,
+        client.metrics?.paid_amount,
+        client.metrics?.sold_amount,
+        client.metric?.paid_amount,
+        client.metric?.sold_amount
+      );
+
+    case "has_phone": {
+      const backendValue = firstDefined(client.has_phone);
+
+      if (backendValue !== null) {
+        return Boolean(backendValue);
+      }
+
+      return [
+        client.primary_phone,
+        client.secondary_phone,
+        client.phone,
+      ].some((value) => String(value || "").trim());
+    }
+
+    case "app_installed":
+      return firstDefined(
+        client.app_installed,
+        client.application_installed,
+        client.push_subscription_exists,
+        client.push_notifications_enabled
+      );
+
+    case "telegram_id":
+      return firstDefined(
+        client.telegram_id,
+        client.tg_id
+      );
+
+    case "max_id":
+      return firstDefined(client.max_id);
+
+    case "notifications_enabled":
+      return firstDefined(
+        client.notifications_enabled,
+        client.push_notifications_enabled
+      );
+
+    case "birth_date":
+      return firstDefined(client.birth_date);
+
+    default:
+      return null;
+  }
+}
+
 function variableCellContent(client, key) {
   const variable = getVariableConfig(key);
   const value = getClientValue(client, key);
@@ -169,7 +245,7 @@ function renderTableHeader() {
       </th>
     `;
   };
-  let headers = `<th><div class="table-sort-label">Клиент</div></th>`;
+  let headers = sortButton("name", "Клиент");
   for (const key of selectedVariables) {
     const variable = SEGMENT_VARIABLES.find((v) => v.key === key);
     if (variable) {
@@ -190,7 +266,7 @@ function renderTableBody() {
     for (const key of segmentState.selectedVariables) {
       cells += `<td>${variableCellContent(client, key)}</td>`;
     }
-    return `<tr data-storage-table-row>${cells}</tr>`;
+    return `<tr data-segment-table-row>${cells}</tr>`;
   }).join("");
   return `<tbody data-segmentation-table-body>${rows}</tbody>`;
 }
@@ -343,7 +419,7 @@ export async function segment(ctx) {
   segmentState.page = 1;
   segmentState.pageSize = 10;
   try {
-    const clients = await api.clients(ctx.org.id, { offset: 0, limit: 10000 });
+    const clients = await api.segmentClients(ctx.org.id, { offset: 0, limit: 10000 });
     segmentState.clients = Array.isArray(clients) ? clients : [];
     return renderSegmentPage([], null);
   } catch (err) {
@@ -359,11 +435,13 @@ export function bindSegment(root, ctx) {
     const container = event.target.closest("[data-segmentation]");
     if (!container) return;
 
-    const sortButton = event.target.closest("[data-segment-sort]");
+const sortButton = event.target.closest("[data-segment-sort]");
     if (sortButton) {
       const key = sortButton.dataset.segmentSort;
-      const currentDirection = sortButton.dataset.segmentDirection;
-      const newDirection = currentDirection === "asc" ? "desc" : "asc";
+      const newDirection =
+        segmentState.sort === key && segmentState.direction === "asc"
+          ? "desc"
+          : "asc";
       segmentState.sort = key;
       segmentState.direction = newDirection;
       segmentState.page = 1;
@@ -566,7 +644,7 @@ function renderTableContent(container) {
       for (const key of selectedVariables) {
         cells += `<td>${variableCellContent(client, key)}</td>`;
       }
-      return `<tr data-storage-table-row>${cells}</tr>`;
+      return `<tr data-segment-table-row>${cells}</tr>`;
     }).join("");
   }
   tableContainer.innerHTML = `

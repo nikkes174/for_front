@@ -20,6 +20,7 @@ from client_circout.backend.client_segments.service.segment_recalculation_servic
 )
 from client_circout.backend.client_segments.service.segment_rules_service import SegmentRulesService
 from client_circout.backend.client_segments.service.segment_service import SegmentService
+from client_circout.backend.client_segments.service.segment_table_service import SegmentTableService
 from client_circout.backend.client_segments.service.segment_trigger_service import SegmentTriggerService
 from client_circout.backend.config import LOYLYTY_API_URL
 from client_circout.backend.db.db import SessionFactory
@@ -169,4 +170,16 @@ def get_segment_data_provider(
 SegmentDataProviderDep = Annotated[
     SegmentExternalDataProvider,
     Depends(get_segment_data_provider),
+]
+
+
+def get_segment_table_service(
+    session: ClientSegmentsSessionDep,
+) -> SegmentTableService:
+    return SegmentTableService(session)
+
+
+SegmentTableServiceDep = Annotated[
+    SegmentTableService,
+    Depends(get_segment_table_service),
 ]

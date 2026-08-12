@@ -18,6 +18,7 @@ from client_circout.backend.client_segments.dependencies import (
     SegmentRecalculationServiceDep,
     SegmentRulesServiceDep,
     SegmentServiceDep,
+    SegmentTableServiceDep,
     SegmentTriggerServiceDep,
 )
 from client_circout.backend.client_segments.schemas import (
@@ -27,6 +28,7 @@ from client_circout.backend.client_segments.schemas import (
     ClientSegmentMemberUpdateSchema,
     ClientSegmentReadSchema,
     ClientSegmentUpdateSchema,
+    SegmentTableClientRead,
 )
 from client_circout.backend.client_segments.service.exceptions import (
     SegmentMemberNotFoundError,
@@ -313,6 +315,27 @@ async def recalculate_dynamic_segments(
         _raise_http_error(exc)
 
     return [_recalculation_read(result) for result in results]
+
+
+@router.get(
+    "/table/clients",
+    response_model=list[SegmentTableClientRead],
+)
+async def list_segment_table_clients(
+    service: SegmentTableServiceDep,
+    organization_id: int = Query(..., ge=1),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10000, ge=1, le=10000),
+) -> list[SegmentTableClientRead]:
+    rows = await service.list_clients(
+        organization_id=organization_id,
+        offset=offset,
+        limit=limit,
+    )
+    return [
+        SegmentTableClientRead.model_validate(row)
+        for row in rows
+    ]
 
 
 @router.get(

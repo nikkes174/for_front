@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -57,3 +58,27 @@ class ClientSegmentMemberReadSchema(ClientSegmentMemberBaseSchema):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+class SegmentTableClientRead(BaseModel):
+    id: int
+
+    full_name: str | None = None
+    last_name: str | None = None
+    first_name: str | None = None
+    middle_name: str | None = None
+
+    primary_phone: str | None = None
+    secondary_phone: str | None = None
+    email: str | None = None
+
+    telegram_id: int | None = None
+    max_id: int | None = None
+    birth_date: date | None = None
+
+    visits_count: int | None = None
+    spent_amount: Decimal | None = None
+
+    has_phone: bool
+    app_installed: bool
+    notifications_enabled: bool

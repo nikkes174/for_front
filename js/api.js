@@ -275,6 +275,20 @@ export const api = {
   updateFinanceAdditionalPlanAssignment: (orgId, employeeId, planId) => request(`/finanse-api/additional-plan-assignments/${orgId}/employees/${employeeId}`, { method: "PUT", body: JSON.stringify({ plan_id: planId || null }) }),
   clientAccounts: (id) => request(`/crm-api/client-accounts/clients/${id}`),
   clientSegments: (orgId) => request(`/crm-api/client-segments?organization_id=${orgId}`),
+  segmentClients: (
+    organizationId,
+    { offset = 0, limit = 10000 } = {}
+  ) => {
+    const params = new URLSearchParams({
+      organization_id: organizationId,
+      offset,
+      limit,
+    });
+
+    return request(
+      `/crm-api/client-segments/table/clients?${params}`
+    );
+  },
   clientCategories: (id) => request(`/crm-api/clients-core/category-links?client_id=${id}`),
   clientAdditionalFieldValues: (id) => request(`/crm-api/clients-core/additional-field-values?client_id=${id}`),
   clientBranches: (id) => request(`/crm-api/clients-core/branches?client_id=${id}`),
