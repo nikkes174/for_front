@@ -10,6 +10,7 @@ import { settings, bindSettings } from "./modules/settings.js";
 import { tasks, bindTasks } from "./modules/tasks.js";
 import { booking, bindBooking } from "./modules/booking.js";
 import { finance, bindFinance } from "./modules/finance.js";
+import { segment, bindSegment } from "./modules/segment.js";
 import { breakdown, bindBreakdown } from "./modules/breakdown.js";
 
 const LAST_ORG_KEY = "loyalty.lastOrganizationId";
@@ -68,6 +69,7 @@ const CATALOG_MENU_SECTIONS = [
 const LOYALTY_MENU_SECTIONS = [
   { slug: "", label: "Система лояльности", permissions: LOYALTY_PERMISSIONS },
   { slug: "cards", label: "Карточки", permissions: ["loyalty.transactions.view"] },
+  { slug: "segment", label: "Сегментация", permissions: ["loyalty.transactions.view"] },
   { slug: "achievements", label: "Достижения", permissions: ["settings.achievements.view"] },
   { slug: "notifications", label: "Рассылки", permissions: ["notifications.notifications.view"] },
 ];
@@ -1081,6 +1083,9 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "catalog" && !canAny(["settings.categories.view", "settings.items.view"])) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
   if (routeInfo.page === "catalog") return ["Товары и услуги", await catalog(ctx, routeInfo.extra || "products", routeInfo.subpage || "")];
+  if (routeInfo.page === "loyalty" && routeInfo.extra === "segment") {
+    return ["Сегментация", await segment(ctx)];
+  }
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
   if (routeInfo.page === "notifications") return ["Лояльность", await loyalty(ctx, "notifications")];
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
@@ -1394,6 +1399,7 @@ bindOnboarding(root, { navigate });
 bindClients(root, { get org() { return state.org; }, navigate, reload });
 bindCatalog(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
+bindSegment(root, { get org() { return state.org; }, navigate, reload });
 bindNotifications(root, { get org() { return state.org; }, navigate, reload });
 bindSettings(root, { get org() { return state.org; }, navigate, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
