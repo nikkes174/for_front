@@ -1186,6 +1186,29 @@ button:active { transform: translateY(1px); }
 form[data-storage-subdivision-edit-form] > .standard-save-button { align-self: end; }
 .warehouse-storage-actions { width: 56px; min-width: 56px; text-align: right; }
 .warehouse-storage-actions .warehouse-actions-popover { margin-left: auto; }
+
+.warehouse-storage-name {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+
+.warehouse-storage-name strong {
+  color: #172033;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.warehouse-storage-subdivision {
+  color: #667085;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+[data-storage-table-sort] {
+  width: 100%;
+}
 .warehouse-product-results { display: grid; gap: 8px; max-height: 280px; overflow: auto; }
 .warehouse-product-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 100px; gap: 8px; align-items: center; min-width: 0; }
 .product-storage-multiselect { position: relative; }
