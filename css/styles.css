@@ -1386,6 +1386,16 @@ form[data-storage-subdivision-edit-form] > .standard-save-button { align-self: e
 [data-storage-table-row] .warehouse-storage-actions { cursor: default; }
 [data-storage-product-edit] { cursor: pointer; }
 
+.warehouse-subdivision-storages {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.warehouse-subdivision-storages h4 { margin: 0; }
+.warehouse-subdivision-storages [data-subdivision-storage-open] { cursor: pointer; }
+.warehouse-subdivision-storages [data-subdivision-storage-open]:hover { background: #f7f9fc; }
+
 .warehouse-storage-filters {
   display: flex;
   align-items: end;
