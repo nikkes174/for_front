@@ -1416,10 +1416,10 @@ button:active { transform: translateY(1px); }
 }
 
 .warehouse-subdivision-menu {
-  position: absolute;
-  z-index: 30;
-  top: -12px;
-  left: calc(100% - 1px);
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
 
   display: none;
   width: 320px;
@@ -1542,10 +1542,10 @@ button:active { transform: translateY(1px); }
 }
 
 .warehouse-subdivision-storage-menu {
-  position: absolute;
-  z-index: 31;
-  top: -8px;
-  left: calc(100% - 1px);
+  position: fixed;
+  z-index: 1010;
+  top: 0;
+  left: 0;
 
   display: none;
   width: 280px;
@@ -1568,7 +1568,7 @@ button:active { transform: translateY(1px); }
 .warehouse-subdivision-storage-popover:focus-within
 .warehouse-subdivision-storage-menu {
   display: block;
-  z-index: 70;
+  z-index: 1010;
 }
 
 .warehouse-subdivision-storage-popover:hover,
@@ -1715,7 +1715,7 @@ button:active { transform: translateY(1px); }
 .product-storage-multiselect .achievement-conditions { padding: 10px; border: 1px solid #dce3ee; border-top: 0; border-radius: 0 0 8px 8px; background: #fff; }
 .product-storage-select-row { grid-template-columns: minmax(0, 1fr) minmax(120px, .6fr); }
 .product-storage-select-row input[type="checkbox"] { width: 14px; min-width: 14px; height: 14px; margin: 0 6px 0 0; vertical-align: middle; }
-@media (max-width: 640px) { .warehouse-create-form { grid-template-columns: 1fr; } .warehouse-product-row { grid-template-columns: auto minmax(0, 1fr); } .warehouse-actions-menu { right: 0; top: 100%; } .warehouse-subdivision-menu, .warehouse-subdivision-storage-menu { left: 0; right: auto; } .warehouse-subdivision-menu { top: 100%; } .warehouse-subdivision-storage-menu { top: 100%; } }
+@media (max-width: 640px) { .warehouse-create-form { grid-template-columns: 1fr; } .warehouse-product-row { grid-template-columns: auto minmax(0, 1fr); } .warehouse-actions-menu { right: 0; top: 100%; } }
 .loyalty-rules-section table .loyalty-rule-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;

@@ -446,6 +446,126 @@ export function bindWarehouse(root, ctx) {
     }
   }
 
+  function positionSubdivisionMenu(popover) {
+    if (!popover) return;
+
+    const trigger = popover.querySelector(
+      ".warehouse-subdivision-trigger"
+    );
+
+    const menu = popover.querySelector(
+      ".warehouse-subdivision-menu"
+    );
+
+    if (!trigger || !menu) return;
+
+    requestAnimationFrame(() => {
+      const triggerRect = trigger.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+
+      const gap = 8;
+      const edge = 12;
+
+      let left = triggerRect.right + gap;
+
+      if (
+        left + menuRect.width >
+        window.innerWidth - edge
+      ) {
+        left =
+          triggerRect.left
+          - menuRect.width
+          - gap;
+      }
+
+      left = Math.max(
+        edge,
+        Math.min(
+          left,
+          window.innerWidth - menuRect.width - edge
+        )
+      );
+
+      let top = triggerRect.top - 12;
+
+      top = Math.max(
+        edge,
+        Math.min(
+          top,
+          window.innerHeight - menuRect.height - edge
+        )
+      );
+
+      menu.style.left = `${Math.round(left)}px`;
+      menu.style.top = `${Math.round(top)}px`;
+    });
+  }
+
+  function positionSubdivisionStorageMenu(storagePopover) {
+    if (!storagePopover) return;
+
+    const trigger = storagePopover.querySelector(
+      ".warehouse-subdivision-storage-trigger"
+    );
+
+    const menu = storagePopover.querySelector(
+      ".warehouse-subdivision-storage-menu"
+    );
+
+    if (!trigger || !menu) return;
+
+    requestAnimationFrame(() => {
+      const triggerRect = trigger.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+
+      const gap = 8;
+      const edge = 12;
+
+      let left = triggerRect.right + gap;
+
+      if (
+        left + menuRect.width >
+        window.innerWidth - edge
+      ) {
+        left =
+          triggerRect.left
+          - menuRect.width
+          - gap;
+      }
+
+      left = Math.max(
+        edge,
+        Math.min(
+          left,
+          window.innerWidth - menuRect.width - edge
+        )
+      );
+
+      let top = triggerRect.top - 8;
+
+      top = Math.max(
+        edge,
+        Math.min(
+          top,
+          window.innerHeight - menuRect.height - edge
+        )
+      );
+
+      menu.style.left = `${Math.round(left)}px`;
+      menu.style.top = `${Math.round(top)}px`;
+    });
+  }
+
+  root.addEventListener("pointerover", (event) => {
+    const subdivisionPopover = event.target.closest(
+      "[data-subdivision-popover]"
+    );
+
+    if (!subdivisionPopover) return;
+
+    positionSubdivisionMenu(subdivisionPopover);
+  });
+
   root.addEventListener("pointerover", (event) => {
     const storageTrigger = event.target.closest(
       "[data-subdivision-storage-hover]"
@@ -458,8 +578,12 @@ export function bindWarehouse(root, ctx) {
         "[data-subdivision-storage-popover]"
       );
 
+    if (!storagePopover) return;
+
+    positionSubdivisionStorageMenu(storagePopover);
+
     const productsMenu =
-      storagePopover?.querySelector(
+      storagePopover.querySelector(
         "[data-subdivision-storage-products]"
       );
 
@@ -475,6 +599,20 @@ export function bindWarehouse(root, ctx) {
   root.addEventListener("click", async (e) => { const button = e.target.closest("[data-storage-transfer]"); if (!button) return; const rows = await api.storages(ctx.org.id); const source = rows.find((r) => Number(r.id) === Number(button.dataset.storageTransfer)); if (!source) return; const destinations = rows.filter((r) => Number(r.id) !== Number(source.id)); putModal(root, modal("Переместить товары", `<form class="modal-grid" data-storage-transfer-form data-id="${source.id}"><div>${esc(source.name)}</div><input type="search" data-storage-product-search data-storage-id="${source.id}" placeholder="Введите название товара"><div data-storage-product-results></div><label><span>Склад назначения</span><select name="destination_storage_id" required><option value="">Выберите склад</option>${destinations.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></label><p data-message>${destinations.length ? "" : "Нет другого склада для перемещения."}</p><button class="primary standard-save-button"${destinations.length ? "" : " disabled"}>Переместить</button></form>`)); });
   root.addEventListener("submit", async (e) => { const form = e.target; if (!form.matches("[data-storage-transfer-form]")) return; e.preventDefault(); const items = [...form.querySelectorAll("[data-storage-product-select]:checked")].map((checkbox) => { const id = checkbox.dataset.storageProductSelect; const input = form.querySelector(`[data-storage-product-amount="${id}"]`); return { product_item_id: Number(id), amount: Number(input?.value), available: Number(input?.max) }; }); const destination = Number(new FormData(form).get("destination_storage_id")); if (!destination || !items.length) { form.querySelector("[data-message]").textContent = "Выберите склад и товары с количеством больше нуля."; return; } if (items.some((item) => !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > item.available)) { form.querySelector("[data-message]").textContent = "Количество товара должно быть больше нуля и не превышать остаток на складе."; return; } try { await api.transferStorageProducts(Number(form.dataset.id), { destination_storage_id: destination, items: items.map(({ product_item_id, amount }) => ({ product_item_id, amount })) }); root.querySelector("[data-warehouse-modal]")?.remove(); await ctx.reload(); } catch (err) { form.querySelector("[data-message]").textContent = err.message; } });
   root.addEventListener("keydown", (e) => { if (e.key !== "Escape") return; const openModal = root.querySelector("[data-warehouse-modal]"); if (openModal && !openModal.hasAttribute("data-warehouse-close-only")) { openModal.remove(); } });
+
+  window.addEventListener("resize", () => {
+    root
+      .querySelectorAll(
+        "[data-subdivision-popover]:hover"
+      )
+      .forEach(positionSubdivisionMenu);
+
+    root
+      .querySelectorAll(
+        "[data-subdivision-storage-popover]:hover"
+      )
+      .forEach(positionSubdivisionStorageMenu);
+  });
 }
 
 function applyStorageSubdivisionFilter(root) {
