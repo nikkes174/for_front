@@ -1698,6 +1698,29 @@ export function hydrateSettingsCache(orgId, data) {
   };
 }
 
+export async function openProductItemEditor(orgId, productItemId) {
+  const cachedItem = String(cache.organizationId || "") === String(orgId)
+    ? findEntity("productItem", productItemId)
+    : null;
+
+  if (cachedItem) {
+    await openEntityModal("productItem", cachedItem);
+    return;
+  }
+
+  const settingsData = await loadSettingsData(orgId);
+
+  hydrateSettingsCache(orgId, settingsData);
+
+  const item = findEntity("productItem", productItemId);
+
+  if (!item) {
+    throw new Error("Товар не найден.");
+  }
+
+  await openEntityModal("productItem", item);
+}
+
 export function renderCatalogTab(tabSlug = "products", data = cache) {
   const categories = data.categories || [];
   const productItems = data.productItems || [];

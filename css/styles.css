@@ -1382,6 +1382,10 @@ form[data-storage-subdivision-edit-form] > .standard-save-button { align-self: e
 .warehouse-storage-actions { width: 56px; min-width: 56px; text-align: right; }
 .warehouse-storage-actions .warehouse-actions-popover { margin-left: auto; }
 
+[data-storage-table-row] { cursor: pointer; }
+[data-storage-table-row] .warehouse-storage-actions { cursor: default; }
+[data-storage-product-edit] { cursor: pointer; }
+
 .warehouse-storage-filters {
   display: flex;
   align-items: end;
