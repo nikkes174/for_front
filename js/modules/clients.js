@@ -1804,10 +1804,19 @@ export function bindClients(root, ctx) {
       event.preventDefault();
       const data = formData(search);
       const query = String(data.q || "").trim();
-      updateClientList({
-        search: query,
-        page: state.clientList?.currentPage || 1,
-      });
+      try {
+        state.clients = await api.clients(ctx.org.id, {
+          query,
+          offset: 0,
+          limit: 1000,
+        });
+        updateClientList({
+          search: query,
+          page: 1,
+        });
+      } catch (error) {
+        setMessage(search, error.message);
+      }
       return;
     }
 
@@ -2049,7 +2058,16 @@ export function bindClients(root, ctx) {
     const resetSearchButton = event.target.closest("[data-client-search-reset]");
     if (resetSearchButton) {
       event.preventDefault();
-      updateClientList({ search: "", page: state.clientList?.currentPage || 1 });
+      try {
+        state.clients = await api.clients(ctx.org.id, {
+          offset: 0,
+          limit: 1000,
+        });
+        updateClientList({ search: "", page: 1 });
+      } catch (error) {
+        const searchForm = root.querySelector("[data-client-search]");
+        if (searchForm) setMessage(searchForm, error.message);
+      }
       return;
     }
 
