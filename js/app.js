@@ -69,6 +69,7 @@ const CATALOG_MENU_SECTIONS = [
 const LOYALTY_MENU_SECTIONS = [
   { slug: "", label: "Система лояльности", permissions: LOYALTY_PERMISSIONS },
   { slug: "cards", label: "Карточки", permissions: ["loyalty.transactions.view"] },
+  { slug: "segment", label: "Сегментация", permissions: ["loyalty.transactions.view"] },
   { slug: "achievements", label: "Достижения", permissions: ["settings.achievements.view"] },
   { slug: "notifications", label: "Рассылки", permissions: ["notifications.notifications.view"] },
 ];
@@ -912,7 +913,6 @@ function shell(content, title) {
         <nav>
           ${navLink(`/organizations/${org.id}`, "Главная", "main.svg")}
           ${navLink(`/organizations/${org.id}/clients`, "Клиенты", "clients.svg")}
-          ${navLink(`/organizations/${org.id}/segmentation`, "\u0421\u0435\u0433\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u044f", "clients.svg")}
           ${loyaltySidebarMenu(org.id)}
           ${catalogSidebarMenu(org.id)}
           ${settingsSidebarMenu(org.id)}
@@ -1019,14 +1019,6 @@ function toggleFinanceSidebarMenu() {
 
 function navigate(path) {
   history.pushState(null, "", path);
-  if (path.includes("/segmentation")) {
-    const titleNode = root.querySelector("[data-page-title]");
-    const pageNode = root.querySelector("[data-page-content]");
-    if (titleNode) titleNode.textContent = "\u0421\u0435\u0433\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u044f";
-    if (pageNode) pageNode.innerHTML = '<section class="panel"><p>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0434\u0430\u043d\u043d\u044b\u0445...</p></section>';
-    draw({ live: true });
-    return;
-  }
   draw();
 }
 
@@ -1085,14 +1077,13 @@ function chooseOrg(routeInfo) {
 
 async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "clients" && !ctx.can("clients.clients.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
-  if (routeInfo.page === "segmentation" && !ctx.can("clients.clients.view")) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "loyalty" && !canAny(LOYALTY_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "tasks" && !canAny(TASK_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "settings" && !canAny(SETTINGS_PERMISSIONS)) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "catalog" && !canAny(["settings.categories.view", "settings.items.view"])) return ["Access denied", '<section class="panel"><p>Access denied</p></section>'];
   if (routeInfo.page === "clients") return ["Клиенты", await clients(ctx)];
-  if (routeInfo.page === "segmentation") return ["\u0421\u0435\u0433\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u044f", await segment(ctx)];
   if (routeInfo.page === "catalog") return ["Товары и услуги", await catalog(ctx, routeInfo.extra || "products", routeInfo.subpage || "")];
+  if (routeInfo.page === "loyalty" && routeInfo.extra === "segment") return ["Сегментация", await segment(ctx)];
   if (routeInfo.page === "loyalty") return ["Лояльность", await loyalty(ctx, routeInfo.extra || "rules")];
   if (routeInfo.page === "notifications") return ["Лояльность", await loyalty(ctx, "notifications")];
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
@@ -1412,7 +1403,7 @@ bindTasks(root, { get org() { return state.org; }, reload });
 bindBooking(root, { get org() { return state.org; }, reload });
 bindFinance(root, { get org() { return state.org; }, reload });
 bindBreakdown(root, { get org() { return state.org; }, reload });
-bindSegment(root, { get org() { return state.org; }, reload });
+bindSegment(root, { get org() { return state.org; }, navigate, reload });
 
 redirectClientDomainFromAdminPath().then((redirected) => {
   if (!redirected) draw();
