@@ -31,6 +31,7 @@
   var message = document.querySelector("[data-cabinet-message]");
   var historyList = document.querySelector("[data-cabinet-history]");
   var historySection = document.querySelector("[data-cabinet-history-section]");
+  var myBookingsSection = document.querySelector(".cabinet-my-bookings");
   var cabinetTitle = document.querySelector("[data-cabinet-title]");
   var notificationsModal = document.querySelector("[data-cabinet-notifications-modal]");
   var pushToggleControl = document.querySelector(".cabinet-notifications-toggle");
@@ -52,6 +53,8 @@
   var token = new URLSearchParams(window.location.search).get("token");
   var submitButton = form.querySelector("button");
   var defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
+  var cabinetFieldNames = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
+  var clientFieldSectionPrefix = "client_field_";
   var defaultCardSections = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
   var currentCardSections = defaultCardSections;
   var currentClient = null;
@@ -677,10 +680,14 @@
     return "";
   }
   function renderHistorySections(sections) {
-    const enabled = Array.isArray(sections) ? sections : defaultCardSections;
+    const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
+    const visitsEnabled = configuredSections.includes("client_visits");
+    if (myBookingsSection) myBookingsSection.hidden = !visitsEnabled;
+    const enabled = configuredSections.filter((section) => section !== "client_name").filter((section) => section !== "client_fields_configured").filter((section) => !String(section).startsWith(clientFieldSectionPrefix));
     currentCardSections = enabled;
+    if (historySection) historySection.hidden = enabled.length === 0;
     if (!enabled.length) {
-      historyList.innerHTML = '<p class="cabinet-history-empty">\u0414\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043A\u043B\u0438\u0435\u043D\u0442\u0430 \u0440\u0430\u0437\u0434\u0435\u043B\u044B \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0438 \u043D\u0435 \u043E\u0442\u043A\u0440\u044B\u0442\u044B.</p>';
+      historyList.innerHTML = "";
       return;
     }
     historyList.innerHTML = enabled.map((section) => section === "client_visits" ? `
@@ -1220,7 +1227,7 @@
     if (tab === "profile" && !allCabinetSections.every((section) => loadedCabinetSections.has(section))) {
       loadCabinetSections(allCabinetSections).then(() => {
         var _a3;
-        applyRegistrationFields(cabinetData == null ? void 0 : cabinetData.registration_fields);
+        applyRegistrationFields(cabinetData == null ? void 0 : cabinetData.registration_fields, cabinetData == null ? void 0 : cabinetData.card_sections);
         fillCurrentUserCabinet(currentClient || {});
         renderHistorySections((_a3 = cabinetData == null ? void 0 : cabinetData.card_sections) != null ? _a3 : defaultCardSections);
       }).catch(() => {
@@ -1258,10 +1265,11 @@
     document.querySelector("[data-cabinet-actions]").hidden = !editing;
     document.querySelector("[data-cabinet-edit]").hidden = registration || editing;
   }
-  function applyRegistrationFields(fields) {
-    const enabled = Array.isArray(fields) ? fields : defaultRegistrationFields;
+  function applyRegistrationFields(fields, cardSections = []) {
+    const configuredFields = Array.isArray(cardSections) && cardSections.includes("client_fields_configured") ? cardSections.filter((section) => String(section).startsWith(clientFieldSectionPrefix)).map((section) => String(section).slice(clientFieldSectionPrefix.length)).filter((field) => cabinetFieldNames.includes(field)) : null;
+    const enabled = configuredFields != null ? configuredFields : Array.isArray(fields) ? fields : defaultRegistrationFields;
     const fieldsByName = new Map([...form.querySelectorAll("[data-cabinet-field]")].map((field) => [field.dataset.cabinetField, field]));
-    const order = [...enabled, ...defaultRegistrationFields.filter((name) => !enabled.includes(name))];
+    const order = [...enabled, ...cabinetFieldNames.filter((name) => !enabled.includes(name))];
     order.forEach((name) => {
       const field = fieldsByName.get(name);
       if (field) form.insertBefore(field, form.querySelector("[data-cabinet-message]"));
@@ -1395,7 +1403,7 @@
         const initialTab = cabinetTabFromHash();
         await loadCabinetSections(cabinetSectionsForTab(initialTab));
         await loadCabinetOrganizationName((cabinetData == null ? void 0 : cabinetData.organization_id) || ((_a3 = cabinetData == null ? void 0 : cabinetData.client) == null ? void 0 : _a3.organization_id) || (currentClient == null ? void 0 : currentClient.organization_id));
-        applyRegistrationFields(cabinetData == null ? void 0 : cabinetData.registration_fields);
+        applyRegistrationFields(cabinetData == null ? void 0 : cabinetData.registration_fields, cabinetData == null ? void 0 : cabinetData.card_sections);
         fillCurrentUserCabinet(currentClient || result);
         renderHistorySections((_b = cabinetData == null ? void 0 : cabinetData.card_sections) != null ? _b : defaultCardSections);
         const pushState = await refreshPushState().catch(() => null);
@@ -1421,7 +1429,7 @@
       allCabinetSections.forEach((section) => loadedCabinetSections.add(section));
       currentClient = link.client || link.profile || null;
       setRegistrationMode(!link.client_id);
-      applyRegistrationFields(link.registration_fields);
+      applyRegistrationFields(link.registration_fields, link.card_sections);
       fillCurrentUserCabinet(currentClient || {});
       renderHistorySections(link.card_sections);
       const pushState = await refreshPushState().catch(() => null);

@@ -1,4 +1,4 @@
-const CACHE_NAME = "cabinet-pwa-v9-media";
+const CACHE_NAME = "cabinet-pwa-v11-visits-settings";
 const APP_SHELL = [
   "/cabinet.html",
   "/auth.html",

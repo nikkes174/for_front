@@ -533,16 +533,16 @@ function productItemStaffFields(item) {
           <label class="service-staff-filter"><input type="checkbox" data-select-all-service-staff ${users.length && users.every((user) => selectedMasterIds.has(String(user.id))) ? "checked" : ""}> <span>Выбрать всех</span></label>
         </div>
       </div>
-      <form class="inline-form compact">
+      <div class="inline-form compact">
         <label><span>Поиск сотрудника</span><input type="search" placeholder="Имя или фамилия" data-service-staff-search></label>
-      </form>
-      <form class="inline-form compact">
+      </div>
+      <div class="inline-form compact">
         <label><span>Филиал</span><select data-service-staff-filter-branch><option value="">Все филиалы</option>${branches.map((branch) => `<option value="${escapeHtml(branch.id)}">${escapeHtml(branch.name)}</option>`).join("")}</select></label>
         <label><span>Роль</span><select data-service-staff-filter-role><option value="">Все роли</option>${roles.map((role) => `<option value="${escapeHtml(role.id)}">${escapeHtml(role.name)}</option>`).join("")}</select></label>
         <label><span>Должность</span><select data-service-staff-filter-department><option value="">Все должности</option>${departments.map((department) => `<option value="${escapeHtml(department.id)}">${escapeHtml(department.name)}</option>`).join("")}</select></label>
         <label><span>Рабочее место</span><select data-service-staff-filter-workplace><option value="">Все рабочие места</option>${workplaces.map((workplace) => `<option value="${escapeHtml(workplace.id)}">${escapeHtml(workplace.name)}</option>`).join("")}</select></label>
         <label class="checkbox"><input type="checkbox" data-hide-inactive-service-staff> Скрыть неактивных</label>
-      </form>
+      </div>
       <div class="service-staff-table-wrap">
         <table class="service-staff-table app-table">
           <thead><tr><th>Оказывает услугу</th><th>Сотрудник</th><th>Цена от</th><th>Цена до</th><th>Длительность</th><th>Тех. перерыв, мин</th></tr></thead>

@@ -217,6 +217,8 @@ function cabinetPage() {
 }
 
 const DEFAULT_CABINET_FIELDS = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
+const CABINET_FIELD_NAMES = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
+const CLIENT_FIELD_SECTION_PREFIX = "client_field_";
 const DEFAULT_CABINET_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
 let cabinetCardSections = DEFAULT_CABINET_CARD_SECTIONS;
 let cabinetClient = null;
@@ -381,11 +383,16 @@ function cabinetSectionBody(section) {
 
 function renderCabinetHistory(sections) {
   const history = root.querySelector("[data-cabinet-history]");
+  const historySection = root.querySelector("[data-cabinet-history-section]");
   if (!history) return;
-  const enabled = Array.isArray(sections) ? sections : DEFAULT_CABINET_CARD_SECTIONS;
+  const enabled = (Array.isArray(sections) ? sections : DEFAULT_CABINET_CARD_SECTIONS)
+    .filter((section) => section !== "client_name")
+    .filter((section) => section !== "client_fields_configured")
+    .filter((section) => !String(section).startsWith(CLIENT_FIELD_SECTION_PREFIX));
   cabinetCardSections = enabled;
+  if (historySection) historySection.hidden = enabled.length === 0;
   if (!enabled.length) {
-    history.innerHTML = `<p class="cabinet-history-empty">\u0414\u043b\u044f \u044d\u0442\u043e\u0433\u043e \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0440\u0430\u0437\u0434\u0435\u043b\u044b \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u0442\u044b.</p>`;
+    history.innerHTML = "";
     return;
   }
   history.innerHTML = enabled.map((section) => `
@@ -447,10 +454,16 @@ function setCabinetEditMode(enabled) {
   if (editButton) editButton.hidden = registration || editing;
 }
 
-function applyCabinetRegistrationFields(form, fields) {
-  const enabled = Array.isArray(fields) ? fields : DEFAULT_CABINET_FIELDS;
+function applyCabinetRegistrationFields(form, fields, cardSections = []) {
+  const configuredFields = Array.isArray(cardSections) && cardSections.includes("client_fields_configured")
+    ? cardSections
+      .filter((section) => String(section).startsWith(CLIENT_FIELD_SECTION_PREFIX))
+      .map((section) => String(section).slice(CLIENT_FIELD_SECTION_PREFIX.length))
+      .filter((field) => CABINET_FIELD_NAMES.includes(field))
+    : null;
+  const enabled = configuredFields ?? (Array.isArray(fields) ? fields : DEFAULT_CABINET_FIELDS);
   const fieldsByName = new Map([...form.querySelectorAll("[data-cabinet-field]")].map((field) => [field.dataset.cabinetField, field]));
-  const order = [...enabled, ...DEFAULT_CABINET_FIELDS.filter((name) => !enabled.includes(name))];
+  const order = [...enabled, ...CABINET_FIELD_NAMES.filter((name) => !enabled.includes(name))];
   order.forEach((name) => {
     const field = fieldsByName.get(name);
     if (field) form.insertBefore(field, form.querySelector("[data-cabinet-message]"));
@@ -671,7 +684,7 @@ async function initCabinetForm() {
       if (!user) throw new Error();
       cabinetData = await api.cabinet().catch(() => null);
       cabinetClient = cabinetData?.client || null;
-      applyCabinetRegistrationFields(form, cabinetData?.registration_fields);
+      applyCabinetRegistrationFields(form, cabinetData?.registration_fields, cabinetData?.card_sections);
       fillCabinetUser(form, cabinetClient || user);
       renderCabinetHistory(cabinetData?.card_sections ?? DEFAULT_CABINET_CARD_SECTIONS);
       await refreshCabinetPushState().catch(() => null);
@@ -694,7 +707,7 @@ async function initCabinetForm() {
     cabinetData = link;
     cabinetClient = link.client || link.profile || null;
     setCabinetRegistrationMode(!link.client_id);
-    applyCabinetRegistrationFields(form, link.registration_fields);
+    applyCabinetRegistrationFields(form, link.registration_fields, link.card_sections);
     fillCabinetUser(form, cabinetClient || {});
     renderCabinetHistory(link.card_sections);
     await refreshCabinetPushState().catch(() => null);

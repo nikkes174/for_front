@@ -3,17 +3,27 @@
   var root = document.querySelector("#root");
   function normalizePhone(value) {
     let digits = String(value != null ? value : "").replace(/\D/g, "");
-    if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) digits = "7".concat(digits.slice(1));
-    else if (digits.length === 10) digits = "7".concat(digits);
+    if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) {
+      digits = "7".concat(digits.slice(1));
+    } else if (digits.length === 10) {
+      digits = "7".concat(digits);
+    }
     return digits;
   }
   function formatPhone(value) {
     var _a;
     let digits = String(value != null ? value : "").replace(/\D/g, "");
-    if (digits.startsWith("7") || digits.startsWith("8")) digits = digits.slice(1);
+    if (digits.startsWith("7") || digits.startsWith("8")) {
+      digits = digits.slice(1);
+    }
     digits = digits.slice(0, 10);
     if (!digits) return "";
-    const chunks = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 8), digits.slice(8, 10)].filter(Boolean);
+    const chunks = [
+      digits.slice(0, 3),
+      digits.slice(3, 6),
+      digits.slice(6, 8),
+      digits.slice(8, 10)
+    ].filter(Boolean);
     return "+7".concat(chunks[0] ? " (".concat(chunks[0]) : "").concat(((_a = chunks[0]) == null ? void 0 : _a.length) === 3 ? ")" : "").concat(chunks[1] ? " ".concat(chunks[1]) : "").concat(chunks[2] ? "-".concat(chunks[2]) : "").concat(chunks[3] ? "-".concat(chunks[3]) : "");
   }
   function isPhoneInput(element) {
@@ -23,17 +33,27 @@
     return element instanceof HTMLInputElement && element.dataset.loginPhoneInput !== void 0 && /^[+\d()\s-]+$/.test(String(element.value || "").trim());
   }
   document.addEventListener("input", (event) => {
-    if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) return;
+    if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) {
+      return;
+    }
     event.target.value = formatPhone(event.target.value);
   });
-  document.addEventListener("blur", (event) => {
-    if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) return;
-    event.target.value = formatPhone(event.target.value);
-  }, true);
+  document.addEventListener(
+    "blur",
+    (event) => {
+      if (!isPhoneInput(event.target) && !isPhoneLikeLoginInput(event.target)) {
+        return;
+      }
+      event.target.value = formatPhone(event.target.value);
+    },
+    true
+  );
   var bodyScrollY = 0;
   var bodyScrollLocked = false;
   function visibleModalCount() {
-    return document.querySelectorAll(".modal-backdrop:not([hidden])").length;
+    return document.querySelectorAll(
+      ".modal-backdrop:not([hidden])"
+    ).length;
   }
   function lockBodyScroll() {
     if (bodyScrollLocked) return;
@@ -62,8 +82,11 @@
     window.scrollTo(0, bodyScrollY);
   }
   function syncBodyScrollLock() {
-    if (visibleModalCount()) lockBodyScroll();
-    else unlockBodyScroll();
+    if (visibleModalCount()) {
+      lockBodyScroll();
+    } else {
+      unlockBodyScroll();
+    }
   }
   var modalObserver = new MutationObserver(syncBodyScrollLock);
   modalObserver.observe(document.body, {
@@ -73,11 +96,31 @@
     attributeFilter: ["hidden"]
   });
   window.addEventListener("pagehide", unlockBodyScroll);
+  function ensureTablerCss() {
+    if (document.querySelector("link[data-tabler-css]")) {
+      return;
+    }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css";
+    link.dataset.tablerCss = "true";
+    document.head.append(link);
+  }
   async function ensureCss() {
-    if (document.querySelector("style[data-app-css]")) return;
+    ensureTablerCss();
+    if (document.querySelector("style[data-app-css]")) {
+      return;
+    }
     try {
-      const response = await fetch("/css/styles.css", { cache: "no-store" });
-      if (!response.ok) return;
+      const response = await fetch(
+        "/css/styles.css",
+        {
+          cache: "no-store"
+        }
+      );
+      if (!response.ok) {
+        return;
+      }
       const style = document.createElement("style");
       style.dataset.appCss = "true";
       style.textContent = await response.text();
@@ -92,7 +135,9 @@
     target.innerHTML = html;
   }
   function formData(form) {
-    return Object.fromEntries(new FormData(form).entries());
+    return Object.fromEntries(
+      new FormData(form).entries()
+    );
   }
   function numberOrNull(value) {
     return value === "" || value == null ? null : Number(value);
@@ -102,27 +147,33 @@
     return trimmed ? trimmed : void 0;
   }
   function setMessage(container, text, type = "error") {
-    const node = container.querySelector("[data-message]");
+    const node = container.querySelector(
+      "[data-message]"
+    );
     if (!node) return;
     node.className = type === "error" ? "form-error" : "notice";
     node.textContent = text || "";
   }
   function field(label, name, attrs = "") {
-    return "<label><span>".concat(escapeHtml(label), '</span><input name="').concat(escapeHtml(name), '" ').concat(attrs, "></label>");
+    return "\n    <label>\n      <span>".concat(escapeHtml(label), '</span>\n      <input\n        name="').concat(escapeHtml(name), '"\n        ').concat(attrs, "\n      >\n    </label>\n  ");
   }
   function selectField(label, name, items, selected = "", placeholder = "\u041D\u0435 \u0432\u044B\u0431\u0440\u0430\u043D\u043E") {
     const options = [
       '<option value="">'.concat(escapeHtml(placeholder), "</option>"),
       ...items.map((item) => {
         var _a, _b;
-        const value = String((_a = item.id) != null ? _a : item.value);
-        return '<option value="'.concat(escapeHtml(value), '" ').concat(String(selected) === value ? "selected" : "", ">").concat(escapeHtml((_b = item.name) != null ? _b : item.label), "</option>");
+        const value = String(
+          (_a = item.id) != null ? _a : item.value
+        );
+        return '\n        <option\n          value="'.concat(escapeHtml(value), '"\n          ').concat(String(selected) === value ? "selected" : "", "\n        >\n          ").concat(escapeHtml((_b = item.name) != null ? _b : item.label), "\n        </option>\n      ");
       })
     ];
-    return "<label><span>".concat(escapeHtml(label), '</span><select name="').concat(escapeHtml(name), '">').concat(options.join(""), "</select></label>");
+    return "\n    <label>\n      <span>".concat(escapeHtml(label), '</span>\n\n      <select name="').concat(escapeHtml(name), '">\n        ').concat(options.join(""), "\n      </select>\n    </label>\n  ");
   }
   function rows(items, empty, mapper) {
-    if (!(items == null ? void 0 : items.length)) return '<tr><td colspan="6">'.concat(escapeHtml(empty), "</td></tr>");
+    if (!(items == null ? void 0 : items.length)) {
+      return '\n      <tr>\n        <td colspan="6">\n          '.concat(escapeHtml(empty), "\n        </td>\n      </tr>\n    ");
+    }
     return items.map(mapper).join("");
   }
 })();

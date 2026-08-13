@@ -2221,6 +2221,10 @@ body.service-gallery-open { overflow: hidden; }
   background: #fafafa;
 }
 
+.cabinet-my-bookings[hidden] {
+  display: none !important;
+}
+
 .cabinet-booking-visits-accordion {
   display: grid;
   grid-template-rows: 0fr;

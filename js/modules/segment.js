@@ -1,4 +1,4 @@
-﻿import { api } from "../api.js";
+import { api } from "../api.js";
 import { escapeHtml } from "../dom.js";
 
 const SEGMENT_VARIABLES = [
@@ -16,6 +16,7 @@ const segmentState = {
   organizationId: null,
   clients: [],
   selectedVariables: [],
+  appliedVariables: [],
   search: "",
   sort: "name",
   direction: "asc",
@@ -235,7 +236,7 @@ function variableCellContent(client, key) {
 }
 
 function renderTableMarkup() {
-  const { selectedVariables } = segmentState;
+  const { appliedVariables } = segmentState;
   const sortButton = (key, label) => {
     const isActive = segmentState.sort === key;
     const marker = isActive ? (segmentState.direction === "asc" ? "↑" : "↓") : "";
@@ -257,7 +258,7 @@ function renderTableMarkup() {
       </th>
     `;
   };
-  const headers = sortButton("name", "Клиент") + selectedVariables
+  const headers = sortButton("name", "Клиент") + appliedVariables
     .map((key) => {
       const variable = SEGMENT_VARIABLES.find((v) => v.key === key);
       if (variable) return sortButton(key, variable.columnLabel);
@@ -267,12 +268,12 @@ function renderTableMarkup() {
   const { pageItems, totalItems } = getCurrentPageClients();
   let rows = "";
   if (totalItems === 0) {
-    rows = `<tr><td colspan="${selectedVariables.length + 1}">Клиенты не найдены</td></tr>`;
+    rows = `<tr><td colspan="${appliedVariables.length + 1}">Клиенты не найдены</td></tr>`;
   } else {
     rows = pageItems.map((client) => {
       const clientName = formatClientName(client);
       let cells = `<td><strong>${escapeHtml(clientName)}</strong></td>`;
-      for (const key of selectedVariables) {
+      for (const key of appliedVariables) {
         cells += `<td>${variableCellContent(client, key)}</td>`;
       }
       return `<tr data-segment-table-row>${cells}</tr>`;
@@ -281,7 +282,7 @@ function renderTableMarkup() {
   return `
     <table
       class="centered-list-table app-table segmentation-table"
-      style="--segment-variable-count: ${selectedVariables.length}"
+      style="--segment-variable-count: ${appliedVariables.length}"
     >
       <thead><tr>${headers}</tr></thead>
       <tbody data-segmentation-table-body>${rows}</tbody>
@@ -290,11 +291,9 @@ function renderTableMarkup() {
 }
 
 function renderTable() {
-  const { selectedVariables } = segmentState;
-  if (!selectedVariables.length) {
-    return `<div data-segmentation-table></div>`;
-  }
-  return `<div data-segmentation-table">${renderTableMarkup()}</div>`;
+  const { appliedVariables } = segmentState;
+  if (!appliedVariables.length) return `<div data-segmentation-table></div>`;
+  return `<div data-segmentation-table>${renderTableMarkup()}</div>`;
 }
 
 function renderPagination() {
@@ -393,7 +392,6 @@ function renderToolbar() {
 }
 
 function renderSegmentPage(clients, error) {
-  const { selectedVariables } = segmentState;
   let content = `
     <section class="finance-page segmentation-page" data-segmentation>
       <div class="panel finance-filter-panel segmentation-filter-panel">
@@ -407,7 +405,7 @@ function renderSegmentPage(clients, error) {
   if (error) {
     content += `<p class="segmentation-error" data-message>${escapeHtml(error)}</p>`;
   }
-  if (selectedVariables.length > 0) {
+  if (segmentState.appliedVariables.length > 0) {
     content += `
       ${renderSearchForm()}
       ${renderTable()}
@@ -423,7 +421,8 @@ function renderSegmentPage(clients, error) {
 
 export async function segment(ctx) {
   segmentState.organizationId = ctx.org.id;
-  segmentState.selectedVariables = [...SEGMENT_VARIABLES.map((v) => v.key)];
+  segmentState.selectedVariables = [];
+  segmentState.appliedVariables = [];
   segmentState.search = "";
   segmentState.sort = "name";
   segmentState.direction = "asc";
@@ -464,11 +463,9 @@ const sortButton = event.target.closest("[data-segment-sort]");
     const applyButton = event.target.closest("[data-segment-apply]");
     if (applyButton) {
       if (!applyButton.disabled) {
-        const details = container.querySelector(".segmentation-variable-select");
-        if (details) details.removeAttribute("open");
-        renderTableContent(container);
-        updateSearchForm(container);
-        updatePagination(container);
+        segmentState.appliedVariables = [...segmentState.selectedVariables];
+        segmentState.page = 1;
+        container.outerHTML = renderSegmentPage([], null);
       }
       return;
     }
@@ -611,13 +608,18 @@ function updatePageSize(container, size) {
   if (select) select.value = String(size);
 }
 
+function updatePagination(container) {
+  const pagination = container.querySelector(".segmentation-pagination");
+  if (pagination) pagination.outerHTML = renderPagination();
+}
+
 function renderTableContent(container) {
   const tableContainer =
     container.querySelector("[data-segmentation-table]");
 
   if (!tableContainer) return;
 
-  if (!segmentState.selectedVariables.length) {
+  if (!segmentState.appliedVariables.length) {
     tableContainer.innerHTML = "";
     return;
   }
