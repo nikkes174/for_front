@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { escapeHtml } from "../dom.js";
+import { openExternalClientCard } from "./clients.js";
 
 const SEGMENT_VARIABLES = [
   { key: "visits_count", label: "Количество визитов", columnLabel: "Количество визитов", type: "number" },
@@ -22,6 +23,9 @@ const segmentState = {
   direction: "asc",
   page: 1,
   pageSize: 10,
+  clientCardResources: null,
+  clientCardResourcesOrganizationId: null,
+  clientCardResourcesRequest: null,
 };
 
 function formatClientName(client) {
@@ -235,6 +239,80 @@ function variableCellContent(client, key) {
   }
 }
 
+async function loadSegmentClientCardResources(organizationId) {
+  if (
+    segmentState.clientCardResources
+    && String(segmentState.clientCardResourcesOrganizationId)
+      === String(organizationId)
+  ) {
+    return segmentState.clientCardResources;
+  }
+
+  if (
+    segmentState.clientCardResourcesRequest
+    && String(segmentState.clientCardResourcesOrganizationId)
+      === String(organizationId)
+  ) {
+    return segmentState.clientCardResourcesRequest;
+  }
+
+  segmentState.clientCardResourcesOrganizationId = organizationId;
+
+  const request = Promise.all([
+    api.branches(organizationId).catch(() => []),
+    api.departments(organizationId).catch(() => []),
+    api.workplaces(organizationId).catch(() => []),
+    api.users(organizationId, 500).catch(() => []),
+    api.memberships(organizationId).catch(() => []),
+    api.branchMemberships(organizationId).catch(() => []),
+    api.roles(organizationId).catch(() => []),
+    api.clientSegments(organizationId).catch(() => []),
+    api.productCategories(organizationId).catch(() => []),
+    api.productItems(organizationId).catch(() => []),
+  ]).then(([
+    branches,
+    departments,
+    workplaces,
+    users,
+    memberships,
+    branchMemberships,
+    roles,
+    segments,
+    productCategories,
+    productItems,
+  ]) => ({
+    branches,
+    departments,
+    workplaces,
+    users,
+    memberships,
+    branchMemberships,
+    roles,
+    segments,
+    productCategories,
+    productItems,
+  }));
+
+  segmentState.clientCardResourcesRequest = request;
+
+  try {
+    const resources = await request;
+
+    if (
+      String(segmentState.clientCardResourcesOrganizationId)
+        === String(organizationId)
+    ) {
+      segmentState.clientCardResources = resources;
+    }
+
+    return resources;
+  } finally {
+    if (segmentState.clientCardResourcesRequest === request) {
+      segmentState.clientCardResourcesRequest = null;
+    }
+  }
+}
+
 function renderTableMarkup() {
   const { appliedVariables } = segmentState;
   const sortButton = (key, label) => {
@@ -272,7 +350,17 @@ function renderTableMarkup() {
   } else {
     rows = pageItems.map((client) => {
       const clientName = formatClientName(client);
-      let cells = `<td><strong>${escapeHtml(clientName)}</strong></td>`;
+      let cells = `
+        <td>
+          <button
+            type="button"
+            class="ghost btn-ghost-secondary"
+            data-segment-open-client="${escapeHtml(client.id)}"
+          >
+            ${escapeHtml(clientName)}
+          </button>
+        </td>
+      `;
       for (const key of appliedVariables) {
         cells += `<td>${variableCellContent(client, key)}</td>`;
       }
@@ -420,6 +508,16 @@ function renderSegmentPage(clients, error) {
 }
 
 export async function segment(ctx) {
+  const organizationChanged =
+    String(segmentState.organizationId || "")
+    !== String(ctx.org.id);
+
+  if (organizationChanged) {
+    segmentState.clientCardResources = null;
+    segmentState.clientCardResourcesRequest = null;
+    segmentState.clientCardResourcesOrganizationId = null;
+  }
+
   segmentState.organizationId = ctx.org.id;
   segmentState.selectedVariables = [];
   segmentState.appliedVariables = [];
@@ -445,7 +543,43 @@ export function bindSegment(root, ctx) {
     const container = event.target.closest("[data-segmentation]");
     if (!container) return;
 
-const sortButton = event.target.closest("[data-segment-sort]");
+    const clientButton =
+      event.target.closest("[data-segment-open-client]");
+
+    if (clientButton) {
+      event.preventDefault();
+
+      const clientId =
+        clientButton.dataset.segmentOpenClient;
+
+      if (!clientId) return;
+
+      clientButton.disabled = true;
+
+      try {
+        const resources =
+          await loadSegmentClientCardResources(ctx.org.id);
+
+        await openExternalClientCard(
+          ctx,
+          clientId,
+          resources
+        );
+      } catch (error) {
+        alert(
+          error.message
+          || "Не удалось открыть карточку клиента"
+        );
+      } finally {
+        if (clientButton.isConnected) {
+          clientButton.disabled = false;
+        }
+      }
+
+      return;
+    }
+
+    const sortButton = event.target.closest("[data-segment-sort]");
     if (sortButton) {
       const key = sortButton.dataset.segmentSort;
       const newDirection =
