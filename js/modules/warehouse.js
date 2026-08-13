@@ -81,8 +81,103 @@ async function openStorageProductsModal(root, storageId) {
   }
 }
 async function openStorageWriteoffModal(root, storageId, storageName) {
-  putModal(root, modal("Списать товар", `<form class="modal-grid warehouse-writeoff-form" data-storage-writeoff-form data-storage-id="${Number(storageId)}"><div class="warehouse-writeoff-storage">${esc(storageName)}</div><label><span>Товар</span><select name="product_item_id" data-storage-writeoff-product required disabled><option value="">Загрузка товаров...</option></select></label><label><span>Количество</span><input type="number" name="amount" step="0.01" min="0.01" data-storage-writeoff-amount required disabled></label><small data-storage-writeoff-available></small><label><span>\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</span><textarea name="comment" rows="3" maxlength="1000"></textarea></label><p data-message></p><button type="submit" class="primary standard-save-button" data-storage-writeoff-submit disabled>Списать</button></form>`));
-  const form = root.querySelector("[data-storage-writeoff-form]"); if (!form) return;
+  putModal(
+    root,
+    modal(
+      "Списать товар",
+      `
+      <form
+        class="modal-grid warehouse-writeoff-form"
+        data-storage-writeoff-form
+        data-storage-id="${Number(storageId)}"
+      >
+        <div class="warehouse-writeoff-storage">
+          ${esc(storageName)}
+        </div>
+
+
+        <label>
+          <span>Товар</span>
+
+
+          <select
+            name="product_item_id"
+            data-storage-writeoff-product
+            required
+            disabled
+          >
+            <option value="">
+              Загрузка товаров...
+            </option>
+          </select>
+        </label>
+
+
+        <label>
+          <span>Количество</span>
+
+
+          <input
+            type="number"
+            name="amount"
+            step="0.01"
+            min="0.01"
+            data-storage-writeoff-amount
+            required
+            disabled
+          >
+        </label>
+
+
+        <small data-storage-writeoff-available></small>
+
+
+        <label class="warehouse-writeoff-comment-label">
+          <span>Комментарий</span>
+
+
+          <div
+            class="notification-message-field warehouse-writeoff-comment"
+          >
+            <textarea
+              name="comment"
+              maxlength="1000"
+              rows="4"
+              wrap="soft"
+              placeholder="Введите комментарий ..."
+            ></textarea>
+          </div>
+        </label>
+
+
+        <p data-message></p>
+
+
+        <button
+          type="submit"
+          class="primary standard-save-button"
+          data-storage-writeoff-submit
+          disabled
+        >
+          Списать
+        </button>
+      </form>
+    `
+    )
+  );
+
+
+  const form = root.querySelector(
+    "[data-storage-writeoff-form]"
+  );
+
+
+  if (!form) return;
+
+
+  form
+    .closest(".modal-card")
+    ?.classList.add("warehouse-writeoff-modal");
   const select = form.querySelector("[data-storage-writeoff-product]"); const amountInput = form.querySelector("[data-storage-writeoff-amount]"); const submitButton = form.querySelector("[data-storage-writeoff-submit]"); const message = form.querySelector("[data-message]");
   try { const products = await api.storageProducts(Number(storageId)); if (!products.length) { select.innerHTML = `<option value="">На складе нет товаров</option>`; message.textContent = "На этом складе нет товаров для списания."; return; } select.innerHTML = `<option value="">Выберите товар</option>${products.map((product) => `<option value="${Number(product.product_item_id)}" data-available="${Number(product.amount) || 0}">${esc(product.title)}</option>`).join("")}`; select.disabled = false; amountInput.disabled = false; submitButton.disabled = false; } catch (err) { message.textContent = err.message; }
 }
