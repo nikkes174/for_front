@@ -43,9 +43,211 @@ export async function warehouse(ctx, tabSlug = "subdivisions") {
   else loadError = subdivisionsResult.reason?.message || "Не удалось загрузить подразделы склада.";
   if (storagesResult.status === "fulfilled") storages = storagesResult.value;
   else loadError = [loadError, storagesResult.reason?.message || "Не удалось загрузить склады."].filter(Boolean).join(" ");
-  return `<section class="panel" data-warehouse data-warehouse-tab="${active}"><h2>${esc(ctx.org.name)}</h2><nav class="tabs">${Object.entries(tabs).map(([slug, label]) => `<a class="btn btn-outline-secondary loyalty-tab-button${slug === active ? " is-active" : ""}" href="/organizations/${Number(ctx.org.id)}/catalog/warehouse/${slug}">${label}</a>`).join("")}</nav>${loadError ? `<p class="warehouse-load-error" data-message>${esc(loadError)}</p>` : ""}${active === "subdivisions" ? subdivisionView(ctx, subdivisions, can) : storageView(ctx, subdivisions, storages, can)}</section>`;
+  return `<section class="panel" data-warehouse data-warehouse-tab="${active}"><h2>${esc(ctx.org.name)}</h2><nav class="tabs">${Object.entries(tabs).map(([slug, label]) => `<a class="btn btn-outline-secondary loyalty-tab-button${slug === active ? " is-active" : ""}" href="/organizations/${Number(ctx.org.id)}/catalog/warehouse/${slug}">${label}</a>`).join("")}</nav>${loadError ? `<p class="warehouse-load-error" data-message>${esc(loadError)}</p>` : ""}${active === "subdivisions" ? subdivisionView(ctx, subdivisions, storages, can) : storageView(ctx, subdivisions, storages, can)}</section>`;
 }
-function subdivisionView(ctx, rows, can) { return `<div class="subpanel warehouse-subpanel"><h3>Подразделы</h3>${can("settings.items.create") ? `<form class="inline-form compact warehouse-create-form" data-storage-subdivision-create><label><span>Название</span><input name="name" required></label><button class="primary standard-save-button">Сохранить</button></form>` : ""}<p data-message></p><div class="table-wrap"><table class="app-table"><thead><tr><th>Название</th><th class="warehouse-subdivision-actions"></th></tr></thead><tbody>${rows.length ? rows.map((r) => `<tr><td><button class="link-button" data-storage-subdivision-edit="${Number(r.id)}">${esc(r.name)}</button></td><td class="warehouse-subdivision-actions">${can("settings.items.delete") ? `<button type="button" class="client-delete-icon-button" data-storage-subdivision-delete="${Number(r.id)}" aria-label="Удалить" title="Удалить"><img src="/fronted/icons/basket.svg" alt=""></button>` : ""}</td></tr>`).join("") : `<tr><td colspan="2">Подразделов пока нет.</td></tr>`}</tbody></table></div></div>`; }
+function subdivisionView(ctx, rows, storages, can) {
+  const storagesBySubdivision = new Map();
+
+  storages.forEach((storage) => {
+    const subdivisionId = String(storage.subdivision_id);
+
+    if (!storagesBySubdivision.has(subdivisionId)) {
+      storagesBySubdivision.set(subdivisionId, []);
+    }
+
+    storagesBySubdivision.get(subdivisionId).push(storage);
+  });
+
+  return `
+    <div class="subpanel warehouse-subpanel">
+      <h3>Подразделы</h3>
+
+
+      ${
+        can("settings.items.create")
+          ? `
+            <form
+              class="inline-form compact warehouse-create-form"
+              data-storage-subdivision-create
+            >
+              <label>
+                <span>Название</span>
+                <input name="name" required>
+              </label>
+
+
+              <button
+                class="primary standard-save-button"
+              >
+                Сохранить
+              </button>
+            </form>
+          `
+          : ""
+      }
+
+
+      <p data-message></p>
+
+
+      <div class="table-wrap warehouse-subdivision-table-wrap">
+        <table class="app-table">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th class="warehouse-subdivision-actions"></th>
+            </tr>
+          </thead>
+
+
+          <tbody>
+            ${
+              rows.length
+                ? rows.map((subdivision) => {
+                    const subdivisionStorages =
+                      storagesBySubdivision.get(
+                        String(subdivision.id)
+                      ) || [];
+
+
+                    return `
+                      <tr>
+                        <td>
+                          <div
+                            class="warehouse-subdivision-popover"
+                            data-subdivision-popover
+                          >
+                            <button
+                              type="button"
+                              class="link-button warehouse-subdivision-trigger"
+                            >
+                              ${esc(subdivision.name)}
+                            </button>
+
+
+                            <div
+                              class="warehouse-subdivision-menu"
+                            >
+                              <form
+                                class="warehouse-subdivision-inline-edit"
+                                data-storage-subdivision-edit-form
+                                data-id="${Number(subdivision.id)}"
+                              >
+                                <label>
+                                  <span>Название</span>
+
+
+                                  <input
+                                    name="name"
+                                    value="${esc(subdivision.name)}"
+                                    required
+                                  >
+                                </label>
+
+
+                                <button
+                                  class="primary standard-save-button"
+                                >
+                                  Сохранить
+                                </button>
+                              </form>
+
+
+                              <div
+                                class="warehouse-subdivision-menu-storages"
+                              >
+                                <strong>Склады</strong>
+
+
+                                ${
+                                  subdivisionStorages.length
+                                    ? subdivisionStorages.map(
+                                        (storage) => `
+                                          <div
+                                            class="warehouse-subdivision-storage-popover"
+                                            data-subdivision-storage-popover
+                                          >
+                                            <button
+                                              type="button"
+                                              class="warehouse-subdivision-storage-trigger"
+                                              data-subdivision-storage-hover="${Number(storage.id)}"
+                                            >
+                                              <span>
+                                                ${esc(storage.name)}
+                                              </span>
+
+
+                                              <small>
+                                                ${esc(
+                                                  storage.product_quantity ?? 0
+                                                )}
+                                              </small>
+                                            </button>
+
+
+                                            <div
+                                              class="warehouse-subdivision-storage-menu"
+                                              data-subdivision-storage-products
+                                              data-storage-id="${Number(storage.id)}"
+                                            >
+                                              <div
+                                                class="warehouse-subdivision-products-loading"
+                                              >
+                                                Загрузка...
+                                              </div>
+                                            </div>
+                                          </div>
+                                        `
+                                      ).join("")
+                                    : `
+                                      <p class="warehouse-subdivision-empty">
+                                        К подразделу пока не привязаны склады.
+                                      </p>
+                                    `
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+
+                        <td class="warehouse-subdivision-actions">
+                          ${
+                            can("settings.items.delete")
+                              ? `
+                                <button
+                                  type="button"
+                                  class="client-delete-icon-button"
+                                  data-storage-subdivision-delete="${Number(subdivision.id)}"
+                                  aria-label="Удалить"
+                                  title="Удалить"
+                                >
+                                  <img
+                                    src="/fronted/icons/basket.svg"
+                                    alt=""
+                                  >
+                                </button>
+                              `
+                              : ""
+                          }
+                        </td>
+                      </tr>
+                    `;
+                  }).join("")
+                : `
+                  <tr>
+                    <td colspan="2">
+                      Подразделов пока нет.
+                    </td>
+                  </tr>
+                `
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
 function storageTableHeader(key, label) {
   return `
     <button
@@ -183,7 +385,89 @@ async function openStorageWriteoffModal(root, storageId, storageName) {
 }
 export function bindWarehouse(root, ctx) {
   if (!root || root.dataset.warehouseBound) return; root.dataset.warehouseBound = "1"; let timer; let sequence = 0; const selected = new Map();
-  root.addEventListener("click", async (e) => { const toggle = e.target.closest("[data-storage-actions-toggle]"); if (toggle) { toggle.closest(".warehouse-actions-popover").classList.toggle("is-open"); return; } if (!e.target.closest(".warehouse-actions-popover")) root.querySelectorAll(".warehouse-actions-popover.is-open").forEach((n) => n.classList.remove("is-open")); const sortButton = e.target.closest("[data-storage-table-sort]"); if (sortButton) { const tbody = root.querySelector("[data-storage-table-body]"); if (!tbody) return; const sortKey = sortButton.dataset.storageTableSort; const direction = sortButton.dataset.storageTableDirection === "desc" ? "desc" : "asc"; const multiplier = direction === "desc" ? -1 : 1; const rows = [...tbody.querySelectorAll("[data-storage-table-row]")]; rows.sort((left, right) => { if (sortKey === "quantity") { const leftQuantity = Number(left.dataset.storageProductQuantity) || 0; const rightQuantity = Number(right.dataset.storageProductQuantity) || 0; const quantityDifference = (leftQuantity - rightQuantity) * multiplier; if (quantityDifference !== 0) { return quantityDifference; } } else { const subdivisionDifference = String(left.dataset.storageSubdivisionName || "").localeCompare(String(right.dataset.storageSubdivisionName || ""), "ru-RU") * multiplier; if (subdivisionDifference !== 0) { return subdivisionDifference; } } return String(left.dataset.storageName || "").localeCompare(String(right.dataset.storageName || ""), "ru-RU") * multiplier; }); rows.forEach((row) => tbody.append(row)); const emptyRow = tbody.querySelector("[data-storage-filter-empty]"); if (emptyRow) { tbody.append(emptyRow); } root.querySelectorAll("[data-storage-table-sort]").forEach((button) => { const isActive = button === sortButton; const marker = button.querySelector("[data-storage-table-sort-marker]"); if (marker) { marker.textContent = isActive ? direction === "asc" ? "↑" : "↓" : ""; } button.dataset.storageTableDirection = isActive && direction === "asc" ? "desc" : "asc"; button.closest("th")?.setAttribute("aria-sort", isActive ? direction === "asc" ? "ascending" : "descending" : "none"); }); return; } const modalClose = e.target.closest("[data-warehouse-modal-close]"); if (modalClose) { modalClose.closest("[data-warehouse-modal]")?.remove(); return; } if (e.target.matches("[data-warehouse-modal]") && !e.target.hasAttribute("data-warehouse-close-only")) { e.target.remove(); return; } const productEdit = e.target.closest("[data-storage-product-edit]"); if (productEdit) { const productItemId = Number(productEdit.dataset.storageProductEdit); root.querySelector("[data-warehouse-modal]")?.remove(); try { await openProductItemEditor(ctx.org.id, productItemId); } catch (err) { const message = root.querySelector("[data-message]"); if (message) message.textContent = err.message; } return; } const count = e.target.closest("[data-storage-product-count]"); const storageRow = e.target.closest("[data-storage-open-products]"); const storageActions = e.target.closest(".warehouse-storage-actions"); const storageId = count ? Number(count.dataset.storageProductCount) : storageRow && !storageActions ? Number(storageRow.dataset.storageOpenProducts) : null; if (storageId) { await openStorageProductsModal(root, storageId); return; } const subdivisionStorage = e.target.closest("[data-subdivision-storage-open]"); if (subdivisionStorage) { await openStorageProductsModal(root, Number(subdivisionStorage.dataset.subdivisionStorageOpen)); return; } const edit = e.target.closest("[data-storage-subdivision-edit]"); if (edit) { const [subdivisions, storages] = await Promise.all([api.storageSubdivisions(ctx.org.id), api.storages(ctx.org.id)]); const row = subdivisions.find((item) => Number(item.id) === Number(edit.dataset.storageSubdivisionEdit)); if (row) { const subdivisionStorages = storages.filter((storage) => Number(storage.subdivision_id) === Number(row.id)); putModal(root, modal("Редактирование подраздела", `<form class="modal-grid" data-storage-subdivision-edit-form data-id="${Number(row.id)}"><label><span>Название</span><input name="name" value="${esc(row.name)}" required></label><button class="primary standard-save-button">Сохранить</button></form><div class="warehouse-subdivision-storages"><h4>Склады</h4>${subdivisionStorages.length ? `<div class="table-wrap"><table class="app-table"><tbody>${subdivisionStorages.map((storage) => `<tr data-subdivision-storage-open="${Number(storage.id)}"><td>${esc(storage.name)}</td><td>${esc(storage.product_quantity ?? 0)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">К подразделу пока не привязаны склады.</p>`}</div>`, true)); } return; } const storageEdit = e.target.closest("[data-storage-edit]"); if (storageEdit) { const [subdivisions, storages] = await Promise.all([api.storageSubdivisions(ctx.org.id), api.storages(ctx.org.id)]); const row = storages.find((item) => Number(item.id) === Number(storageEdit.dataset.storageEdit)); if (row) putModal(root, modal("Редактирование склада", `<form class="modal-grid" data-storage-edit-form data-id="${row.id}"><label><span>Название склада</span><input name="name" value="${esc(row.name)}" required></label><label><span>Подраздел</span><select name="subdivision_id" required>${subdivisions.map((item) => `<option value="${Number(item.id)}"${Number(item.id) === Number(row.subdivision_id) ? " selected" : ""}>${esc(item.name)}</option>`).join("")}</select></label><button class="primary standard-save-button">Сохранить</button></form>`)); return; } const writeoff = e.target.closest("[data-storage-writeoff]"); if (writeoff) { const storages = await api.storages(ctx.org.id); const storage = storages.find((item) => Number(item.id) === Number(writeoff.dataset.storageWriteoff)); if (!storage) return; await openStorageWriteoffModal(root, storage.id, storage.name); return; } const subDelete = e.target.closest("[data-storage-subdivision-delete]"); if (subDelete && confirm("Удалить подраздел склада?")) { try { await api.deleteStorageSubdivision(Number(subDelete.dataset.storageSubdivisionDelete)); await ctx.reload(); } catch (err) { root.querySelector("[data-message]").textContent = err.message; } return; } const del = e.target.closest("[data-storage-delete]"); if (del) { const rows = await api.storages(ctx.org.id); const row = rows.find((r) => Number(r.id) === Number(del.dataset.storageDelete)); if (row && confirm(`Удалить склад «${row.name}»?`)) { try { await api.deleteStorage(row.id); await ctx.reload(); } catch (err) { root.querySelector("[data-message]").textContent = err.message; } } return; } });
+
+  async function loadSubdivisionStorageProducts(storageProductsMenu) {
+    if (
+      !storageProductsMenu
+      || storageProductsMenu.dataset.loaded === "1"
+      || storageProductsMenu.dataset.loading === "1"
+    ) {
+      return;
+    }
+
+    storageProductsMenu.dataset.loading = "1";
+
+    const storageId = Number(
+      storageProductsMenu.dataset.storageId
+    );
+
+    try {
+      const products = await api.storageProducts(storageId);
+
+      storageProductsMenu.innerHTML = products.length
+        ? `
+        <div class="warehouse-subdivision-products-list">
+          ${products.map(
+            (product) => `
+              <button
+                type="button"
+                class="warehouse-subdivision-product"
+                data-storage-product-edit="${Number(product.product_item_id)}"
+              >
+                <span>
+                  ${esc(product.title)}
+                </span>
+
+
+                <small>
+                  ${esc(product.amount ?? 0)}
+                </small>
+              </button>
+            `
+          ).join("")}
+        </div>
+      `
+        : `
+        <p class="warehouse-subdivision-empty">
+          На складе пока нет товаров.
+        </p>
+      `;
+
+      storageProductsMenu.dataset.loaded = "1";
+    } catch (err) {
+      storageProductsMenu.innerHTML =
+        `
+        <p class="warehouse-subdivision-empty">
+          ${esc(err.message)}
+        </p>
+      `;
+    } finally {
+      delete storageProductsMenu.dataset.loading;
+    }
+  }
+
+  root.addEventListener("pointerover", (event) => {
+    const storageTrigger = event.target.closest(
+      "[data-subdivision-storage-hover]"
+    );
+
+    if (!storageTrigger) return;
+
+    const storagePopover =
+      storageTrigger.closest(
+        "[data-subdivision-storage-popover]"
+      );
+
+    const productsMenu =
+      storagePopover?.querySelector(
+        "[data-subdivision-storage-products]"
+      );
+
+    if (!productsMenu) return;
+
+    loadSubdivisionStorageProducts(productsMenu);
+  });
+  root.addEventListener("click", async (e) => { const toggle = e.target.closest("[data-storage-actions-toggle]"); if (toggle) { toggle.closest(".warehouse-actions-popover").classList.toggle("is-open"); return; } if (!e.target.closest(".warehouse-actions-popover")) root.querySelectorAll(".warehouse-actions-popover.is-open").forEach((n) => n.classList.remove("is-open")); const sortButton = e.target.closest("[data-storage-table-sort]"); if (sortButton) { const tbody = root.querySelector("[data-storage-table-body]"); if (!tbody) return; const sortKey = sortButton.dataset.storageTableSort; const direction = sortButton.dataset.storageTableDirection === "desc" ? "desc" : "asc"; const multiplier = direction === "desc" ? -1 : 1; const rows = [...tbody.querySelectorAll("[data-storage-table-row]")]; rows.sort((left, right) => { if (sortKey === "quantity") { const leftQuantity = Number(left.dataset.storageProductQuantity) || 0; const rightQuantity = Number(right.dataset.storageProductQuantity) || 0; const quantityDifference = (leftQuantity - rightQuantity) * multiplier; if (quantityDifference !== 0) { return quantityDifference; } } else { const subdivisionDifference = String(left.dataset.storageSubdivisionName || "").localeCompare(String(right.dataset.storageSubdivisionName || ""), "ru-RU") * multiplier; if (subdivisionDifference !== 0) { return subdivisionDifference; } } return String(left.dataset.storageName || "").localeCompare(String(right.dataset.storageName || ""), "ru-RU") * multiplier; }); rows.forEach((row) => tbody.append(row)); const emptyRow = tbody.querySelector("[data-storage-filter-empty]"); if (emptyRow) { tbody.append(emptyRow); } root.querySelectorAll("[data-storage-table-sort]").forEach((button) => { const isActive = button === sortButton; const marker = button.querySelector("[data-storage-table-sort-marker]"); if (marker) { marker.textContent = isActive ? direction === "asc" ? "↑" : "↓" : ""; } button.dataset.storageTableDirection = isActive && direction === "asc" ? "desc" : "asc"; button.closest("th")?.setAttribute("aria-sort", isActive ? direction === "asc" ? "ascending" : "descending" : "none"); }); return; } const modalClose = e.target.closest("[data-warehouse-modal-close]"); if (modalClose) { modalClose.closest("[data-warehouse-modal]")?.remove(); return; } if (e.target.matches("[data-warehouse-modal]") && !e.target.hasAttribute("data-warehouse-close-only")) { e.target.remove(); return; } const productEdit = e.target.closest("[data-storage-product-edit]"); if (productEdit) { const productItemId = Number(productEdit.dataset.storageProductEdit); root.querySelector("[data-warehouse-modal]")?.remove(); try { await openProductItemEditor(ctx.org.id, productItemId); } catch (err) { const message = root.querySelector("[data-message]"); if (message) message.textContent = err.message; } return; } const count = e.target.closest("[data-storage-product-count]"); const storageRow = e.target.closest("[data-storage-open-products]"); const storageActions = e.target.closest(".warehouse-storage-actions"); const storageId = count ? Number(count.dataset.storageProductCount) : storageRow && !storageActions ? Number(storageRow.dataset.storageOpenProducts) : null; if (storageId) { await openStorageProductsModal(root, storageId); return; }  const storageEdit = e.target.closest("[data-storage-edit]"); if (storageEdit) { const [subdivisions, storages] = await Promise.all([api.storageSubdivisions(ctx.org.id), api.storages(ctx.org.id)]); const row = storages.find((item) => Number(item.id) === Number(storageEdit.dataset.storageEdit)); if (row) putModal(root, modal("Редактирование склада", `<form class="modal-grid" data-storage-edit-form data-id="${row.id}"><label><span>Название склада</span><input name="name" value="${esc(row.name)}" required></label><label><span>Подраздел</span><select name="subdivision_id" required>${subdivisions.map((item) => `<option value="${Number(item.id)}"${Number(item.id) === Number(row.subdivision_id) ? " selected" : ""}>${esc(item.name)}</option>`).join("")}</select></label><button class="primary standard-save-button">Сохранить</button></form>`)); return; } const writeoff = e.target.closest("[data-storage-writeoff]"); if (writeoff) { const storages = await api.storages(ctx.org.id); const storage = storages.find((item) => Number(item.id) === Number(writeoff.dataset.storageWriteoff)); if (!storage) return; await openStorageWriteoffModal(root, storage.id, storage.name); return; } const subDelete = e.target.closest("[data-storage-subdivision-delete]"); if (subDelete && confirm("Удалить подраздел склада?")) { try { await api.deleteStorageSubdivision(Number(subDelete.dataset.storageSubdivisionDelete)); await ctx.reload(); } catch (err) { root.querySelector("[data-message]").textContent = err.message; } return; } const del = e.target.closest("[data-storage-delete]"); if (del) { const rows = await api.storages(ctx.org.id); const row = rows.find((r) => Number(r.id) === Number(del.dataset.storageDelete)); if (row && confirm(`Удалить склад «${row.name}»?`)) { try { await api.deleteStorage(row.id); await ctx.reload(); } catch (err) { root.querySelector("[data-message]").textContent = err.message; } } return; } });
   root.addEventListener("submit", async (e) => { const form = e.target; if (!form.matches("[data-storage-writeoff-form]")) return; e.preventDefault(); const data = new FormData(form); const productItemId = Number(data.get("product_item_id")); const amount = Number(data.get("amount")); const amountInput = form.querySelector("[data-storage-writeoff-amount]"); const available = Number(amountInput?.max) || 0; const message = form.querySelector("[data-message]"); if (!productItemId) { message.textContent = "Выберите товар."; return; } if (!Number.isFinite(amount) || amount <= 0) { message.textContent = "Введите количество товара для списания."; return; } if (amount > available) { message.textContent = "Количество для списания не может превышать остаток на складе."; return; } try { await api.writeoffStorageProduct(Number(form.dataset.storageId), { product_item_id: productItemId, amount, comment: String(data.get("comment") || "").trim() }); root.querySelector("[data-warehouse-modal]")?.remove(); await ctx.reload(); } catch (err) { message.textContent = err.message; } });
   root.addEventListener("submit", async (e) => { const form = e.target; if (!form.matches("[data-storage-subdivision-create], [data-storage-create], [data-storage-subdivision-edit-form], [data-storage-edit-form]")) return; e.preventDefault(); const data = new FormData(form); try { if (form.matches("[data-storage-subdivision-create]")) await api.createStorageSubdivision({ organization_id: Number(ctx.org.id), name: data.get("name").trim() }); else if (form.matches("[data-storage-create]")) await api.createStorage({ organization_id: Number(ctx.org.id), subdivision_id: Number(data.get("subdivision_id")), name: data.get("name").trim() }); else if (form.matches("[data-storage-edit-form]")) await api.updateStorage(Number(form.dataset.id), { name: data.get("name").trim(), subdivision_id: Number(data.get("subdivision_id")) }); else await api.updateStorageSubdivision(Number(form.dataset.id), { name: data.get("name").trim() }); root.querySelector("[data-warehouse-modal]")?.remove(); await ctx.reload(); } catch (err) { (form.querySelector("[data-message]") || root.querySelector("[data-message]")).textContent = err.message; } });
   root.addEventListener("input", (e) => { if (!e.target.matches("[data-storage-product-search]")) return; clearTimeout(timer); const input = e.target; const current = ++sequence; timer = setTimeout(async () => { const rows = await api.storageProducts(Number(input.dataset.storageId), input.value); if (current !== sequence) return; const target = root.querySelector("[data-storage-product-results]"); if (target) target.innerHTML = rows.map((r) => `<label class="warehouse-product-row"><input type="checkbox" data-storage-product-select="${Number(r.product_item_id)}"><span>${esc(r.title)}</span><small>${esc(r.amount ?? 0)}</small><input type="number" step="0.01" min="0.01" max="${Number(r.amount) || 0}" data-storage-product-amount="${Number(r.product_item_id)}"></label>`).join(""); }, 250); });
