@@ -1564,7 +1564,7 @@ return `
         ? `
           <button
             type="button"
-            class="ghost pagination-link"
+            class="btn btn-outline-secondary client-search-reset"
             data-client-search-reset
           >
             Сбросить
@@ -1599,8 +1599,15 @@ export function bindClients(root, ctx) {
     const resetButton = root.querySelector("[data-client-search-reset]");
     const searchForm = root.querySelector("[data-client-search]");
     if (searchForm && !state.clientList.search && resetButton) resetButton.remove();
-    if (searchForm && state.clientList.search && !resetButton) {
-      searchForm.insertAdjacentHTML("beforeend", '<button type="button" class="ghost pagination-link" data-client-search-reset>Сбросить</button>');
+    if (
+      searchForm
+      && state.clientList.search
+      && !resetButton
+    ) {
+      searchForm.insertAdjacentHTML(
+        "beforeend",
+        `<button type="button" class="btn btn-outline-secondary client-search-reset" data-client-search-reset>Сбросить</button>`
+      );
     }
     history.replaceState(null, "", clientListUrl(ctx, state.clientList));
   };
