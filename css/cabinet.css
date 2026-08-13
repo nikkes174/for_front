@@ -2591,12 +2591,14 @@ body.service-gallery-open { overflow: hidden; }
 .cabinet-bottom-nav {
   position: fixed;
   z-index: 100;
-  right: max(16px, env(safe-area-inset-right));
+  right: auto;
   bottom: max(16px, env(safe-area-inset-bottom));
-  left: max(16px, env(safe-area-inset-left));
+  left: 50%;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--cabinet-bottom-nav-items, 5), minmax(0, 1fr));
   align-items: center;
+  width: min(calc(var(--cabinet-bottom-nav-items, 5) * 110px + 14px), calc(100vw - 32px));
+  transform: translateX(-50%);
   max-width: 520px;
   min-height: 64px;
   margin: 0 auto;
@@ -2621,6 +2623,7 @@ body.service-gallery-open { overflow: hidden; }
   cursor: pointer;
   transition: background-color .24s ease, transform .24s ease, color .24s ease;
 }
+.cabinet-bottom-nav-item[hidden] { display: none !important; }
 .cabinet-bottom-nav-item svg {
   width: 25px;
   height: 25px;
@@ -2636,6 +2639,10 @@ body.service-gallery-open { overflow: hidden; }
   fill: none !important;
   stroke: currentColor !important;
   stroke-width: 1.9;
+}
+.cabinet-bottom-nav-item--chat svg path {
+  fill: currentColor !important;
+  stroke: none !important;
 }
 .cabinet-bottom-nav-item.active {
   background: rgb(17 17 17 / 10%);

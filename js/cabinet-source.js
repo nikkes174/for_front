@@ -56,8 +56,11 @@ const form = document.querySelector("[data-cabinet-form]");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
       const cabinetFieldNames = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
       const clientFieldSectionPrefix = "client_field_";
-      const defaultCardSections = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
+      const clientAccessConfiguredSection = "client_access_configured";
+      const clientAccessSections = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
+      const defaultCardSections = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat", ...clientAccessSections];
       let currentCardSections = defaultCardSections;
+      let currentAccessSections = defaultCardSections;
       let currentClient = null;
       let cabinetData = null;
       const allCabinetSections = ["profile", "visits", "loyalty", "achievements", "referrals"];
@@ -736,13 +739,58 @@ const form = document.querySelector("[data-cabinet-form]");
         return "";
       }
 
+      function cabinetAccessEnabled(sections, section) {
+        const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
+        if (!configuredSections.includes(clientAccessConfiguredSection)) return true;
+        return configuredSections.includes(section);
+      }
+
+      function cabinetAccessSections(sections) {
+        const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
+        if (configuredSections.includes(clientAccessConfiguredSection)) return configuredSections;
+        const organizationId = cabinetData?.organization_id || cabinetData?.client?.organization_id || currentClient?.organization_id;
+        try {
+          const saved = JSON.parse(localStorage.getItem(`loyalty.clientCardSections.${organizationId || "default"}`) || "null");
+          if (Array.isArray(saved) && saved.includes(clientAccessConfiguredSection)) return saved;
+        } catch {
+          // Ignore broken local settings and use the API response.
+        }
+        return configuredSections;
+      }
+
+      function applyCabinetAccess(sections) {
+        const configuredSections = cabinetAccessSections(sections);
+        const controls = {
+          client_online_booking: '[data-cabinet-tab="client_booking"]',
+          client_achievements: '[data-cabinet-tab="achievements"]',
+          client_notifications: "[data-cabinet-notifications-open]",
+          client_logout: "[data-cabinet-logout]",
+        };
+        Object.entries(controls).forEach(([section, selector]) => {
+          document.querySelectorAll(selector).forEach((element) => {
+            element.hidden = !cabinetAccessEnabled(configuredSections, section);
+          });
+        });
+        document.querySelectorAll('[data-cabinet-tab="chat"]').forEach((element) => {
+          element.hidden = !configuredSections.includes("client_chat");
+        });
+        const bottomNav = document.querySelector(".cabinet-bottom-nav");
+        if (bottomNav) bottomNav.style.setProperty("--cabinet-bottom-nav-items", String(bottomNav.querySelectorAll(".cabinet-bottom-nav-item:not([hidden])").length));
+      }
+
       function renderHistorySections(sections) {
         const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
+        const accessSections = cabinetAccessSections(configuredSections);
+        if (accessSections.includes(clientAccessConfiguredSection) || clientAccessSections.some((section) => accessSections.includes(section))) currentAccessSections = accessSections;
+        applyCabinetAccess(currentAccessSections);
         const visitsEnabled = configuredSections.includes("client_visits");
         if (myBookingsSection) myBookingsSection.hidden = !visitsEnabled;
         const enabled = configuredSections
           .filter((section) => section !== "client_name")
+          .filter((section) => section !== "client_chat")
           .filter((section) => section !== "client_fields_configured")
+          .filter((section) => section !== clientAccessConfiguredSection)
+          .filter((section) => !clientAccessSections.includes(section))
           .filter((section) => !String(section).startsWith(clientFieldSectionPrefix));
         currentCardSections = enabled;
         if (historySection) historySection.hidden = enabled.length === 0;
@@ -1296,6 +1344,7 @@ const form = document.querySelector("[data-cabinet-form]");
       function cabinetTabFromHash() {
         if (location.hash === "#my-booking") return "client_booking";
         if (location.hash === "#achievements") return "achievements";
+        if (location.hash === "#chat") return "chat";
         return "profile";
       }
 
@@ -1341,7 +1390,17 @@ const form = document.querySelector("[data-cabinet-form]");
         }
       }
 
+      function cabinetTabAllowed(tab) {
+        if (tab === "client_booking" && publicBookingOrganizationId) return true;
+        const sections = cabinetAccessSections(cabinetData?.card_sections ?? defaultCardSections);
+        if (tab === "client_booking") return cabinetAccessEnabled(sections, "client_online_booking");
+        if (tab === "achievements") return cabinetAccessEnabled(sections, "client_achievements");
+        if (tab === "chat") return sections.includes("client_chat");
+        return true;
+      }
+
       function setCabinetTab(tab) {
+        if (!cabinetTabAllowed(tab)) tab = "profile";
         document.querySelectorAll("[data-cabinet-tab]").forEach((link) => link.classList.toggle("active", link.dataset.cabinetTab === tab));
         document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
           view.hidden = view.dataset.cabinetView !== tab;
@@ -1599,7 +1658,7 @@ const form = document.querySelector("[data-cabinet-form]");
           event.preventDefault();
           setCabinetTab(link.dataset.cabinetTab);
           closeCabinetMenu();
-          const tabHashes = { achievements: "#achievements", client_booking: "#my-booking", profile: "#my-data" };
+          const tabHashes = { achievements: "#achievements", chat: "#chat", client_booking: "#my-booking", profile: "#my-data" };
           history.replaceState(null, "", tabHashes[link.dataset.cabinetTab] || "#my-data");
         });
       });

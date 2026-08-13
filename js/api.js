@@ -164,6 +164,7 @@ export const api = {
     return request(`/organizations/storages/${storageId}/products${suffix}`, { cache: "no-store" });
   },
   transferStorageProducts: (storageId, body) => request(`/organizations/storages/${storageId}/transfer`, { method: "POST", body: JSON.stringify(body) }),
+  writeoffStorageProduct: (storageId, body) => request(`/organizations/storages/${storageId}/writeoff`, { method: "POST", body: JSON.stringify(body) }),
   organizationBots: (orgId) => request(`/bots/organizations/${orgId}`, { cache: "no-store" }),
   saveOrganizationBot: (orgId, platform, body) => request(`/bots/organizations/${orgId}/${platform}`, { method: "PUT", body: JSON.stringify(body) }),
   toggleOrganizationBot: (orgId, platform, enabled) => request(`/bots/organizations/${orgId}/${platform}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }) }),

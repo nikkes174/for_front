@@ -1237,6 +1237,7 @@ function openReviewTextModal(item) {
 function storageEventDetailsHtml(item) {
   const payload = item.payload || {};
   if ((item.event_type || item.event_name) === "storage_transfer") return escapeHtml(`Товар: ${payload.product_title || "—"}; количество: ${payload.amount ?? 0}; ${payload.source_storage_name || "—"} → ${payload.destination_storage_name || "—"}`);
+  if ((item.event_type || item.event_name) === "storage_writeoff") return escapeHtml(`\u0422\u043e\u0432\u0430\u0440: ${payload.product_title || "\u2014"}; \u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e: ${payload.amount ?? 0}; \u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439: ${payload.comment || "\u2014"}`);
   const branch = (cache.branches || []).find((row) => String(row.id) === String(item.branch_id || payload.branch_id));
   const employee = (cache.users || []).find((row) => String(row.id) === String(item.actor_id || payload.employee_id));
   return escapeHtml(`Причина: ${payload.reason || "Визит"}; филиал: ${branch?.name || "—"}; сотрудник: ${employee ? userLabelById(employee.id) : "—"}; товар: ${payload.product_title || "—"}; количество: ${payload.amount ?? 0}`);
@@ -1825,7 +1826,7 @@ function isClientCreateEvent(item) {
 function eventNameCell(item) {
   const eventCode = String(item.event_type || item.event_name || item.name || "").toLowerCase();
   const isStorageEvent = item.entity_type === "warehouse";
-  const label = isStorageEvent ? (/transfer|\u043f\u0435\u0440\u0435\u043d\u043e\u0441/.test(eventCode) ? "\u041f\u0435\u0440\u0435\u043d\u043e\u0441 \u0442\u043e\u0432\u0430\u0440\u0430" : "\u0421\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0441\u043e \u0441\u043a\u043b\u0430\u0434\u0430") : humanizeCode(item.event_type || item.event_name || item.name);
+  const label = isStorageEvent ? (/transfer|\u043f\u0435\u0440\u0435\u043d\u043e\u0441/.test(eventCode) ? "\u041f\u0435\u0440\u0435\u043d\u043e\u0441 \u0442\u043e\u0432\u0430\u0440\u0430" : /writeoff|write_off|\u0441\u043f\u0438\u0441\u0430\u043d/.test(eventCode) ? "\u0421\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0442\u043e\u0432\u0430\u0440\u0430" : "\u0421\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0441\u043e \u0441\u043a\u043b\u0430\u0434\u0430") : humanizeCode(item.event_type || item.event_name || item.name);
   const normalizedLabel = String(label).trim().toLowerCase().replace(/\s+/g, " ");
   if (isStorageEvent) return `<button type="button" class="ghost storage-event-button" data-open-storage-event="${escapeHtml(item.id)}">${escapeHtml(label)}</button>`;
   if (isClientCreateEvent(item) || normalizedLabel === "\u043a\u043b\u0438\u0435\u043d\u0442 \u0441\u043e\u0437\u0434\u0430\u043d\u0438\u0435") return `<button type="button" class="ghost event-client-create-button">${escapeHtml(label)}</button>`;

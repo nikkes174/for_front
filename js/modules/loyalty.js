@@ -17,8 +17,10 @@ const REGISTRATION_FIELD_NAMES = [
   "vk_id",
   "email",
 ];
-const DEFAULT_CLIENT_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat"];
 const CLIENT_FIELD_SECTION_PREFIX = "client_field_";
+const CLIENT_ACCESS_CONFIGURED_SECTION = "client_access_configured";
+const CLIENT_ACCESS_SECTIONS = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
+const DEFAULT_CLIENT_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat", ...CLIENT_ACCESS_SECTIONS];
 
 function showLoyaltyToast(message) {
   document.querySelector("[data-loyalty-toast]")?.remove();
@@ -455,12 +457,24 @@ function clientCardSectionsStorageKey(orgId) {
 
 function normalizeClientCardSections(sections) {
   if (!Array.isArray(sections)) return [...DEFAULT_CLIENT_CARD_SECTIONS];
-  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || name === "client_fields_configured" || (String(name).startsWith(CLIENT_FIELD_SECTION_PREFIX) && REGISTRATION_FIELD_NAMES.includes(String(name).slice(CLIENT_FIELD_SECTION_PREFIX.length))) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
+  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || name === "client_fields_configured" || name === CLIENT_ACCESS_CONFIGURED_SECTION || (String(name).startsWith(CLIENT_FIELD_SECTION_PREFIX) && REGISTRATION_FIELD_NAMES.includes(String(name).slice(CLIENT_FIELD_SECTION_PREFIX.length))) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
 }
 
 function enabledClientCardSections(orgId) {
   if (Array.isArray(loyaltyState.clientCardSections)) {
-    return normalizeClientCardSections(loyaltyState.clientCardSections);
+    const sections = normalizeClientCardSections(loyaltyState.clientCardSections);
+    if (sections.includes(CLIENT_ACCESS_CONFIGURED_SECTION)) return sections;
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(clientCardSectionsStorageKey(orgId)) || "null");
+      if (Array.isArray(saved) && saved.includes(CLIENT_ACCESS_CONFIGURED_SECTION)) {
+        return normalizeClientCardSections(saved);
+      }
+    } catch {
+      // Ignore broken local settings and use the API response.
+    }
+
+    return sections;
   }
   try {
     const saved = JSON.parse(localStorage.getItem(clientCardSectionsStorageKey(orgId)) || "null");
@@ -1058,6 +1072,8 @@ function clientCabinetFieldsSelect(enabledSections) {
 function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
   const level = selectedClient?.client_level || metric?.client_level || metric?.loyalty_level || levels?.[0]?.name || L.notSet;
   const enabledSections = enabledClientCardSections(ctx.org?.id);
+  const accessConfigured = enabledSections.includes(CLIENT_ACCESS_CONFIGURED_SECTION);
+  const accessEnabled = (section) => !accessConfigured || enabledSections.includes(section);
   const blocks = [
     {
       key: "client_name",
@@ -1084,6 +1100,22 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     {
       key: "client_chat",
       html: cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", "", enabledSections.includes("client_chat")),
+    },
+    {
+      key: "client_online_booking",
+      html: cardConfigBlock(ctx, "client_online_booking", "Онлайн запись", "", accessEnabled("client_online_booking")),
+    },
+    {
+      key: "client_achievements",
+      html: cardConfigBlock(ctx, "client_achievements", "Достижения", "", accessEnabled("client_achievements")),
+    },
+    {
+      key: "client_notifications",
+      html: cardConfigBlock(ctx, "client_notifications", "Уведомления", "", accessEnabled("client_notifications")),
+    },
+    {
+      key: "client_logout",
+      html: cardConfigBlock(ctx, "client_logout", "Кнопка выхода", "", accessEnabled("client_logout")),
     },
   ];
   const order = new Map(enabledSections.map((key, index) => [key, index]));
@@ -1677,6 +1709,7 @@ export function bindLoyalty(root, ctx) {
         .map((input) => input.dataset.clientCardSection);
       const profileFields = [...root.querySelectorAll("[data-client-profile-field]:checked")].map((input) => `${CLIENT_FIELD_SECTION_PREFIX}${input.value}`);
       sections.push("client_fields_configured", ...profileFields);
+      sections.push(CLIENT_ACCESS_CONFIGURED_SECTION);
       await api.updateClientCardSections(ctx.org.id, sections);
       saveEnabledClientCardSections(ctx.org.id, sections);
       loyaltyState.clientCardSections = sections;
