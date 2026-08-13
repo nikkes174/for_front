@@ -234,7 +234,7 @@ function variableCellContent(client, key) {
   }
 }
 
-function renderTableHeader() {
+function renderTableMarkup() {
   const { selectedVariables } = segmentState;
   const sortButton = (key, label) => {
     const isActive = segmentState.sort === key;
@@ -257,30 +257,36 @@ function renderTableHeader() {
       </th>
     `;
   };
-  let headers = sortButton("name", "Клиент");
-  for (const key of selectedVariables) {
-    const variable = SEGMENT_VARIABLES.find((v) => v.key === key);
-    if (variable) {
-      headers += sortButton(key, variable.columnLabel);
-    }
-  }
-  return `<thead><tr>${headers}</tr></thead>`;
-}
-
-function renderTableBody() {
+  const headers = sortButton("name", "Клиент") + selectedVariables
+    .map((key) => {
+      const variable = SEGMENT_VARIABLES.find((v) => v.key === key);
+      if (variable) return sortButton(key, variable.columnLabel);
+      return "";
+    })
+    .join("");
   const { pageItems, totalItems } = getCurrentPageClients();
+  let rows = "";
   if (totalItems === 0) {
-    return `<tbody data-segmentation-table-body><tr><td colspan="${SEGMENT_VARIABLES.length + 1}">Клиенты не найдены</td></tr></tbody>`;
+    rows = `<tr><td colspan="${selectedVariables.length + 1}">Клиенты не найдены</td></tr>`;
+  } else {
+    rows = pageItems.map((client) => {
+      const clientName = formatClientName(client);
+      let cells = `<td><strong>${escapeHtml(clientName)}</strong></td>`;
+      for (const key of selectedVariables) {
+        cells += `<td>${variableCellContent(client, key)}</td>`;
+      }
+      return `<tr data-segment-table-row>${cells}</tr>`;
+    }).join("");
   }
-  const rows = pageItems.map((client) => {
-    const clientName = formatClientName(client);
-    let cells = `<td><strong>${escapeHtml(clientName)}</strong></td>`;
-    for (const key of segmentState.selectedVariables) {
-      cells += `<td>${variableCellContent(client, key)}</td>`;
-    }
-    return `<tr data-segment-table-row>${cells}</tr>`;
-  }).join("");
-  return `<tbody data-segmentation-table-body>${rows}</tbody>`;
+  return `
+    <table
+      class="centered-list-table app-table segmentation-table"
+      style="--segment-variable-count: ${selectedVariables.length}"
+    >
+      <thead><tr>${headers}</tr></thead>
+      <tbody data-segmentation-table-body>${rows}</tbody>
+    </table>
+  `;
 }
 
 function renderTable() {
@@ -288,14 +294,7 @@ function renderTable() {
   if (!selectedVariables.length) {
     return `<div data-segmentation-table></div>`;
   }
-  return `
-    <div data-segmentation-table>
-      <table class="centered-list-table app-table segmentation-table">
-        ${renderTableHeader()}
-        ${renderTableBody()}
-      </table>
-    </div>
-  `;
+  return `<div data-segmentation-table">${renderTableMarkup()}</div>`;
 }
 
 function renderPagination() {
@@ -613,57 +612,16 @@ function updatePageSize(container, size) {
 }
 
 function renderTableContent(container) {
-  const tableContainer = container.querySelector("[data-segmentation-table]");
+  const tableContainer =
+    container.querySelector("[data-segmentation-table]");
+
   if (!tableContainer) return;
-  const { selectedVariables } = segmentState;
-  if (!selectedVariables.length) {
+
+  if (!segmentState.selectedVariables.length) {
     tableContainer.innerHTML = "";
     return;
   }
-  const { pageItems, totalItems } = getCurrentPageClients();
-  let headers = `<th><div class="table-sort-label">Клиент</div></th>`;
-  for (const key of selectedVariables) {
-    const variable = SEGMENT_VARIABLES.find((v) => v.key === key);
-    if (variable) {
-      const isActive = segmentState.sort === key;
-      const marker = isActive ? (segmentState.direction === "asc" ? "↑" : "↓") : "";
-      const ariaSort = isActive ? (segmentState.direction === "asc" ? "ascending" : "descending") : "none";
-      headers += `
-        <th>
-          <button
-            type="button"
-            class="table-sort"
-            data-segment-sort="${escapeHtml(key)}"
-            data-segment-direction="${segmentState.direction === "desc" ? "desc" : "asc"}"
-            aria-sort="${ariaSort}"
-          >
-            <span class="table-sort-label">
-              ${escapeHtml(variable.columnLabel)}
-              <span class="table-sort-marker" data-segment-sort-marker aria-hidden="true">${marker}</span>
-            </span>
-          </button>
-        </th>
-      `;
-    }
-  }
-  let rows = "";
-  if (totalItems === 0) {
-    rows = `<tr><td colspan="${selectedVariables.length + 1}">Клиенты не найдены</td></tr>`;
-  } else {
-    rows = pageItems.map((client) => {
-      const clientName = formatClientName(client);
-      let cells = `<td><strong>${escapeHtml(clientName)}</strong></td>`;
-      for (const key of selectedVariables) {
-        cells += `<td>${variableCellContent(client, key)}</td>`;
-      }
-      return `<tr data-segment-table-row>${cells}</tr>`;
-    }).join("");
-  }
-  tableContainer.innerHTML = `
-    <table class="centered-list-table app-table segmentation-table">
-      <thead><tr>${headers}</tr></thead>
-      <tbody data-segmentation-table-body>${rows}</tbody>
-    </table>
-  `;
+
+  tableContainer.innerHTML = renderTableMarkup();
 }
 

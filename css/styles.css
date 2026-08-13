@@ -830,11 +830,35 @@ button:active { transform: translateY(1px); }
 }
 
 .segmentation-table {
-  min-width: 960px;
+  width: 100%;
+  min-width: max(
+    960px,
+    calc(220px + var(--segment-variable-count, 1) * 170px)
+  );
+  table-layout: fixed;
 }
 
+.segmentation-table th:first-child,
+.segmentation-table td:first-child {
+  width: 220px;
+}
+
+.segmentation-table th,
 .segmentation-table td {
+  box-sizing: border-box;
+  text-align: center;
   vertical-align: middle;
+}
+
+.segmentation-table .table-sort {
+  width: 100%;
+  min-height: 24px;
+  justify-content: center;
+}
+
+[data-segmentation-table] {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .segmentation-boolean {
