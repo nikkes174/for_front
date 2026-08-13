@@ -1390,6 +1390,26 @@ button:active { transform: translateY(1px); }
   display: inline-flex;
 }
 
+.warehouse-subdivision-popover:hover,
+.warehouse-subdivision-popover:focus-within {
+  z-index: 40;
+}
+
+.warehouse-subdivision-popover:hover
+.warehouse-subdivision-menu,
+.warehouse-subdivision-popover:focus-within
+.warehouse-subdivision-menu {
+  z-index: 50;
+}
+
+.warehouse-subdivision-table-wrap {
+  overflow: visible;
+}
+
+.warehouse-subdivision-table-wrap > table {
+  border-radius: inherit;
+}
+
 .warehouse-subdivision-trigger {
   position: relative;
   z-index: 1;
@@ -1548,6 +1568,12 @@ button:active { transform: translateY(1px); }
 .warehouse-subdivision-storage-popover:focus-within
 .warehouse-subdivision-storage-menu {
   display: block;
+  z-index: 70;
+}
+
+.warehouse-subdivision-storage-popover:hover,
+.warehouse-subdivision-storage-popover:focus-within {
+  z-index: 60;
 }
 
 .warehouse-subdivision-products-list {
