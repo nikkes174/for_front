@@ -596,7 +596,91 @@ export function bindWarehouse(root, ctx) {
   root.addEventListener("submit", async (e) => { const form = e.target; if (!form.matches("[data-storage-subdivision-create], [data-storage-create], [data-storage-subdivision-edit-form], [data-storage-edit-form]")) return; e.preventDefault(); const data = new FormData(form); try { if (form.matches("[data-storage-subdivision-create]")) await api.createStorageSubdivision({ organization_id: Number(ctx.org.id), name: data.get("name").trim() }); else if (form.matches("[data-storage-create]")) await api.createStorage({ organization_id: Number(ctx.org.id), subdivision_id: Number(data.get("subdivision_id")), name: data.get("name").trim() }); else if (form.matches("[data-storage-edit-form]")) await api.updateStorage(Number(form.dataset.id), { name: data.get("name").trim(), subdivision_id: Number(data.get("subdivision_id")) }); else await api.updateStorageSubdivision(Number(form.dataset.id), { name: data.get("name").trim() }); root.querySelector("[data-warehouse-modal]")?.remove(); await ctx.reload(); } catch (err) { (form.querySelector("[data-message]") || root.querySelector("[data-message]")).textContent = err.message; } });
   root.addEventListener("input", (e) => { if (!e.target.matches("[data-storage-product-search]")) return; clearTimeout(timer); const input = e.target; const current = ++sequence; timer = setTimeout(async () => { const rows = await api.storageProducts(Number(input.dataset.storageId), input.value); if (current !== sequence) return; const target = root.querySelector("[data-storage-product-results]"); if (target) target.innerHTML = rows.map((r) => `<label class="warehouse-product-row"><input type="checkbox" data-storage-product-select="${Number(r.product_item_id)}"><span>${esc(r.title)}</span><small>${esc(r.amount ?? 0)}</small><input type="number" step="0.01" min="0.01" max="${Number(r.amount) || 0}" data-storage-product-amount="${Number(r.product_item_id)}"></label>`).join(""); }, 250); });
   root.addEventListener("change", (e) => { const writeoffProduct = e.target.closest("[data-storage-writeoff-product]"); if (writeoffProduct) { const form = writeoffProduct.closest("[data-storage-writeoff-form]"); if (!form) return; const selectedOption = writeoffProduct.selectedOptions[0]; const available = Number(selectedOption?.dataset.available) || 0; const amountInput = form.querySelector("[data-storage-writeoff-amount]"); const availableText = form.querySelector("[data-storage-writeoff-available]"); if (amountInput) { amountInput.value = ""; amountInput.max = String(available); } if (availableText) availableText.textContent = writeoffProduct.value ? `Доступно на складе: ${available}` : ""; return; } const subdivisionFilterOption = e.target.closest("[data-storage-subdivision-filter-option]"); if (subdivisionFilterOption) { applyStorageSubdivisionFilter(root); return; } const amount = e.target.closest("[data-storage-product-amount]"); if (amount) selected.set(amount.dataset.storageProductAmount, Number(amount.value)); const check = e.target.closest("[data-storage-product-select]"); if (check && !check.checked) selected.delete(check.dataset.storageProductSelect); });
-  root.addEventListener("click", async (e) => { const button = e.target.closest("[data-storage-transfer]"); if (!button) return; const rows = await api.storages(ctx.org.id); const source = rows.find((r) => Number(r.id) === Number(button.dataset.storageTransfer)); if (!source) return; const destinations = rows.filter((r) => Number(r.id) !== Number(source.id)); putModal(root, modal("Переместить товары", `<form class="modal-grid" data-storage-transfer-form data-id="${source.id}"><div>${esc(source.name)}</div><input type="search" data-storage-product-search data-storage-id="${source.id}" placeholder="Введите название товара"><div data-storage-product-results></div><label><span>Склад назначения</span><select name="destination_storage_id" required><option value="">Выберите склад</option>${destinations.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></label><p data-message>${destinations.length ? "" : "Нет другого склада для перемещения."}</p><button class="primary standard-save-button"${destinations.length ? "" : " disabled"}>Переместить</button></form>`)); });
+  root.addEventListener("click", async (e) => {
+    const button = e.target.closest(
+      "[data-storage-transfer]"
+    );
+    if (!button) return;
+
+    const rows = await api.storages(ctx.org.id);
+    const source = rows.find(
+      (r) =>
+        Number(r.id) ===
+        Number(button.dataset.storageTransfer)
+    );
+    if (!source) return;
+
+    const destinations = rows.filter(
+      (r) => Number(r.id) !== Number(source.id)
+    );
+
+    putModal(
+      root,
+      modal(
+        "Переместить товары",
+        `
+        <form
+          class="warehouse-transfer-form"
+          data-storage-transfer-form
+          data-id="${Number(source.id)}"
+        >
+          <div class="warehouse-transfer-controls">
+            <div class="warehouse-transfer-source">
+              ${esc(source.name)}
+            </div>
+
+            <label>
+              <span>Склад назначения</span>
+              <select
+                name="destination_storage_id"
+                required
+              >
+                <option value="">
+                  Выберите склад
+                </option>
+                ${destinations.map(
+                  (storage) => `
+                    <option value="${Number(storage.id)}">
+                      ${esc(storage.name)}
+                    </option>
+                  `
+                ).join("")}
+              </select>
+            </label>
+
+            <button
+              class="primary standard-save-button"
+              ${destinations.length ? "" : "disabled"}
+            >
+              Переместить
+            </button>
+
+            <p data-message>
+              ${
+                destinations.length
+                  ? ""
+                  : "Нет другого склада для перемещения."
+              }
+            </p>
+          </div>
+
+          <div class="warehouse-transfer-products">
+            <input
+              type="search"
+              data-storage-product-search
+              data-storage-id="${Number(source.id)}"
+              placeholder="Введите название товара"
+            >
+
+            <div
+              data-storage-product-results
+            ></div>
+          </div>
+        </form>
+      `
+      )
+    );
+  });
   root.addEventListener("submit", async (e) => { const form = e.target; if (!form.matches("[data-storage-transfer-form]")) return; e.preventDefault(); const items = [...form.querySelectorAll("[data-storage-product-select]:checked")].map((checkbox) => { const id = checkbox.dataset.storageProductSelect; const input = form.querySelector(`[data-storage-product-amount="${id}"]`); return { product_item_id: Number(id), amount: Number(input?.value), available: Number(input?.max) }; }); const destination = Number(new FormData(form).get("destination_storage_id")); if (!destination || !items.length) { form.querySelector("[data-message]").textContent = "Выберите склад и товары с количеством больше нуля."; return; } if (items.some((item) => !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > item.available)) { form.querySelector("[data-message]").textContent = "Количество товара должно быть больше нуля и не превышать остаток на складе."; return; } try { await api.transferStorageProducts(Number(form.dataset.id), { destination_storage_id: destination, items: items.map(({ product_item_id, amount }) => ({ product_item_id, amount })) }); root.querySelector("[data-warehouse-modal]")?.remove(); await ctx.reload(); } catch (err) { form.querySelector("[data-message]").textContent = err.message; } });
   root.addEventListener("keydown", (e) => { if (e.key !== "Escape") return; const openModal = root.querySelector("[data-warehouse-modal]"); if (openModal && !openModal.hasAttribute("data-warehouse-close-only")) { openModal.remove(); } });
 
