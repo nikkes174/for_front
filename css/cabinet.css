@@ -2691,6 +2691,29 @@ body.service-gallery-open { overflow: hidden; }
 .cabinet-notifications-modal .cabinet-switch input:checked + .cabinet-switch-track::after {
   transform: translateX(18px);
 }
+.cabinet-bonus-list {
+  display: grid;
+  gap: 8px;
+}
+.cabinet-bonus-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.cabinet-bonus-row:last-child {
+  border-bottom: 0;
+}
+.cabinet-bonus-row span {
+  color: #667085;
+  font-size: 13px;
+}
+.cabinet-bonus-row b {
+  color: #172033;
+  font-size: 15px;
+}
 
 /* Keep the booking caption clear of the organization avatar. */
 [data-cabinet-view="client_booking"] .cabinet-booking-brand label {

@@ -2449,6 +2449,21 @@ form[data-visit-edit] .visit-item-picker select {
   gap: 8px;
 }
 
+.client-card-bonus-preview {
+  display: grid;
+  gap: 6px;
+}
+
+.client-card-bonus-preview > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.client-card-bonus-preview span {
+  color: #667085;
+}
+
 .card-block-settings {
   display: grid;
   grid-template-columns: minmax(90px, 1fr);

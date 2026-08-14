@@ -55,6 +55,8 @@
   var defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
   var cabinetFieldNames = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
   var clientFieldSectionPrefix = "client_field_";
+  var clientBonusesSection = "client_bonuses";
+  var clientBonusesConfiguredSection = "client_bonuses_configured";
   var clientAccessConfiguredSection = "client_access_configured";
   var clientAccessSections = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
   var clientBottomMenuSections = ["client_online_booking", "client_achievements", "client_chat", "client_notifications", "client_logout"];
@@ -473,6 +475,7 @@
     if (section === "client_level") return "\u0423\u0440\u043E\u0432\u0435\u043D\u044C";
     if (section === "client_visits") return "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0432\u0438\u0437\u0438\u0442\u043E\u0432";
     if (section === "client_personal_link") return "\u0420\u0435\u0444\u0435\u0440\u0430\u043B\u044C\u043D\u0430\u044F \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0430";
+    if (section === clientBonusesSection) return "\u0411\u043E\u043D\u0443\u0441\u044B";
     if (section === "client_chat") return "\u0427\u0430\u0442";
     if (section.startsWith("bonus_")) return "\u0411\u043E\u043D\u0443\u0441\u044B";
     return section;
@@ -647,6 +650,17 @@
           </div>
         `;
   }
+  function enabledBonusSections(sections) {
+    if (!cabinetBonusesEnabled(sections)) return [];
+    return sections.filter((section) => String(section).startsWith("bonus_") && section !== "bonus_cashback");
+  }
+  function cabinetBonusesEnabled(sections) {
+    const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
+    if (!configuredSections.includes(clientBonusesConfiguredSection)) {
+      return configuredSections.some((section) => String(section).startsWith("bonus_") && section !== "bonus_cashback");
+    }
+    return configuredSections.includes(clientBonusesSection);
+  }
   function sectionBody(section) {
     var _a3, _b;
     const client = (cabinetData == null ? void 0 : cabinetData.client) || currentClient;
@@ -676,11 +690,24 @@
             <p>\u041F\u0440\u0438\u0433\u043B\u0430\u0448\u0451\u043D\u043D\u044B\u0445: <b>${escapeHtml(Number.isFinite(invitesCount) ? invitesCount : 0)}</b></p>
           `;
     }
-    if (section === "client_chat") return `<p class="cabinet-history-empty">\u0427\u0430\u0442 \u043F\u043E\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D.</p>`;
-    if (section.startsWith("bonus_")) {
-      const balance = bonusBalanceForSection(section);
-      return `<b>${escapeHtml(money((balance == null ? void 0 : balance.balance) || 0))}</b><span>${escapeHtml(bonusName(section))}</span>`;
+    if (section === clientBonusesSection) {
+      const bonusSections = enabledBonusSections(currentCardSections);
+      if (!bonusSections.length) return `<p class="cabinet-history-empty">Бонусов пока нет.</p>`;
+      return `
+        <div class="cabinet-bonus-list">
+          ${bonusSections.map((bonusSection) => {
+            const balance = bonusBalanceForSection(bonusSection);
+            return `
+              <div class="cabinet-bonus-row">
+                <span>${escapeHtml(bonusName(bonusSection))}</span>
+                <b>${escapeHtml(money((balance == null ? void 0 : balance.balance) || 0))}</b>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
     }
+    if (section === "client_chat") return `<p class="cabinet-history-empty">Чат пока не подключен.</p>`;
     return "";
   }
   function cabinetAccessEnabled(sections, section) {
@@ -714,6 +741,8 @@
     }).forEach((item) => {
       bottomNav.append(item);
     });
+    const bonusNav = document.querySelector(".cabinet-bonus-nav");
+    if (bonusNav) bonusNav.hidden = !cabinetBonusesEnabled(configuredSections);
   }
   function applyCabinetAccess(sections) {
     const configuredSections = cabinetAccessSections(sections);
@@ -742,7 +771,8 @@
     applyCabinetAccess(currentAccessSections);
     const visitsEnabled = configuredSections.includes("client_visits");
     if (myBookingsSection) myBookingsSection.hidden = !visitsEnabled;
-    const enabled = configuredSections.filter((section) => section !== "client_name").filter((section) => section !== "client_chat").filter((section) => section !== "client_fields_configured").filter((section) => section !== clientAccessConfiguredSection).filter((section) => !clientAccessSections.includes(section)).filter((section) => !String(section).startsWith(clientFieldSectionPrefix));
+     const enabled = configuredSections.filter((section) => section !== "client_name").filter((section) => section !== "client_chat").filter((section) => section !== "client_fields_configured").filter((section) => section !== clientAccessConfiguredSection).filter((section) => section !== clientBonusesConfiguredSection).filter((section) => !clientAccessSections.includes(section)).filter((section) => !String(section).startsWith(clientFieldSectionPrefix)).filter((section) => !String(section).startsWith("bonus_"));
+    if (cabinetBonusesEnabled(configuredSections)) enabled.push(clientBonusesSection);
     currentCardSections = enabled;
     if (historySection) historySection.hidden = enabled.length === 0;
     if (!enabled.length) {

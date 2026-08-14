@@ -18,6 +18,9 @@ const REGISTRATION_FIELD_NAMES = [
   "email",
 ];
 const CLIENT_FIELD_SECTION_PREFIX = "client_field_";
+const CLIENT_BONUSES_SECTION = "client_bonuses";
+const CLIENT_BONUSES_CONFIGURED_SECTION =
+  "client_bonuses_configured";
 const CLIENT_ACCESS_CONFIGURED_SECTION = "client_access_configured";
 const CLIENT_ACCESS_SECTIONS = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
 
@@ -27,6 +30,7 @@ const CLIENT_MAIN_SCREEN_SECTIONS = [
   "client_level",
   "client_visits",
   "client_personal_link",
+  "client_bonuses",
 ];
 
 
@@ -474,7 +478,7 @@ function clientCardSectionsStorageKey(orgId) {
 
 function normalizeClientCardSections(sections) {
   if (!Array.isArray(sections)) return [...DEFAULT_CLIENT_CARD_SECTIONS];
-  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || name === "client_fields_configured" || name === CLIENT_ACCESS_CONFIGURED_SECTION || (String(name).startsWith(CLIENT_FIELD_SECTION_PREFIX) && REGISTRATION_FIELD_NAMES.includes(String(name).slice(CLIENT_FIELD_SECTION_PREFIX.length))) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
+  return [...new Set(sections.filter((name) => DEFAULT_CLIENT_CARD_SECTIONS.includes(name) || name === "client_fields_configured" || name === CLIENT_ACCESS_CONFIGURED_SECTION || name === CLIENT_BONUSES_SECTION || name === CLIENT_BONUSES_CONFIGURED_SECTION || (String(name).startsWith(CLIENT_FIELD_SECTION_PREFIX) && REGISTRATION_FIELD_NAMES.includes(String(name).slice(CLIENT_FIELD_SECTION_PREFIX.length))) || (String(name).startsWith("bonus_") && name !== "bonus_cashback")))];
 }
 
 function enabledClientCardSections(orgId) {
@@ -1086,6 +1090,80 @@ function clientCabinetFieldsSelect(enabledSections) {
   return `<label class="card-access"><span>Поля пользователя</span><details class="checkbox-select"><summary>${escapeHtml(summary)}</summary>${REGISTRATION_FIELD_NAMES.map((field) => `<label class="checkbox"><input type="checkbox" data-client-profile-field value="${escapeHtml(field)}" ${selectedFields.includes(field) ? "checked" : ""}> ${escapeHtml(labels[field] || field)}</label>`).join("")}</details></label>`;
 }
 
+function clientBonusesEnabled(enabledSections) {
+  const configured = enabledSections.includes(
+    CLIENT_BONUSES_CONFIGURED_SECTION
+  );
+
+  if (!configured) {
+    return enabledSections.some(
+      (section) =>
+        String(section).startsWith("bonus_")
+        && section !== "bonus_cashback"
+    );
+  }
+
+  return enabledSections.includes(
+    CLIENT_BONUSES_SECTION
+  );
+}
+
+function bonusBalancePreview(
+  bonusTypes,
+  bonusTypeBalances
+) {
+  const names = new Map([
+    ["cashback", "Кэшбэк"],
+  ]);
+
+  (bonusTypes || []).forEach((item) => {
+    if (!item.code) return;
+
+    names.set(
+      item.code,
+      item.name || item.code
+    );
+  });
+
+  const balances = Array.isArray(
+    bonusTypeBalances
+  )
+    ? bonusTypeBalances
+    : [];
+
+  if (!balances.length) {
+    return "";
+  }
+
+  return `
+    <div class="client-card-bonus-preview">
+      ${balances.map((item) => {
+        const type =
+          item.bonus_type
+          || item.type
+          || "cashback";
+
+        return `
+          <div>
+            <span>
+              ${escapeHtml(
+                names.get(type) || type
+              )}
+            </span>
+
+
+            <b>
+              ${escapeHtml(
+                money(item.balance)
+              )}
+            </b>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
   const level =
     selectedClient?.client_level
@@ -1143,9 +1221,26 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
         ctx,
         "client_personal_link",
         "Реферальная программа",
-        `${personalLinkPreview(selectedClient)}${clientCabinetCurrencySelect(bonusTypes, enabledSections)}`,
+        personalLinkPreview(selectedClient),
         enabledSections.includes(
           "client_personal_link"
+        )
+      ),
+    },
+    {
+      key: CLIENT_BONUSES_SECTION,
+      html: cardConfigBlock(
+        ctx,
+        CLIENT_BONUSES_SECTION,
+        "Бонусы",
+        bonusBalancePreview(
+          bonusTypes,
+          bonusTypeBalances
+        ),
+        clientBonusesEnabled(enabledSections),
+        clientCabinetCurrencySelect(
+          bonusTypes,
+          enabledSections
         )
       ),
     },
@@ -1873,6 +1968,9 @@ export function bindLoyalty(root, ctx) {
       const profileFields = [...root.querySelectorAll("[data-client-profile-field]:checked")].map((input) => `${CLIENT_FIELD_SECTION_PREFIX}${input.value}`);
       sections.push("client_fields_configured", ...profileFields);
       sections.push(CLIENT_ACCESS_CONFIGURED_SECTION);
+      sections.push(
+        CLIENT_BONUSES_CONFIGURED_SECTION
+      );
       await api.updateClientCardSections(ctx.org.id, sections);
       saveEnabledClientCardSections(ctx.org.id, sections);
       loyaltyState.clientCardSections = sections;

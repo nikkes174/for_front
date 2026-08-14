@@ -56,6 +56,10 @@ const form = document.querySelector("[data-cabinet-form]");
       const defaultRegistrationFields = ["last_name", "first_name", "middle_name", "phone", "gender", "email"];
       const cabinetFieldNames = ["last_name", "first_name", "middle_name", "phone", "gender", "telegram_id", "max_id", "vk_id", "email"];
       const clientFieldSectionPrefix = "client_field_";
+      const clientBonusesSection =
+        "client_bonuses";
+      const clientBonusesConfiguredSection =
+        "client_bonuses_configured";
       const clientAccessConfiguredSection = "client_access_configured";
       const clientAccessSections = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
       const clientBottomMenuSections = ["client_online_booking", "client_achievements", "client_chat", "client_notifications", "client_logout"];
@@ -503,6 +507,7 @@ const form = document.querySelector("[data-cabinet-form]");
         if (section === "client_level") return "\u0423\u0440\u043e\u0432\u0435\u043d\u044c";
         if (section === "client_visits") return "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0438\u0437\u0438\u0442\u043e\u0432";
         if (section === "client_personal_link") return "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u0430";
+        if (section === clientBonusesSection) return "\u0411\u043e\u043d\u0443\u0441\u044b";
         if (section === "client_chat") return "\u0427\u0430\u0442";
         if (section.startsWith("bonus_")) return "\u0411\u043e\u043d\u0443\u0441\u044b";
         return section;
@@ -702,6 +707,41 @@ const form = document.querySelector("[data-cabinet-form]");
         `;
       }
 
+      function enabledBonusSections(sections) {
+        if (!cabinetBonusesEnabled(sections)) {
+          return [];
+        }
+
+        return sections.filter(
+          (section) =>
+            String(section).startsWith("bonus_")
+            && section !== "bonus_cashback"
+        );
+      }
+
+      function cabinetBonusesEnabled(sections) {
+        const configuredSections =
+          Array.isArray(sections)
+            ? sections
+            : defaultCardSections;
+
+        if (
+          !configuredSections.includes(
+            clientBonusesConfiguredSection
+          )
+        ) {
+          return configuredSections.some(
+            (section) =>
+              String(section).startsWith("bonus_")
+              && section !== "bonus_cashback"
+          );
+        }
+
+        return configuredSections.includes(
+          clientBonusesSection
+        );
+      }
+
       function sectionBody(section) {
         const client = cabinetData?.client || currentClient;
         if (section === "client_name") return `<b>${escapeHtml(clientName(client))}</b>`;
@@ -732,11 +772,26 @@ const form = document.querySelector("[data-cabinet-form]");
             <p>\u041f\u0440\u0438\u0433\u043b\u0430\u0448\u0451\u043d\u043d\u044b\u0445: <b>${escapeHtml(Number.isFinite(invitesCount) ? invitesCount : 0)}</b></p>
           `;
         }
-        if (section === "client_chat") return `<p class="cabinet-history-empty">\u0427\u0430\u0442 \u043f\u043e\u043a\u0430 \u043d\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d.</p>`;
-        if (section.startsWith("bonus_")) {
-          const balance = bonusBalanceForSection(section);
-          return `<b>${escapeHtml(money(balance?.balance || 0))}</b><span>${escapeHtml(bonusName(section))}</span>`;
+        if (section === clientBonusesSection) {
+          const bonusSections = enabledBonusSections(currentCardSections);
+          if (!bonusSections.length) {
+            return `<p class="cabinet-history-empty">\u0411\u043e\u043d\u0443\u0441\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</p>`;
+          }
+          return `
+            <div class="cabinet-bonus-list">
+              ${bonusSections.map((bonusSection) => {
+                const balance = bonusBalanceForSection(bonusSection);
+                return `
+                  <div class="cabinet-bonus-row">
+                    <span>${escapeHtml(bonusName(bonusSection))}</span>
+                    <b>${escapeHtml(money(balance?.balance || 0))}</b>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
         }
+        if (section === "client_chat") return `<p class="cabinet-history-empty">\u0427\u0430\u0442 \u043f\u043e\u043a\u0430 \u043d\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d.</p>`;
         return "";
       }
 
@@ -809,6 +864,15 @@ const form = document.querySelector("[data-cabinet-form]");
           .forEach((item) => {
             bottomNav.append(item);
           });
+
+        const bonusNav = document.querySelector(
+          ".cabinet-bonus-nav"
+        );
+        if (bonusNav) {
+          bonusNav.hidden = !cabinetBonusesEnabled(
+            configuredSections
+          );
+        }
       }
 
       function applyCabinetAccess(sections) {
@@ -846,8 +910,18 @@ const form = document.querySelector("[data-cabinet-form]");
           .filter((section) => section !== "client_chat")
           .filter((section) => section !== "client_fields_configured")
           .filter((section) => section !== clientAccessConfiguredSection)
+          .filter((section) => section !== clientBonusesConfiguredSection)
           .filter((section) => !clientAccessSections.includes(section))
-          .filter((section) => !String(section).startsWith(clientFieldSectionPrefix));
+          .filter((section) => !String(section).startsWith(clientFieldSectionPrefix))
+          .filter(
+            (section) =>
+              !String(section).startsWith("bonus_")
+          );
+        if (
+          cabinetBonusesEnabled(configuredSections)
+        ) {
+          enabled.push(clientBonusesSection);
+        }
         currentCardSections = enabled;
         if (historySection) historySection.hidden = enabled.length === 0;
         if (!enabled.length) {
