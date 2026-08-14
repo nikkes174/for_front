@@ -11,6 +11,7 @@ import { tasks, bindTasks } from "./modules/tasks.js";
 import { booking, bindBooking } from "./modules/booking.js";
 import { finance, bindFinance } from "./modules/finance.js";
 import { breakdown, bindBreakdown } from "./modules/breakdown.js";
+import { expenses, bindExpenses } from "./modules/expenses.js";
 import { segment, bindSegment } from "./modules/segment.js";
 
 const LAST_ORG_KEY = "loyalty.lastOrganizationId";
@@ -880,10 +881,15 @@ function settingsSidebarMenu(orgId) {
 
 function financeSidebarMenu(orgId) {
   const isFinancePage = location.pathname.includes(`/organizations/${orgId}/finance`)
-    || location.pathname.includes(`/organizations/${orgId}/breakdown`);
+    || location.pathname.includes(`/organizations/${orgId}/breakdown`)
+    || location.pathname.includes(`/organizations/${orgId}/expenses`);
   const activeSlug = location.pathname.includes(`/organizations/${orgId}/breakdown`)
     ? "breakdown"
-    : "salary";
+    : location.pathname.includes(
+        `/organizations/${orgId}/expenses`
+      )
+      ? "expenses"
+      : "salary";
   return `
     <div class="sidebar-group ${isFinancePage ? "active" : ""}">
       <button
@@ -902,6 +908,7 @@ function financeSidebarMenu(orgId) {
         ${isFinancePage ? "" : "hidden"}
       >
         <a class="${activeSlug === "salary" ? "active" : ""}" href="/organizations/${orgId}/finance">Зарплаты</a>
+        <a class="${activeSlug === "expenses" ? "active" : ""}" href="/organizations/${orgId}/expenses">Расходы</a>
         <a class="${activeSlug === "breakdown" ? "active" : ""}" href="/organizations/${orgId}/breakdown">Детализация</a>
       </div>
     </div>
@@ -1107,6 +1114,7 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "tasks") return ["Задачи", await tasks(ctx)];
   if (routeInfo.page === "booking") return ["Записи", await booking(ctx)];
   if (routeInfo.page === "finance") return ["Финансы", await finance(ctx)];
+  if (routeInfo.page === "expenses") return ["Расходы", await expenses(ctx)];
   if (routeInfo.page === "breakdown") return ["Детализация", await breakdown(ctx)];
   if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx, routeInfo.extra || "")];
   return ["Главная", await dashboard(ctx)];
@@ -1420,6 +1428,7 @@ bindSettings(root, { get org() { return state.org; }, navigate, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
 bindBooking(root, { get org() { return state.org; }, reload });
 bindFinance(root, { get org() { return state.org; }, reload });
+bindExpenses(root, { get org() { return state.org; }, reload });
 bindBreakdown(root, { get org() { return state.org; }, reload });
 bindSegment(root, { get org() { return state.org; }, navigate, reload });
 

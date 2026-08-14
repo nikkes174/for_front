@@ -956,6 +956,95 @@ button:active { transform: translateY(1px); }
 .finance-table td small { display: block; margin-top: 3px; color: #98a2b3; }
 .finance-table tr.is-inactive { opacity: .62; }
 .finance-salary-cell { font-weight: 600; }
+
+
+.finance-expenses-page {
+  display: grid;
+  gap: 16px;
+}
+
+
+.finance-expenses-panel {
+  display: grid;
+  gap: 16px;
+}
+
+
+.finance-expenses-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+
+.finance-expenses-head h2 {
+  margin: 0;
+}
+
+
+.finance-expenses-form {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(180px, 1fr)
+    minmax(160px, 0.7fr)
+    auto;
+  gap: 12px;
+  align-items: end;
+}
+
+
+.finance-expenses-form label {
+  display: grid;
+  gap: 6px;
+
+  color: #667085;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+
+.finance-expenses-form select,
+.finance-expenses-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+
+.finance-expenses-form
+.standard-save-button {
+  min-height: 40px;
+  justify-self: start;
+}
+
+
+.finance-expenses-message {
+  min-height: 18px;
+  margin: 0;
+
+  color: #667085;
+  font-size: 13px;
+}
+
+
+.finance-expenses-table {
+  width: 100%;
+}
+
+
+.finance-expenses-table th,
+.finance-expenses-table td {
+  vertical-align: middle;
+}
+
+
+.finance-expenses-actions {
+  width: 56px;
+  text-align: center;
+}
+
+
 .finance-plan-toggle { min-width: 112px; padding: 7px 10px; white-space: nowrap; }
 .finance-plan-actions { display: grid; gap: 6px; min-width: 176px; }
 .finance-plan-actions button { width: 100%; padding: 7px 10px; white-space: nowrap; }
@@ -3064,6 +3153,8 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   .inline-form.compact { grid-template-columns: 1fr; }
   .client-search { grid-template-columns: 1fr; }
   .client-search-submit, .client-search-reset { width: 100%; min-width: 0; max-width: none; }
+  .finance-expenses-form { grid-template-columns: 1fr; }
+  .finance-expenses-form .standard-save-button { width: 100%; }
   .permission-matrix { grid-template-columns: 1fr; }
   .loyalty-grid { grid-template-columns: 1fr; }
   .card-config-block { grid-template-columns: 1fr; }
