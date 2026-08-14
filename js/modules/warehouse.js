@@ -603,34 +603,37 @@ export function bindWarehouse(root, ctx) {
     if (!button) return;
 
     const rows = await api.storages(ctx.org.id);
+
     const source = rows.find(
-      (r) =>
-        Number(r.id) ===
+      (row) =>
+        Number(row.id) ===
         Number(button.dataset.storageTransfer)
     );
     if (!source) return;
 
     const destinations = rows.filter(
-      (r) => Number(r.id) !== Number(source.id)
+      (row) => Number(row.id) !== Number(source.id)
     );
 
     putModal(
       root,
       modal(
-        "Переместить товары",
+        `
+        <span>Переместить товары</span>
+        <span class="warehouse-transfer-title-storage">
+          ${esc(source.name)}
+        </span>
+      `,
         `
         <form
           class="warehouse-transfer-form"
           data-storage-transfer-form
           data-id="${Number(source.id)}"
         >
-          <div class="warehouse-transfer-controls">
-            <div class="warehouse-transfer-source">
-              ${esc(source.name)}
-            </div>
-
-            <label>
+          <div class="warehouse-transfer-fields">
+            <label class="warehouse-transfer-destination">
               <span>Склад назначения</span>
+
               <select
                 name="destination_storage_id"
                 required
@@ -638,6 +641,7 @@ export function bindWarehouse(root, ctx) {
                 <option value="">
                   Выберите склад
                 </option>
+
                 ${destinations.map(
                   (storage) => `
                     <option value="${Number(storage.id)}">
@@ -648,31 +652,40 @@ export function bindWarehouse(root, ctx) {
               </select>
             </label>
 
-            <button
-              class="primary standard-save-button"
-              ${destinations.length ? "" : "disabled"}
-            >
-              Переместить
-            </button>
+            <label class="warehouse-transfer-search">
+              <span class="warehouse-transfer-search-label">
+                Товар
+              </span>
 
-            <p data-message>
-              ${
-                destinations.length
-                  ? ""
-                  : "Нет другого склада для перемещения."
-              }
-            </p>
+              <input
+                type="search"
+                data-storage-product-search
+                data-storage-id="${Number(source.id)}"
+                placeholder="Введите название товара"
+              >
+            </label>
           </div>
 
-          <div class="warehouse-transfer-products">
-            <input
-              type="search"
-              data-storage-product-search
-              data-storage-id="${Number(source.id)}"
-              placeholder="Введите название товара"
-            >
+          <div class="warehouse-transfer-content">
+            <div class="warehouse-transfer-controls">
+              <button
+                class="primary standard-save-button warehouse-transfer-submit"
+                ${destinations.length ? "" : "disabled"}
+              >
+                Переместить
+              </button>
+
+              <p data-message>
+                ${
+                  destinations.length
+                    ? ""
+                    : "Нет другого склада для перемещения."
+                }
+              </p>
+            </div>
 
             <div
+              class="warehouse-transfer-products"
               data-storage-product-results
             ></div>
           </div>
