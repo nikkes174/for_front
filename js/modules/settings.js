@@ -297,7 +297,13 @@ function achievementConditionsFields(conditions = [], includeAddButton = true) {
     <div class="achievement-builder modal-full">
       <div class="achievement-builder-head">
         <b>Условия</b>
-        ${includeAddButton ? `<button type="button" class="ghost btn-ghost-secondary" data-add-achievement-condition>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435</button>` : ""}
+        ${includeAddButton ? `<button
+          type="button"
+          class="btn btn-outline-secondary"
+          data-add-achievement-condition
+        >
+          \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435
+        </button>` : ""}
       </div>
       <div class="achievement-conditions" data-achievement-conditions>
       ${rows.map((condition) => achievementConditionRow(condition)).join("")}
@@ -591,7 +597,13 @@ function userBookingBlocksField(item) {
       <div class="user-booking-blocks" data-user-booking-blocks>
         ${blocks.map((block) => userBookingBlockRow(block)).join("")}
       </div>
-      <button type="button" class="ghost user-booking-block-add btn-ghost-secondary" data-add-user-booking-block>Добавить период</button>
+      <button
+        type="button"
+        class="btn btn-outline-secondary user-booking-block-add"
+        data-add-user-booking-block
+      >
+        Добавить период
+      </button>
     </div>
   `;
 }
@@ -1764,8 +1776,26 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
           <label><span>Категория для загрузки</span><select data-product-excel-category>
             ${scopedCategories.map((category) => `<option value="${escapeHtml(category.id)}" ${String(category.id) === String(importCategoryId) ? "selected" : ""}>${escapeHtml(category.name)}</option>`).join("")}
           </select></label>
-          <label class="secondary catalog-excel-upload ${scopedCategories.length ? "" : "is-disabled"}">Загрузить Excel<input type="file" accept=".xls,.xlsx" data-product-excel-file data-item-type="${escapeHtml(type)}" ${scopedCategories.length ? "" : "disabled"}></label>
-          <button type="button" class="catalog-excel-export" data-product-excel-export data-item-type="${escapeHtml(type)}">Выгрузить Excel</button>
+          <label
+            class="btn btn-outline-secondary catalog-excel-upload ${scopedCategories.length ? "" : "is-disabled"}"
+          >
+            Загрузить Excel
+            <input
+              type="file"
+              accept=".xls,.xlsx"
+              data-product-excel-file
+              data-item-type="${escapeHtml(type)}"
+              ${scopedCategories.length ? "" : "disabled"}
+            >
+          </label>
+          <button
+            type="button"
+            class="btn btn-outline-secondary catalog-excel-export"
+            data-product-excel-export
+            data-item-type="${escapeHtml(type)}"
+          >
+            Выгрузить Excel
+          </button>
           <span data-product-excel-message></span>
           <div class="catalog-excel-preview" data-product-excel-preview hidden></div>
         </div>
@@ -1791,7 +1821,13 @@ export function renderAchievementsPanel(achievementsList = cache.achievements ||
             ${ACHIEVEMENT_LOGIC_OPTIONS.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join("")}
           </select></label>
           ${achievementConditionsFields([], false)}
-          <button type="button" class="ghost achievement-add-condition" data-add-achievement-condition>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435</button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary achievement-add-condition"
+            data-add-achievement-condition
+          >
+            \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u043e\u0432\u0438\u0435
+          </button>
           <button class="primary achievement-create" disabled>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u0435</button>
           <p data-message></p>
         </form>

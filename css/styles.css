@@ -1831,9 +1831,8 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 }
 .catalog-excel-actions { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .catalog-excel-actions > label:first-child { display: grid; gap: 6px; min-width: 230px; color: #667085; font-size: 14px; font-weight: 500; }
-.catalog-excel-upload, .catalog-excel-export { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 7px; background: #eef2f7; padding: 8px 14px; color: #172033; box-sizing: border-box; }
+.catalog-excel-upload, .catalog-excel-export { min-height: 40px; box-sizing: border-box; }
 .catalog-excel-upload { position: relative; cursor: pointer; }
-.catalog-excel-upload:hover, .catalog-excel-export:hover { background: #e2e8f0; }
 .catalog-excel-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .catalog-excel-preview { position:fixed; inset:0; z-index:110; display:grid; place-items:center; padding:24px; background:rgb(15 23 42 / 45%); }
 .catalog-excel-preview[hidden] { display:none; }
@@ -2404,6 +2403,30 @@ form[data-visit-edit] .visit-item-picker select {
   padding: 0 20px;
   justify-self: start;
   box-sizing: border-box;
+}
+.card-mode-tabs .btn.btn-outline-secondary {
+  border-radius: 6px;
+  transform: none;
+}
+
+.card-mode-tabs .btn.btn-outline-secondary:hover {
+  color: #ffffff;
+  background-color: #6b7280;
+  border-color: #6b7280;
+  transform: none;
+}
+
+.card-mode-tabs .btn.btn-outline-secondary.active {
+  color: #ffffff;
+  background-color: #6b7280;
+  border-color: #6b7280;
+}
+
+.card-mode-tabs .btn.btn-outline-secondary.active:hover {
+  color: #ffffff;
+  background-color: #6b7280;
+  border-color: #6b7280;
+  transform: none;
 }
 .pagination {
   display: flex;

@@ -1164,9 +1164,22 @@ function cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalance
   return `
     <div class="subpanel">
       ${titleWithHint("\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0438", "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430 \u0431\u043b\u043e\u043a\u043e\u0432 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438 \u0438 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u0430.")}
-      <div class="tabs compact-tabs">
-        <button type="button" class="${mode === "registration" ? "active" : ""}" data-card-mode="registration">\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f</button>
-        <button type="button" class="${mode === "client" ? "active" : ""}" data-card-mode="client">\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430</button>
+      <div class="tabs compact-tabs card-mode-tabs">
+        <button
+          type="button"
+          class="btn btn-outline-secondary ${mode === "registration" ? "active" : ""}"
+          data-card-mode="registration"
+        >
+          \u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-outline-secondary ${mode === "client" ? "active" : ""}"
+          data-card-mode="client"
+        >
+          \u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430
+        </button>
       </div>
       <div class="card-config-grid">
         ${configBody}

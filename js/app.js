@@ -948,7 +948,12 @@ function shell(content, title) {
             </button>
             <div><span data-org-title>${escapeHtml(org.name)}</span><h1 data-page-title>${escapeHtml(title)}</h1></div>
           </div>
-          <button class="ghost" data-logout>Выйти</button>
+          <button
+            class="btn btn-outline-secondary"
+            data-logout
+          >
+            Выйти
+          </button>
         </header>
         <div data-page-content>${content}</div>
       </main>
