@@ -20,6 +20,23 @@ const REGISTRATION_FIELD_NAMES = [
 const CLIENT_FIELD_SECTION_PREFIX = "client_field_";
 const CLIENT_ACCESS_CONFIGURED_SECTION = "client_access_configured";
 const CLIENT_ACCESS_SECTIONS = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
+
+
+const CLIENT_MAIN_SCREEN_SECTIONS = [
+  "client_name",
+  "client_level",
+  "client_visits",
+  "client_personal_link",
+];
+
+
+const CLIENT_BOTTOM_MENU_SECTIONS = [
+  "client_online_booking",
+  "client_achievements",
+  "client_chat",
+  "client_notifications",
+  "client_logout",
+];
 const DEFAULT_CLIENT_CARD_SECTIONS = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat", ...CLIENT_ACCESS_SECTIONS];
 
 function showLoyaltyToast(message) {
@@ -1070,59 +1087,162 @@ function clientCabinetFieldsSelect(enabledSections) {
 }
 
 function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
-  const level = selectedClient?.client_level || metric?.client_level || metric?.loyalty_level || levels?.[0]?.name || L.notSet;
-  const enabledSections = enabledClientCardSections(ctx.org?.id);
-  const accessConfigured = enabledSections.includes(CLIENT_ACCESS_CONFIGURED_SECTION);
-  const accessEnabled = (section) => !accessConfigured || enabledSections.includes(section);
-  const blocks = [
+  const level =
+    selectedClient?.client_level
+    || metric?.client_level
+    || metric?.loyalty_level
+    || levels?.[0]?.name
+    || L.notSet;
+
+  const enabledSections =
+    enabledClientCardSections(ctx.org?.id);
+
+  const accessConfigured = enabledSections.includes(
+    CLIENT_ACCESS_CONFIGURED_SECTION
+  );
+
+  const accessEnabled = (section) =>
+    !accessConfigured
+    || enabledSections.includes(section);
+
+  const mainBlocks = [
     {
       key: "client_name",
-      html: cardConfigBlock(ctx, "client_name", "Данные пользователя", "Поля, которые пользователь видит и меняет", enabledSections.includes("client_name"), clientCabinetFieldsSelect(enabledSections)),
+      html: cardConfigBlock(
+        ctx,
+        "client_name",
+        "Данные пользователя",
+        "Поля, которые пользователь видит и меняет",
+        enabledSections.includes("client_name"),
+        clientCabinetFieldsSelect(enabledSections)
+      ),
     },
     {
       key: "client_level",
-      html: cardConfigBlock(ctx, "client_level", "\u0423\u0440\u043e\u0432\u0435\u043d\u044c", `<b>${escapeHtml(level)}</b>`, enabledSections.includes("client_level")),
+      html: cardConfigBlock(
+        ctx,
+        "client_level",
+        "Уровень",
+        `<b>${escapeHtml(level)}</b>`,
+        enabledSections.includes("client_level")
+      ),
     },
     {
       key: "client_visits",
-      html: cardConfigBlock(ctx, "client_visits", "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0438\u0437\u0438\u0442\u043e\u0432", visitsPreview(visits), enabledSections.includes("client_visits")),
+      html: cardConfigBlock(
+        ctx,
+        "client_visits",
+        "История визитов",
+        visitsPreview(visits),
+        enabledSections.includes("client_visits")
+      ),
     },
     {
       key: "client_personal_link",
       html: cardConfigBlock(
         ctx,
         "client_personal_link",
-        "\u0420\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u0430\u044f \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u0430",
+        "Реферальная программа",
         `${personalLinkPreview(selectedClient)}${clientCabinetCurrencySelect(bonusTypes, enabledSections)}`,
-        enabledSections.includes("client_personal_link"),
+        enabledSections.includes(
+          "client_personal_link"
+        )
+      ),
+    },
+  ];
+
+  const bottomMenuBlocks = [
+    {
+      key: "client_online_booking",
+      html: cardConfigBlock(
+        ctx,
+        "client_online_booking",
+        "Онлайн запись",
+        "",
+        accessEnabled("client_online_booking")
+      ),
+    },
+    {
+      key: "client_achievements",
+      html: cardConfigBlock(
+        ctx,
+        "client_achievements",
+        "Достижения",
+        "",
+        accessEnabled("client_achievements")
       ),
     },
     {
       key: "client_chat",
-      html: cardConfigBlock(ctx, "client_chat", "\u0427\u0430\u0442", "", enabledSections.includes("client_chat")),
-    },
-    {
-      key: "client_online_booking",
-      html: cardConfigBlock(ctx, "client_online_booking", "Онлайн запись", "", accessEnabled("client_online_booking")),
-    },
-    {
-      key: "client_achievements",
-      html: cardConfigBlock(ctx, "client_achievements", "Достижения", "", accessEnabled("client_achievements")),
+      html: cardConfigBlock(
+        ctx,
+        "client_chat",
+        "Чат",
+        "",
+        enabledSections.includes("client_chat")
+      ),
     },
     {
       key: "client_notifications",
-      html: cardConfigBlock(ctx, "client_notifications", "Уведомления", "", accessEnabled("client_notifications")),
+      html: cardConfigBlock(
+        ctx,
+        "client_notifications",
+        "Уведомления",
+        "",
+        accessEnabled("client_notifications")
+      ),
     },
     {
       key: "client_logout",
-      html: cardConfigBlock(ctx, "client_logout", "Кнопка выхода", "", accessEnabled("client_logout")),
+      html: cardConfigBlock(
+        ctx,
+        "client_logout",
+        "Кнопка выхода",
+        "",
+        accessEnabled("client_logout")
+      ),
     },
   ];
-  const order = new Map(enabledSections.map((key, index) => [key, index]));
-  return blocks
-    .sort((a, b) => (order.get(a.key) ?? blocks.length) - (order.get(b.key) ?? blocks.length))
-    .map((item) => item.html)
-    .join("");
+
+  const order = new Map(
+    enabledSections.map(
+      (key, index) => [key, index]
+    )
+  );
+
+  const sortBlocks = (blocks) =>
+    [...blocks].sort(
+      (a, b) =>
+        (order.get(a.key) ?? blocks.length)
+        - (order.get(b.key) ?? blocks.length)
+    );
+
+  return `
+    <section class="client-card-config-column">
+      <h3>Блоки основного экрана</h3>
+
+
+      <div
+        class="card-config-grid"
+        data-card-config-group="main"
+      >
+        ${sortBlocks(mainBlocks).map((item) => item.html).join("")}
+      </div>
+    </section>
+
+
+    <section class="client-card-config-column">
+      <h3>Блоки нижнего меню</h3>
+
+
+      <div
+        class="card-config-grid"
+        data-card-config-group="bottom"
+      >
+        ${sortBlocks(bottomMenuBlocks).map((item) => item.html).join("")}
+      </div>
+    </section>
+  `;
 }
 
 function personalLinkPreview(selectedClient) {
@@ -1181,7 +1301,7 @@ function cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalance
           \u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430
         </button>
       </div>
-      <div class="card-config-grid">
+      <div class="${mode === "client" ? "client-card-config-columns" : "card-config-grid"}">
         ${configBody}
       </div>
       ${mode === "registration" ? `
@@ -1643,19 +1763,49 @@ export function bindLoyalty(root, ctx) {
   root.addEventListener("dragstart", (event) => {
     const block = event.target.closest("[data-card-config-block]");
     if (!block) return;
+
+    const group = block.closest(
+      "[data-card-config-group]"
+    );
+
+    if (group) {
+      block.dataset.cardConfigDragGroup =
+        group.dataset.cardConfigGroup;
+    }
+
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", block.dataset.cardConfigBlock || "");
     block.classList.add("dragging");
   });
 
   root.addEventListener("dragend", (event) => {
-    event.target.closest("[data-card-config-block]")?.classList.remove("dragging");
+    const block = event.target.closest("[data-card-config-block]");
+    if (!block) return;
+
+    block.classList.remove("dragging");
+    delete block.dataset.cardConfigDragGroup;
   });
 
   root.addEventListener("dragover", (event) => {
     const block = event.target.closest("[data-card-config-block]");
     const dragging = root.querySelector("[data-card-config-block].dragging");
     if (!block || !dragging || block === dragging) return;
+
+    const targetGroup = block.closest(
+      "[data-card-config-group]"
+    );
+    const draggingGroup = dragging.closest(
+      "[data-card-config-group]"
+    );
+
+    if (
+      targetGroup
+      && draggingGroup
+      && targetGroup !== draggingGroup
+    ) {
+      return;
+    }
+
     event.preventDefault();
     const after = event.clientY > block.getBoundingClientRect().top + block.offsetHeight / 2;
     block.parentNode.insertBefore(dragging, after ? block.nextSibling : block);

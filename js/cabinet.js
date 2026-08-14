@@ -57,6 +57,7 @@
   var clientFieldSectionPrefix = "client_field_";
   var clientAccessConfiguredSection = "client_access_configured";
   var clientAccessSections = ["client_online_booking", "client_achievements", "client_notifications", "client_logout"];
+  var clientBottomMenuSections = ["client_online_booking", "client_achievements", "client_chat", "client_notifications", "client_logout"];
   var defaultCardSections = ["client_name", "client_level", "client_visits", "client_personal_link", "client_chat", ...clientAccessSections];
   var currentCardSections = defaultCardSections;
   var currentAccessSections = defaultCardSections;
@@ -698,8 +699,25 @@
     }
     return configuredSections;
   }
+  function applyCabinetBottomNavOrder(sections) {
+    const bottomNav = document.querySelector(".cabinet-bottom-nav");
+    if (!bottomNav) return;
+    const configuredSections = cabinetAccessSections(sections);
+    const order = new Map(configuredSections.map((section, index) => [section, index]));
+    const items = [...bottomNav.querySelectorAll("[data-cabinet-bottom-section]")];
+    items.sort((a, b) => {
+      const aSection = a.dataset.cabinetBottomSection;
+      const bSection = b.dataset.cabinetBottomSection;
+      const aDefault = clientBottomMenuSections.indexOf(aSection);
+      const bDefault = clientBottomMenuSections.indexOf(bSection);
+      return (order.get(aSection) ?? 1000 + aDefault) - (order.get(bSection) ?? 1000 + bDefault);
+    }).forEach((item) => {
+      bottomNav.append(item);
+    });
+  }
   function applyCabinetAccess(sections) {
     const configuredSections = cabinetAccessSections(sections);
+    applyCabinetBottomNavOrder(configuredSections);
     const controls = {
       client_online_booking: '[data-cabinet-tab="client_booking"]',
       client_achievements: '[data-cabinet-tab="achievements"]',
