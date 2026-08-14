@@ -1,8 +1,7 @@
 import { escapeHtml } from "../dom.js";
 
 
-const EXPENSES_STORAGE_PREFIX =
-  "loyalty.financeExpenses";
+import { api } from "../api.js";
 
 
 const EXPENSE_NAME_OPTIONS = [
@@ -12,51 +11,10 @@ const EXPENSE_NAME_OPTIONS = [
   "Сумма в день",
 ];
 
-
 const EXPENSE_TYPE_OPTIONS = [
   "Постоянные",
   "Фиксированные",
 ];
-
-
-function expensesStorageKey(organizationId) {
-  return `${EXPENSES_STORAGE_PREFIX}.${organizationId}`;
-}
-
-
-function loadExpenses(organizationId) {
-  try {
-    const value = JSON.parse(
-      localStorage.getItem(
-        expensesStorageKey(organizationId)
-      ) || "[]"
-    );
-
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-
-function saveExpenses(organizationId, rows) {
-  localStorage.setItem(
-    expensesStorageKey(organizationId),
-    JSON.stringify(rows)
-  );
-}
-
-
-function expenseId() {
-  if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID();
-  }
-
-  return `expense-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}`;
-}
-
 
 function expenseMoney(value) {
   return new Intl.NumberFormat("ru-RU", {
@@ -158,7 +116,14 @@ function expensesTable(rows) {
 
 
 export async function expenses(ctx) {
-  const rows = loadExpenses(ctx.org.id);
+  let rows = [];
+  let loadError = "";
+
+  try {
+    rows = await api.organizationExpenses(ctx.org.id);
+  } catch (error) {
+    loadError = error.message;
+  }
 
   return `
     <section class="finance-expenses-page">
@@ -228,7 +193,7 @@ export async function expenses(ctx) {
         <p
           class="finance-expenses-message"
           data-finance-expenses-message
-        ></p>
+        >${escapeHtml(loadError)}</p>
 
 
         ${expensesTable(rows)}
@@ -239,7 +204,7 @@ export async function expenses(ctx) {
 
 
 export function bindExpenses(root, ctx) {
-  root.addEventListener("submit", (event) => {
+  root.addEventListener("submit", async (event) => {
     const form = event.target;
 
     if (
@@ -272,21 +237,21 @@ export function bindExpenses(root, ctx) {
       return;
     }
 
-    const rows = loadExpenses(ctx.org.id);
-
-    rows.push({
-      id: expenseId(),
-      name,
-      type,
-      amount,
-    });
-
-    saveExpenses(ctx.org.id, rows);
-
-    ctx.reload();
+    try {
+      await api.createOrganizationExpense({
+        organization_id: Number(ctx.org.id),
+        name,
+        type,
+        amount,
+      });
+      await ctx.reload();
+    } catch (error) {
+      const message = root.querySelector("[data-finance-expenses-message]");
+      if (message) message.textContent = error.message;
+    }
   });
 
-  root.addEventListener("click", (event) => {
+  root.addEventListener("click", async (event) => {
     const remove = event.target.closest(
       "[data-finance-expense-delete]"
     );
@@ -296,12 +261,12 @@ export function bindExpenses(root, ctx) {
     const id =
       remove.dataset.financeExpenseDelete;
 
-    const rows = loadExpenses(ctx.org.id).filter(
-      (row) => String(row.id) !== String(id)
-    );
-
-    saveExpenses(ctx.org.id, rows);
-
-    ctx.reload();
+    try {
+      await api.deleteOrganizationExpense(Number(id));
+      await ctx.reload();
+    } catch (error) {
+      const message = root.querySelector("[data-finance-expenses-message]");
+      if (message) message.textContent = error.message;
+    }
   });
 }

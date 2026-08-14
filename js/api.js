@@ -227,6 +227,9 @@ export const api = {
     return request(`/crm-api/clients-core/clients/search?${params}`);
   },
   client: (id, orgId) => request(`/crm-api/clients-core/clients/${id}${orgId ? `?organization_id=${orgId}` : ""}`),
+  organizationExpenses: (orgId) => request(`/organizations/${orgId}/expense-records`, { cache: "no-store" }),
+  createOrganizationExpense: (body) => request("/organizations/expense-records", { method: "POST", body: JSON.stringify(body) }),
+  deleteOrganizationExpense: (expenseId) => request(`/organizations/expense-records/${expenseId}`, { method: "DELETE" }),
   createClient: (body) => request("/crm-api/clients-core/clients", { method: "POST", body: JSON.stringify(body) }),
   updateClient: (id, body) => request(`/crm-api/clients-core/clients/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   uploadClientPhoto: (id, file) => {

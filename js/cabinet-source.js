@@ -32,6 +32,9 @@ const form = document.querySelector("[data-cabinet-form]");
       const message = document.querySelector("[data-cabinet-message]");
       const historyList = document.querySelector("[data-cabinet-history]");
       const historySection = document.querySelector("[data-cabinet-history-section]");
+      const profileHeading = form?.previousElementSibling;
+      const profileMainBlock = document.createElement("div");
+      profileMainBlock.className = "cabinet-profile-main-block";
       const myBookingsSection = document.querySelector(".cabinet-my-bookings");
       const cabinetTitle = document.querySelector("[data-cabinet-title]");
       const notificationsModal = document.querySelector("[data-cabinet-notifications-modal]");
@@ -906,7 +909,6 @@ const form = document.querySelector("[data-cabinet-form]");
         const visitsEnabled = configuredSections.includes("client_visits");
         if (myBookingsSection) myBookingsSection.hidden = !visitsEnabled;
         const enabled = configuredSections
-          .filter((section) => section !== "client_name")
           .filter((section) => section !== "client_chat")
           .filter((section) => section !== "client_fields_configured")
           .filter((section) => section !== clientAccessConfiguredSection)
@@ -915,20 +917,19 @@ const form = document.querySelector("[data-cabinet-form]");
           .filter((section) => !String(section).startsWith(clientFieldSectionPrefix))
           .filter(
             (section) =>
-              !String(section).startsWith("bonus_")
+              section === clientBonusesSection
+                ? cabinetBonusesEnabled(configuredSections)
+                : !String(section).startsWith("bonus_")
           );
-        if (
-          cabinetBonusesEnabled(configuredSections)
-        ) {
-          enabled.push(clientBonusesSection);
-        }
-        currentCardSections = enabled;
+        currentCardSections = configuredSections;
         if (historySection) historySection.hidden = enabled.length === 0;
         if (!enabled.length) {
           historyList.innerHTML = "";
           return;
         }
-        historyList.innerHTML = enabled.map((section) => section === "client_visits" ? `
+        historyList.innerHTML = enabled.map((section) => section === "client_name" ? `
+          <div data-cabinet-profile-main-block></div>
+        ` : section === "client_visits" ? `
           <article class="cabinet-history-card cabinet-history-card--visits ${visitsExpanded ? "is-expanded" : ""}">
             <button type="button" class="cabinet-history-trigger" data-cabinet-visits-toggle aria-expanded="${visitsExpanded}">
               <span>${escapeHtml(sectionTitle(section))}</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.9201 8.94995L13.4001 15.47C12.6301 16.24 11.3701 16.24 10.6001 15.47L4.08008 8.94995" stroke="#292D32" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -941,6 +942,15 @@ const form = document.querySelector("[data-cabinet-form]");
             <div class="cabinet-history-body">${sectionBody(section)}</div>
           </article>
         `).join("");
+        const profileMainBlockSlot = historyList.querySelector(
+          "[data-cabinet-profile-main-block]"
+        );
+        if (profileMainBlockSlot) {
+          if (profileHeading && !profileMainBlock.contains(profileHeading)) {
+            profileMainBlock.append(profileHeading, form);
+          }
+          profileMainBlockSlot.replaceWith(profileMainBlock);
+        }
         historyList.insertAdjacentHTML("beforeend", visitModal());
       }
 

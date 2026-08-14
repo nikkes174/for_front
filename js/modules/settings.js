@@ -1248,13 +1248,58 @@ function openReviewTextModal(item) {
 
 function storageEventDetailsHtml(item) {
   const payload = item.payload || {};
-  if ((item.event_type || item.event_name) === "storage_transfer") return escapeHtml(`Товар: ${payload.product_title || "—"}; количество: ${payload.amount ?? 0}; ${payload.source_storage_name || "—"} → ${payload.destination_storage_name || "—"}`);
-  if ((item.event_type || item.event_name) === "storage_writeoff") return escapeHtml(`\u0422\u043e\u0432\u0430\u0440: ${payload.product_title || "\u2014"}; \u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e: ${payload.amount ?? 0}; \u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439: ${payload.comment || "\u2014"}`);
-  const branch = (cache.branches || []).find((row) => String(row.id) === String(item.branch_id || payload.branch_id));
-  const employee = (cache.users || []).find((row) => String(row.id) === String(item.actor_id || payload.employee_id));
-  return escapeHtml(`Причина: ${payload.reason || "Визит"}; филиал: ${branch?.name || "—"}; сотрудник: ${employee ? userLabelById(employee.id) : "—"}; товар: ${payload.product_title || "—"}; количество: ${payload.amount ?? 0}`);
-}
 
+  if (
+    (item.event_type || item.event_name) === "storage_transfer"
+  ) {
+    return escapeHtml(
+      `Товар: ${payload.product_title || "—"} · ` +
+      `Количество: ${payload.amount ?? 0}; ` +
+      `${payload.source_storage_name || "—"} → ` +
+      `${payload.destination_storage_name || "—"}`
+    );
+  }
+
+  if (
+    (item.event_type || item.event_name) === "storage_writeoff"
+  ) {
+    const storage = (cache.storages || []).find(
+      (row) =>
+        String(row.id) ===
+        String(payload.storage_id || item.entity_id)
+    );
+
+    return escapeHtml(
+      `Товар: ${payload.product_title || "—"} · ` +
+      `Количество: ${payload.amount ?? 0} · ` +
+      `Склад: ${payload.storage_name || storage?.name || "—"} · ` +
+      `Остаток товара: ${payload.remaining_amount ?? "—"} · ` +
+      `Комментарий: ${payload.comment || "—"}`
+    );
+  }
+
+  const branch = (cache.branches || []).find(
+    (row) =>
+      String(row.id) ===
+      String(item.branch_id || payload.branch_id)
+  );
+
+  const employee = (cache.users || []).find(
+    (row) =>
+      String(row.id) ===
+      String(item.actor_id || payload.employee_id)
+  );
+
+  return escapeHtml(
+    `Причина: ${payload.reason || "Визит"}; ` +
+    `Филиал: ${branch?.name || "—"} · ` +
+    `Сотрудник: ${
+      employee ? userLabelById(employee.id) : "—"
+    } · ` +
+    `Товар: ${payload.product_title || "—"} · ` +
+    `Количество: ${payload.amount ?? 0}`
+  );
+}
 function eventDetailsHtml(item) {
   if (item.entity_type === "warehouse") return storageEventDetailsHtml(item);
   if (item.entity_type === "client_review") return reviewEventDetailsHtml(item);
