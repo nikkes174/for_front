@@ -21,7 +21,7 @@ function expensesTable(rows) {
       <table class="app-table finance-expenses-table">
         <thead>
           <tr>
-            <th>азвание</th>
+            <th>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</th>
             <th>Сумма в год</th>
             <th>Сумма в месяц</th>
             <th>Сумма в неделю</th>
@@ -129,13 +129,13 @@ export async function expenses(ctx) {
           data-finance-expense-form
         >
           <label class="finance-expense-name-field">
-            <span>азвание</span>
+            <span>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</span>
 
             <input
               type="text"
               name="name"
               maxlength="255"
-              placeholder="азвание расхода"
+              placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u0430"
               required
             >
           </label>
