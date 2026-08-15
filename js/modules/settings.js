@@ -3389,6 +3389,9 @@ export function bindSettings(root, ctx) {
     root.querySelectorAll("[data-department-branch-select] details[open]").forEach((details) => {
       if (!details.contains(event.target)) details.removeAttribute("open");
     });
+    root.querySelectorAll(".events-filter-control details[open]").forEach((details) => {
+      if (!details.contains(event.target)) details.removeAttribute("open");
+    });
   });
 
   root.addEventListener("change", (event) => {

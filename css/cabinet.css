@@ -1582,17 +1582,19 @@ body.service-gallery-open { overflow: hidden; }
 }
 
 .cabinet-booking-service-checkbox input:checked + .cabinet-booking-service-checkbox-frame {
-  border-color: #111827;
-  box-shadow: 0 0 0 3px rgb(17 24 39 / 15%), inset 0 0 0 2px rgb(255 255 255 / 12%);
+  border-color: #4299e1;
+  background: #4299e1;
+  box-shadow: 0 0 0 3px rgb(66 153 225 / 35%), inset 0 0 0 2px rgb(255 255 255 / 12%);
 }
 
 .cabinet-booking-service-checkbox input:checked + .cabinet-booking-service-checkbox-frame svg {
+  stroke: #fff;
   stroke-dashoffset: 0;
   transform: scale(1.05);
 }
 
 .cabinet-booking-service-checkbox input:focus-visible + .cabinet-booking-service-checkbox-frame {
-  outline: 2px solid #111827;
+  outline: 2px solid #4299e1;
   outline-offset: 3px;
 }
 

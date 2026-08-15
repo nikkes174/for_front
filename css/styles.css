@@ -2036,7 +2036,7 @@ form[data-loyalty-edit-form][data-kind="rule"] > button.primary {
 .notification-channels-select.is-open .notification-channels-options { display: grid; }
 .notification-channels-options label { min-height: 36px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
 .notification-channels-options label:hover { background: #f2f4f7; }
-.notification-channels-options input { width: 17px; height: 17px; margin: 0; accent-color: #111; }
+.notification-channels-options input { width: 17px; height: 17px; margin: 0; accent-color: #4299e1; }
 .notification-channels-options .notification-single-delivery { align-items: flex-start; margin-top: 4px; padding-top: 10px; border-top: 1px solid #e4e7ec; line-height: 1.35; }
 .notification-history { display: grid; gap: 10px; margin-top: 18px; padding-top: 18px; border-top: 1px solid #e4e7ec; }
 .notification-history-list { display: grid; gap: 10px; }
@@ -3394,7 +3394,7 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .organization-bot-switch input { position: absolute; inset: 0; z-index: 1; opacity: 0; cursor: pointer; }
 .organization-bot-switch span { width: 50px; height: 28px; border-radius: 999px; background: #cbd5e1; box-shadow: inset 0 0 0 1px #b6c2d2; transition: background .18s ease, box-shadow .18s ease; }
 .organization-bot-switch span::after { content: ""; display: block; width: 22px; height: 22px; margin: 3px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(15 23 42 / 20%); transition: transform .18s ease; }
-.organization-bot-switch input:checked + span { background: #2563eb; box-shadow: inset 0 0 0 1px #2563eb; }
+.organization-bot-switch input:checked + span { background: #4299e1; box-shadow: inset 0 0 0 1px #4299e1; }
 .organization-bot-switch input:checked + span::after { transform: translateX(22px); }
 .organization-bot-switch input:focus-visible + span { outline: 3px solid rgb(37 99 235 / 22%); outline-offset: 3px; }
 .organization-bot-switch input:disabled + span { opacity: .5; }
@@ -3526,3 +3526,5 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   width: 100%;
 }
 .auth-login-actions .auth-primary-btn { width: 100%; }
+
+input[type="checkbox"] { accent-color: #4299e1; }
