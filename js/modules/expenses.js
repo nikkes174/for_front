@@ -4,18 +4,6 @@ import { escapeHtml } from "../dom.js";
 import { api } from "../api.js";
 
 
-const EXPENSE_NAME_OPTIONS = [
-  "Сумма в год",
-  "Сумма в месяц",
-  "Сумма в неделю",
-  "Сумма в день",
-];
-
-const EXPENSE_TYPE_OPTIONS = [
-  "Постоянные",
-  "Фиксированные",
-];
-
 function expenseMoney(value) {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
@@ -26,18 +14,6 @@ function expenseMoney(value) {
 }
 
 
-function expenseOptions(values) {
-  return values
-    .map(
-      (value) => `
-        <option value="${escapeHtml(value)}">
-          ${escapeHtml(value)}
-        </option>
-      `
-    )
-    .join("");
-}
-
 
 function expensesTable(rows) {
   return `
@@ -45,9 +21,11 @@ function expensesTable(rows) {
       <table class="app-table finance-expenses-table">
         <thead>
           <tr>
-            <th>Название</th>
-            <th>Тип Расхода</th>
-            <th>Сумма</th>
+            <th>азвание</th>
+            <th>Сумма в год</th>
+            <th>Сумма в месяц</th>
+            <th>Сумма в неделю</th>
+            <th>Сумма в день</th>
             <th class="finance-expenses-actions"></th>
           </tr>
         </thead>
@@ -69,13 +47,26 @@ function expensesTable(rows) {
 
 
                         <td>
-                          ${escapeHtml(row.type)}
+                          ${escapeHtml(
+                            expenseMoney(row.amount_year)
+                          )}
                         </td>
-
 
                         <td>
                           ${escapeHtml(
-                            expenseMoney(row.amount)
+                            expenseMoney(row.amount_month)
+                          )}
+                        </td>
+
+                        <td>
+                          ${escapeHtml(
+                            expenseMoney(row.amount_week)
+                          )}
+                        </td>
+
+                        <td>
+                          ${escapeHtml(
+                            expenseMoney(row.amount_day)
                           )}
                         </td>
 
@@ -102,7 +93,7 @@ function expensesTable(rows) {
                   .join("")
               : `
                 <tr data-finance-expenses-empty>
-                  <td colspan="4">
+                  <td colspan="6">
                     Расходов пока нет.
                   </td>
                 </tr>
@@ -137,47 +128,40 @@ export async function expenses(ctx) {
           class="finance-expenses-form"
           data-finance-expense-form
         >
-          <label>
-            <span>Название</span>
-
-
-            <select name="name" required>
-              <option value="">
-                Выберите название
-              </option>
-
-
-              ${expenseOptions(EXPENSE_NAME_OPTIONS)}
-            </select>
-          </label>
-
-
-          <label>
-            <span>Тип Расхода</span>
-
-
-            <select name="type" required>
-              <option value="">
-                Выберите тип
-              </option>
-
-
-              ${expenseOptions(EXPENSE_TYPE_OPTIONS)}
-            </select>
-          </label>
-
-
-          <label>
-            <span>Сумма</span>
-
+          <label class="finance-expense-name-field">
+            <span>азвание</span>
 
             <input
-              type="number"
-              name="amount"
-              min="0.01"
-              step="0.01"
+              type="text"
+              name="name"
+              maxlength="255"
+              placeholder="азвание расхода"
               required
             >
+          </label>
+
+
+
+
+
+          <label class="finance-expense-amount-field">
+            <span>Сумма в год</span>
+            <input type="number" name="amount_year" min="0" step="0.01" value="0" required>
+          </label>
+
+          <label class="finance-expense-amount-field">
+            <span>Сумма в месяц</span>
+            <input type="number" name="amount_month" min="0" step="0.01" value="0" required>
+          </label>
+
+          <label class="finance-expense-amount-field">
+            <span>Сумма в неделю</span>
+            <input type="number" name="amount_week" min="0" step="0.01" value="0" required>
+          </label>
+
+          <label class="finance-expense-amount-field">
+            <span>Сумма в день</span>
+            <input type="number" name="amount_day" min="0" step="0.01" value="0" required>
           </label>
 
 
@@ -221,17 +205,36 @@ export function bindExpenses(root, ctx) {
       data.get("name") || ""
     ).trim();
 
-    const type = String(
-      data.get("type") || ""
-    ).trim();
+    const amountYear = Number(
+      data.get("amount_year")
+    );
 
-    const amount = Number(data.get("amount"));
+    const amountMonth = Number(
+      data.get("amount_month")
+    );
+
+    const amountWeek = Number(
+      data.get("amount_week")
+    );
+
+    const amountDay = Number(
+      data.get("amount_day")
+    );
+
+    const amounts = [
+      amountYear,
+      amountMonth,
+      amountWeek,
+      amountDay,
+    ];
 
     if (
-      !EXPENSE_NAME_OPTIONS.includes(name)
-      || !EXPENSE_TYPE_OPTIONS.includes(type)
-      || !Number.isFinite(amount)
-      || amount <= 0
+      !name
+      || amounts.some(
+        (value) =>
+          !Number.isFinite(value)
+          || value < 0
+      )
     ) {
       form.reportValidity();
       return;
@@ -241,8 +244,10 @@ export function bindExpenses(root, ctx) {
       await api.createOrganizationExpense({
         organization_id: Number(ctx.org.id),
         name,
-        type,
-        amount,
+        amount_year: amountYear,
+        amount_month: amountMonth,
+        amount_week: amountWeek,
+        amount_day: amountDay,
       });
       await ctx.reload();
     } catch (error) {

@@ -986,12 +986,15 @@ button:active { transform: translateY(1px); }
 .finance-expenses-form {
   display: grid;
   grid-template-columns:
-    minmax(180px, 1fr)
-    minmax(180px, 1fr)
-    minmax(160px, 0.7fr)
+    220px
+    130px
+    130px
+    130px
+    130px
     auto;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
+  justify-content: start;
 }
 
 
@@ -1005,10 +1008,17 @@ button:active { transform: translateY(1px); }
 }
 
 
-.finance-expenses-form select,
 .finance-expenses-form input {
   width: 100%;
   min-width: 0;
+}
+
+.finance-expense-name-field {
+  width: 220px;
+}
+
+.finance-expense-amount-field {
+  width: 130px;
 }
 
 
@@ -3270,6 +3280,10 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
   .client-search { grid-template-columns: 1fr; }
   .client-search-submit, .client-search-reset { width: 100%; min-width: 0; max-width: none; }
   .finance-expenses-form { grid-template-columns: 1fr; }
+  .finance-expense-name-field,
+  .finance-expense-amount-field {
+    width: 100%;
+  }
   .finance-expenses-form .standard-save-button { width: 100%; }
   .permission-matrix { grid-template-columns: 1fr; }
   .loyalty-grid { grid-template-columns: 1fr; }
