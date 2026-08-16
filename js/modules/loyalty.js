@@ -959,27 +959,12 @@ function bonusTypesSection(ctx, bonusTypes) {
   return `<div class="subpanel">${titleWithHint(L.bonusTypesTitle, L.bonusTypesHint)}${canCreate(ctx, "transactions") ? `<form class="inline-form compact" data-loyalty-bonus-type-create>${field(L.name, "name")}<button class="primary" disabled>${L.createBonusType}</button><p data-message></p></form>` : ""}<table class="app-table"><tbody>${rows(bonusTypes || [], L.bonusTypesEmpty, (item) => `<tr><td>${escapeHtml(item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "bonus-type", item.id)}</td></tr>`)}</tbody></table></div>`;
 }
 
-function cardOrganizationAccess(ctx, key) {
-  const orgName = ctx.org?.name || ctx.org?.title || `#${ctx.org?.id || ""}`;
-  return `
-    <label class="card-access">
-      <span>\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c</span>
-      <details class="checkbox-select">
-        <summary>\u0412\u0441\u0435 \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438</summary>
-        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_all_orgs" checked> \u0412\u0441\u0435</label>
-        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_org_${escapeHtml(ctx.org?.id || "")}" checked> ${escapeHtml(orgName)}</label>
-      </details>
-    </label>
-  `;
-}
-
 function cardBlockSettings(ctx, key, enabled = true, extraContent = "") {
   const registrationField = key.startsWith("reg_") ? key.slice(4) : "";
   const clientCardSection = registrationField ? "" : key;
   return `
     <div class="card-block-settings">
       <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}> \u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c</label>
-      ${cardOrganizationAccess(ctx, key)}
       ${extraContent}
     </div>
   `;
