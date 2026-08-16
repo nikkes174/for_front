@@ -21,6 +21,11 @@ ensureCss();
 
 let state = { me: null, orgs: [], org: null, permissionsConfigured: false, allowedPermissions: new Set(), hasOrganizationRole: false };
 let ajaxCount = 0;
+let turboProgressTimer = null;
+let turboProgressHideTimer = null;
+let turboProgressValue = 0;
+
+const TURBO_PROGRESS_DELAY = 120;
 let drawToken = 0;
 
 const SETTINGS_PERMISSIONS = [
@@ -923,7 +928,11 @@ function shell(content, title) {
 
   return `
     <div class="app ${sidebarOpen ? "sidebar-open" : ""}">
-      <div class="ajax-indicator" aria-hidden="true"><span></span></div>
+      <div
+        class="turbo-progress-bar"
+        data-turbo-progress
+        aria-hidden="true"
+      ></div>
       <aside class="sidebar ${sidebarOpen ? "is-open" : ""}" data-sidebar aria-label="Основное меню" aria-hidden="${sidebarOpen ? "false" : "true"}">
         <div class="sidebar-head">
         <strong class="brand">Лояльность</strong>
@@ -1410,13 +1419,102 @@ root.addEventListener("change", (event) => {
 });
 
 window.addEventListener("popstate", draw);
+
+function turboProgressElement() {
+  return root.querySelector(
+    "[data-turbo-progress]"
+  );
+}
+
+function setTurboProgress(value) {
+  const bar = turboProgressElement();
+
+  if (!bar) return;
+
+  turboProgressValue = Math.max(
+    0,
+    Math.min(100, Number(value) || 0)
+  );
+
+  bar.style.width = `${turboProgressValue}%`;
+}
+
+function showTurboProgress() {
+  const bar = turboProgressElement();
+
+  if (!bar) return;
+
+  window.clearTimeout(turboProgressHideTimer);
+
+  bar.classList.add("is-visible");
+
+  setTurboProgress(
+    turboProgressValue > 0
+      ? turboProgressValue
+      : 18
+  );
+
+  requestAnimationFrame(() => {
+    if (ajaxCount > 0) {
+      setTurboProgress(72);
+    }
+  });
+}
+
+function hideTurboProgress() {
+  const bar = turboProgressElement();
+
+  if (!bar) return;
+
+  window.clearTimeout(turboProgressTimer);
+  window.clearTimeout(turboProgressHideTimer);
+
+  setTurboProgress(100);
+
+  turboProgressHideTimer =
+    window.setTimeout(() => {
+      bar.classList.remove("is-visible");
+
+      window.setTimeout(() => {
+        if (ajaxCount === 0) {
+          setTurboProgress(0);
+        }
+      }, 180);
+    }, 120);
+}
+
 window.addEventListener("ajax:start", () => {
   ajaxCount += 1;
-  document.body.classList.add("ajax-active");
+
+  if (ajaxCount !== 1) return;
+
+  window.clearTimeout(turboProgressTimer);
+  window.clearTimeout(turboProgressHideTimer);
+
+  turboProgressTimer = window.setTimeout(() => {
+    if (ajaxCount > 0) {
+      showTurboProgress();
+    }
+  }, TURBO_PROGRESS_DELAY);
 });
+
 window.addEventListener("ajax:end", () => {
-  ajaxCount = Math.max(ajaxCount - 1, 0);
-  if (!ajaxCount) document.body.classList.remove("ajax-active");
+  ajaxCount = Math.max(
+    ajaxCount - 1,
+    0
+  );
+
+  if (ajaxCount > 0) return;
+
+  window.clearTimeout(turboProgressTimer);
+
+  const bar = turboProgressElement();
+
+  if (bar?.classList.contains("is-visible")) {
+    hideTurboProgress();
+  } else {
+    setTurboProgress(0);
+  }
 });
 
 bindOnboarding(root, { navigate });
