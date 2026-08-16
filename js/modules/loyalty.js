@@ -959,9 +959,22 @@ function bonusTypesSection(ctx, bonusTypes) {
   return `<div class="subpanel">${titleWithHint(L.bonusTypesTitle, L.bonusTypesHint)}${canCreate(ctx, "transactions") ? `<form class="inline-form compact" data-loyalty-bonus-type-create>${field(L.name, "name")}<button class="primary" disabled>${L.createBonusType}</button><p data-message></p></form>` : ""}<table class="app-table"><tbody>${rows(bonusTypes || [], L.bonusTypesEmpty, (item) => `<tr><td>${escapeHtml(item.name)}</td><td class="actions">${deleteButtonIfAllowed(ctx, "bonus-type", item.id)}</td></tr>`)}</tbody></table></div>`;
 }
 
-function cardBlockSettings(ctx, key, enabled = true, extraContent = "") {
-  const registrationField = key.startsWith("reg_") ? key.slice(4) : "";
-  const clientCardSection = registrationField ? "" : key;
+function cardBlockSettings(
+  ctx,
+  key,
+  enabled = true,
+  extraContent = ""
+) {
+  const registrationField =
+    key.startsWith("reg_")
+      ? key.slice(4)
+      : "";
+
+  const clientCardSection =
+    registrationField
+      ? ""
+      : key;
+
   return `
     <div class="card-block-settings">
       <label class="card-block-switch">
@@ -969,16 +982,30 @@ function cardBlockSettings(ctx, key, enabled = true, extraContent = "") {
           type="checkbox"
           name="${escapeHtml(key)}_enabled"
           aria-label="Показывать"
-          ${registrationField
-            ? `data-registration-field="${escapeHtml(registrationField)}"`
-            : ""}
-          ${clientCardSection
-            ? `data-client-card-section="${escapeHtml(clientCardSection)}"`
-            : ""}
+          ${
+            registrationField
+              ? `data-registration-field="${escapeHtml(
+                  registrationField
+                )}"`
+              : ""
+          }
+          ${
+            clientCardSection
+              ? `data-client-card-section="${escapeHtml(
+                  clientCardSection
+                )}"`
+              : ""
+          }
           ${enabled ? "checked" : ""}
         >
         <span aria-hidden="true"></span>
       </label>
+
+      ${
+        registrationField
+          ? cardOrganizationAccess(ctx, key)
+          : ""
+      }
 
       ${extraContent}
     </div>
@@ -1037,7 +1064,6 @@ function clientCardConfigBlock(
       }
 
       <div class="client-card-config-settings">
-        ${cardOrganizationAccess(ctx, key)}
         ${extraContent}
       </div>
     </div>
