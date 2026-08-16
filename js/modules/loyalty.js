@@ -997,6 +997,67 @@ function cardConfigBlock(ctx, key, title, preview, enabled = true, extraContent 
   `;
 }
 
+function clientCardConfigBlock(
+  ctx,
+  key,
+  title,
+  preview,
+  enabled = true,
+  extraContent = ""
+) {
+  return `
+    <div
+      class="card-config-block client-card-config-block"
+      draggable="true"
+      data-card-config-block="${escapeHtml(key)}"
+    >
+      <div class="client-card-config-head">
+        <h4>${escapeHtml(title)}</h4>
+
+        <label class="card-block-switch">
+          <input
+            type="checkbox"
+            name="${escapeHtml(key)}_enabled"
+            aria-label="Показывать"
+            data-client-card-section="${escapeHtml(key)}"
+            ${enabled ? "checked" : ""}
+          >
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+
+      ${
+        preview
+          ? `
+            <div class="card-preview">
+              ${preview}
+            </div>
+          `
+          : ""
+      }
+
+      <div class="client-card-config-settings">
+        ${cardOrganizationAccess(ctx, key)}
+        ${extraContent}
+      </div>
+    </div>
+  `;
+}
+
+function cardOrganizationAccess(ctx, key) {
+  const orgName = ctx.org?.name || ctx.org?.title || `#${ctx.org?.id || ""}`;
+  return `
+    <label class="card-access">
+      <span>\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c</span>
+      <details class="checkbox-select">
+        <summary>\u0412\u0441\u0435 \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438</summary>
+        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_all_orgs" checked> \u0412\u0441\u0435</label>
+        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_org_${escapeHtml(ctx.org?.id || "")}" checked> ${escapeHtml(orgName)}</label>
+      </details>
+    </label>
+  `;
+}
+
 function bonusBalanceBlocks(ctx, bonusTypes, bonusTypeBalances, enabledSections) {
   const names = new Map([["cashback", "\u041a\u0435\u0448\u0431\u044d\u043a"]]);
   (bonusTypes || []).forEach((item) => names.set(item.code, item.name || item.code));
@@ -1165,13 +1226,6 @@ function bonusBalancePreview(
 }
 
 function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, levels, metric, visits) {
-  const level =
-    selectedClient?.client_level
-    || metric?.client_level
-    || metric?.loyalty_level
-    || levels?.[0]?.name
-    || L.notSet;
-
   const enabledSections =
     enabledClientCardSections(ctx.org?.id);
 
@@ -1186,7 +1240,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
   const mainBlocks = [
     {
       key: "client_name",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_name",
         "Данные пользователя",
@@ -1197,17 +1251,17 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_level",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_level",
         "Уровень",
-        `<b>${escapeHtml(level)}</b>`,
+        "",
         enabledSections.includes("client_level")
       ),
     },
     {
       key: "client_visits",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_visits",
         "История визитов",
@@ -1217,7 +1271,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_personal_link",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_personal_link",
         "Реферальная программа",
@@ -1229,7 +1283,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: CLIENT_BONUSES_SECTION,
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         CLIENT_BONUSES_SECTION,
         "Бонусы",
@@ -1249,7 +1303,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
   const bottomMenuBlocks = [
     {
       key: "client_online_booking",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_online_booking",
         "Онлайн запись",
@@ -1259,7 +1313,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_achievements",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_achievements",
         "Достижения",
@@ -1269,7 +1323,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_chat",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_chat",
         "Чат",
@@ -1279,7 +1333,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_notifications",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_notifications",
         "Уведомления",
@@ -1289,7 +1343,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
     },
     {
       key: "client_logout",
-      html: cardConfigBlock(
+      html: clientCardConfigBlock(
         ctx,
         "client_logout",
         "Кнопка выхода",

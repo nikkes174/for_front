@@ -2515,6 +2515,39 @@ form[data-visit-edit] .visit-item-picker select {
   grid-template-columns: 1fr;
 }
 
+.client-card-config-block {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.client-card-config-head {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.client-card-config-head h4 {
+  min-width: 0;
+  margin: 0;
+}
+
+.client-card-config-head
+.card-block-switch {
+  flex: 0 0 28px;
+  margin-left: auto;
+  justify-self: auto;
+}
+
+.client-card-config-settings {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
 .card-config-block {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
