@@ -964,7 +964,22 @@ function cardBlockSettings(ctx, key, enabled = true, extraContent = "") {
   const clientCardSection = registrationField ? "" : key;
   return `
     <div class="card-block-settings">
-      <label class="card-block-switch"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}><span aria-hidden="true"></span></label>
+      <label class="card-block-switch">
+        <input
+          type="checkbox"
+          name="${escapeHtml(key)}_enabled"
+          aria-label="Показывать"
+          ${registrationField
+            ? `data-registration-field="${escapeHtml(registrationField)}"`
+            : ""}
+          ${clientCardSection
+            ? `data-client-card-section="${escapeHtml(clientCardSection)}"`
+            : ""}
+          ${enabled ? "checked" : ""}
+        >
+        <span aria-hidden="true"></span>
+      </label>
+
       ${extraContent}
     </div>
   `;

@@ -3552,10 +3552,79 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .auth-login-actions .auth-primary-btn { width: 100%; }
 
 input[type="checkbox"] { accent-color: #4299e1; }
-.card-block-switch { position: relative; display: grid; width: 50px; height: 40px; align-items: center; cursor: pointer; }
-.card-block-switch input { position: absolute; z-index: 1; inset: 0; opacity: 0; cursor: pointer; }
-.card-block-switch span { width: 50px; height: 28px; border-radius: 999px; background: #cbd5e1; box-shadow: inset 0 0 0 1px #b6c2d2; transition: background .18s ease, box-shadow .18s ease; }
-.card-block-switch span::after { content: ""; display: block; width: 22px; height: 22px; margin: 3px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(15 23 42 / 20%); transition: transform .18s ease; }
-.card-block-switch input:checked + span { background: #4299e1; box-shadow: inset 0 0 0 1px #4299e1; }
-.card-block-switch input:checked + span::after { transform: translateX(22px); }
-.card-block-switch input:focus-visible + span { outline: 3px solid rgb(66 153 225 / 22%); outline-offset: 3px; }
+.card-block-switch {
+  position: relative;
+  display: inline-grid;
+  width: 28px;
+  height: 22px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-self: end;
+  cursor: pointer;
+}
+
+.card-block-switch input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.card-block-switch span {
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 16px;
+
+  border-radius: 999px;
+
+  background: #cbd5e1;
+
+  box-shadow:
+    inset 0 0 0 1px #b6c2d2;
+
+  transition:
+    background .18s ease,
+    box-shadow .18s ease;
+}
+
+.card-block-switch span::after {
+  content: "";
+
+  position: absolute;
+  top: 2px;
+  left: 2px;
+
+  width: 12px;
+  height: 12px;
+
+  border-radius: 50%;
+
+  background: #fff;
+
+  box-shadow:
+    0 1px 3px rgb(15 23 42 / 22%);
+
+  transition:
+    transform .18s ease;
+}
+
+.card-block-switch input:checked + span {
+  background: #4299e1;
+
+  box-shadow:
+    inset 0 0 0 1px #4299e1;
+}
+
+.card-block-switch input:checked + span::after {
+  transform: translateX(12px);
+}
+
+.card-block-switch input:focus-visible + span {
+  outline: 2px solid rgb(66 153 225 / 28%);
+  outline-offset: 2px;
+}
