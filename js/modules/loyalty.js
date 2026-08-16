@@ -1001,12 +1001,6 @@ function cardBlockSettings(
         <span aria-hidden="true"></span>
       </label>
 
-      ${
-        registrationField
-          ? cardOrganizationAccess(ctx, key)
-          : ""
-      }
-
       ${extraContent}
     </div>
   `;
@@ -1067,20 +1061,6 @@ function clientCardConfigBlock(
         ${extraContent}
       </div>
     </div>
-  `;
-}
-
-function cardOrganizationAccess(ctx, key) {
-  const orgName = ctx.org?.name || ctx.org?.title || `#${ctx.org?.id || ""}`;
-  return `
-    <label class="card-access">
-      <span>\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c</span>
-      <details class="checkbox-select">
-        <summary>\u0412\u0441\u0435 \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0438</summary>
-        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_all_orgs" checked> \u0412\u0441\u0435</label>
-        <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_org_${escapeHtml(ctx.org?.id || "")}" checked> ${escapeHtml(orgName)}</label>
-      </details>
-    </label>
   `;
 }
 
@@ -1270,7 +1250,7 @@ function clientCardBlocks(ctx, selectedClient, bonusTypes, bonusTypeBalances, le
         ctx,
         "client_name",
         "Данные пользователя",
-        "Поля, которые пользователь видит и меняет",
+        "",
         enabledSections.includes("client_name"),
         clientCabinetFieldsSelect(enabledSections)
       ),
