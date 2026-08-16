@@ -2031,10 +2031,23 @@ export function bindLoyalty(root, ctx) {
       sections.push(
         CLIENT_BONUSES_CONFIGURED_SECTION
       );
-      await api.updateClientCardSections(ctx.org.id, sections);
-      saveEnabledClientCardSections(ctx.org.id, sections);
+      await api.updateClientCardSections(
+        ctx.org.id,
+        sections
+      );
+
+      saveEnabledClientCardSections(
+        ctx.org.id,
+        sections
+      );
+
       loyaltyState.clientCardSections = sections;
-      loyaltyState.actionResult = "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.";
+      loyaltyState.actionResult = "";
+
+      showLoyaltyToast(
+        "Настройки карточки клиента сохранены."
+      );
+
       ctx.reload();
       return;
     }
