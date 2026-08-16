@@ -964,7 +964,7 @@ function cardBlockSettings(ctx, key, enabled = true, extraContent = "") {
   const clientCardSection = registrationField ? "" : key;
   return `
     <div class="card-block-settings">
-      <label class="checkbox"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}> \u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c</label>
+      <label class="card-block-switch"><input type="checkbox" name="${escapeHtml(key)}_enabled" ${registrationField ? `data-registration-field="${escapeHtml(registrationField)}"` : ""} ${clientCardSection ? `data-client-card-section="${escapeHtml(clientCardSection)}"` : ""} ${enabled ? "checked" : ""}><span aria-hidden="true"></span></label>
       ${extraContent}
     </div>
   `;
@@ -1061,7 +1061,7 @@ function registrationBlocks(ctx) {
     ctx,
     `reg_${key}`,
     title,
-    `<span>${escapeHtml(title)}</span><input disabled placeholder="${escapeHtml(title)}">`,
+    "",
     enabledFields.includes(key),
     );
   }).join("");
@@ -1381,7 +1381,7 @@ function cardsSection(ctx, selectedClient, balance, bonusTypes, bonusTypeBalance
           \u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430
         </button>
       </div>
-      <div class="${mode === "client" ? "client-card-config-columns" : "card-config-grid"}">
+      <div class="${mode === "client" ? "client-card-config-columns" : mode === "registration" ? "card-config-grid registration-card-config-grid" : "card-config-grid"}">
         ${configBody}
       </div>
       ${mode === "registration" ? `

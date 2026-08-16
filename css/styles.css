@@ -2477,6 +2477,16 @@ form[data-visit-edit] .visit-item-picker select {
   gap: 12px;
 }
 
+@media (min-width: 821px) {
+  .registration-card-config-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .registration-card-config-grid .card-config-block {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
 .client-card-config-columns {
   display: grid;
   grid-template-columns:
@@ -3542,3 +3552,10 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .auth-login-actions .auth-primary-btn { width: 100%; }
 
 input[type="checkbox"] { accent-color: #4299e1; }
+.card-block-switch { position: relative; display: grid; width: 50px; height: 40px; align-items: center; cursor: pointer; }
+.card-block-switch input { position: absolute; z-index: 1; inset: 0; opacity: 0; cursor: pointer; }
+.card-block-switch span { width: 50px; height: 28px; border-radius: 999px; background: #cbd5e1; box-shadow: inset 0 0 0 1px #b6c2d2; transition: background .18s ease, box-shadow .18s ease; }
+.card-block-switch span::after { content: ""; display: block; width: 22px; height: 22px; margin: 3px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(15 23 42 / 20%); transition: transform .18s ease; }
+.card-block-switch input:checked + span { background: #4299e1; box-shadow: inset 0 0 0 1px #4299e1; }
+.card-block-switch input:checked + span::after { transform: translateX(22px); }
+.card-block-switch input:focus-visible + span { outline: 3px solid rgb(66 153 225 / 22%); outline-offset: 3px; }
