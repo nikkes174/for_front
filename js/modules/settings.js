@@ -1693,7 +1693,10 @@ export async function loadSettingsData(orgId) {
     roles.map(async (role) => [role.id, await api.rolePermissions(role.id).catch(() => [])]),
   ));
   const missingEventClientIds = [...new Set(events
-    .filter((item) => item.entity_type === "client_visit" && !item.payload?.full_name)
+    .filter((item) => {
+      const clientId = item.client_id || item.payload?.client_id;
+      return clientId && !item.payload?.full_name && !item.payload?.client_name;
+    })
     .map((item) => item.client_id || item.payload?.client_id)
     .filter(Boolean)
     .map((id) => String(id)))];
@@ -1705,8 +1708,12 @@ export async function loadSettingsData(orgId) {
   events.forEach((item) => {
     const clientId = item.client_id || item.payload?.client_id;
     const fullName = clientId ? eventClientNames.get(String(clientId)) : "";
-    if (fullName && item.entity_type === "client_visit" && !item.payload?.full_name) {
-      item.payload = { ...(item.payload || {}), full_name: fullName };
+    if (fullName) {
+      item.payload = {
+        ...(item.payload || {}),
+        full_name: item.payload?.full_name || fullName,
+        client_name: item.payload?.client_name || fullName,
+      };
     }
   });
   const userIds = new Set(users.map((user) => String(user.id)));

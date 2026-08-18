@@ -1258,6 +1258,39 @@ function refreshSelectedClientModal(root, ctx) {
   });
 }
 
+function selectedClientVisitsHtml(client) {
+  const visits = client?.visits || [];
+  const pages = Math.max(Math.ceil(visits.length / 5), 1);
+  const page = Math.max(1, Math.min(state.visitPage, pages));
+  const pageVisits = visits.slice((page - 1) * 5, page * 5);
+  state.visitPage = page;
+
+  return `<div data-client-visits-page-content>
+    <table class="app-table"><tbody>
+      ${rows(pageVisits, "Истории визитов пока нет.", (item) => {
+        const visit = item.visit || item;
+        const visitStatusClass = visit.visit_status === "completed" ? "is-completed" : ["cancelled", "no_show"].includes(visit.visit_status) ? "is-cancelled" : "";
+        return `<tr>
+          <td><button type="button" class="ghost" data-open-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at, visit.branch_id) || "Дата не указана")}</b><small>${escapeHtml(visitStatusLabel(visit.visit_status))}</small></button></td>
+          <td class="visit-history-status ${visitStatusClass}">${escapeHtml(visitStatusLabel(visit.visit_status))}</td>
+          <td><button type="button" class="client-delete-icon-button" data-delete-visit="${escapeHtml(visit.id)}" aria-label="Удалить визит" title="Удалить визит"><img src="/fronted/icons/basket.svg" alt=""></button></td>
+        </tr>`;
+      })}
+    </tbody></table>
+    <p>Всего визитов: <b>${visits.length}</b></p>
+    ${visits.length > 5 ? `<div class="visit-pagination"><button type="button" class="ghost" data-client-visits-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>←</button><span>${page} / ${pages}</span><button type="button" class="ghost" data-client-visits-page="${page + 1}" ${page >= pages ? "disabled" : ""}>→</button></div>` : ""}
+  </div>`;
+}
+
+function renderSelectedClientVisitsPage(root) {
+  const container = root.querySelector("[data-client-modal] [data-client-visits-page-content]");
+  if (!container || !state.selectedClient) return;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = selectedClientVisitsHtml(state.selectedClient);
+  const next = wrapper.firstElementChild;
+  if (next) container.innerHTML = next.innerHTML;
+}
+
 function modal(client) {
   if (!client) return "";
   const metric = client.metric;
@@ -1331,25 +1364,7 @@ function modal(client) {
           <form class="inline-form compact visit-form" data-visit-create data-permission="clients.visits.create">
             ${visitCreateFormMarkup()}
           </form>
-          ${(() => {
-            const visits = client.visits || [];
-            const pages = Math.max(Math.ceil(visits.length / 5), 1);
-            const page = Math.min(state.visitPage, pages);
-            const pageVisits = visits.slice((page - 1) * 5, page * 5);
-            return `<table class="app-table"><tbody>
-            ${rows(pageVisits, "Истории визитов пока нет.", (item) => {
-              const visit = item.visit || item;
-              const visitStatusClass = visit.visit_status === "completed" ? "is-completed" : ["cancelled", "no_show"].includes(visit.visit_status) ? "is-cancelled" : "";
-              return `<tr>
-                <td><button type="button" class="ghost" data-open-visit="${escapeHtml(visit.id)}"><b>${escapeHtml(dateTime(visit.visit_at, visit.branch_id) || "Дата не указана")}</b><small>${escapeHtml(visitStatusLabel(visit.visit_status))}</small></button></td>
-                <td class="visit-history-status ${visitStatusClass}">${escapeHtml(visitStatusLabel(visit.visit_status))}</td>
-                <td><button type="button" class="client-delete-icon-button" data-delete-visit="${escapeHtml(visit.id)}" aria-label="Удалить визит" title="Удалить визит"><img src="/fronted/icons/basket.svg" alt=""></button></td>
-              </tr>`;
-            })}
-          </tbody></table>
-          <p>Всего визитов: <b>${visits.length}</b></p>
-          ${visits.length > 5 ? `<div class="visit-pagination"><button type="button" class="ghost" data-client-visits-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>←</button><span>${page} / ${pages}</span><button type="button" class="ghost" data-client-visits-page="${page + 1}" ${page >= pages ? "disabled" : ""}>→</button></div>` : ""}`;
-          })()}
+          ${selectedClientVisitsHtml(client)}
         </div>
         <div class="subpanel">
           <h3>Счета клиента</h3>
@@ -1995,8 +2010,9 @@ export function bindClients(root, ctx) {
     }
     const visitPageButton = event.target.closest("[data-client-visits-page]");
     if (visitPageButton) {
+      event.preventDefault();
       state.visitPage = Number(visitPageButton.dataset.clientVisitsPage) || 1;
-      ctx.reload();
+      renderSelectedClientVisitsPage(root);
       return;
     }
     const saveLevelButton = event.target.closest("[data-client-level-save]");

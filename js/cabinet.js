@@ -621,6 +621,36 @@
           </article>
         `;
   }
+  function visitsPageHtml(visits) {
+    const source = Array.isArray(visits) ? visits : [];
+    if (!source.length) {
+      return `
+            <p class="cabinet-history-empty">
+              \u0412\u0438\u0437\u0438\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442.
+            </p>
+          `;
+    }
+    const pages = Math.max(1, Math.ceil(source.length / VISITS_PER_PAGE));
+    visitsPage = Math.max(1, Math.min(visitsPage, pages));
+    const start = (visitsPage - 1) * VISITS_PER_PAGE;
+    const pageVisits = source.slice(start, start + VISITS_PER_PAGE);
+    return `
+          <div class="cabinet-visit-page-content" data-cabinet-visits-page-content>
+            <div class="cabinet-visit-list">
+              ${pageVisits.map(visitHistoryItems).join("")}
+            </div>
+            ${visitPagination(source)}
+          </div>
+        `;
+  }
+  function renderVisitsPage() {
+    const container = document.querySelector("[data-cabinet-visits-page-content]");
+    if (!container) return;
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = visitsPageHtml((cabinetData == null ? void 0 : cabinetData.visits) || []).trim();
+    const next = wrapper.firstElementChild;
+    if (next) container.innerHTML = next.innerHTML;
+  }
   function visitPagination(visits) {
     const pages = Math.ceil(visits.length / VISITS_PER_PAGE);
     if (pages <= 1) return "";
@@ -687,17 +717,7 @@
       return `<b>${escapeHtml(level)}</b>`;
     }
     if (section === "client_visits") {
-      const visits = (cabinetData == null ? void 0 : cabinetData.visits) || [];
-      if (!visits.length) return `<p class="cabinet-history-empty">\u0412\u0438\u0437\u0438\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442.</p>`;
-      const pages = Math.ceil(visits.length / VISITS_PER_PAGE);
-      visitsPage = Math.min(visitsPage, pages);
-      const pageVisits = visits.slice((visitsPage - 1) * VISITS_PER_PAGE, visitsPage * VISITS_PER_PAGE);
-      return `
-            <div class="cabinet-visit-list">
-              ${pageVisits.map(visitHistoryItems).join("")}
-            </div>
-            ${visitPagination(visits)}
-          `;
+      return visitsPageHtml((cabinetData == null ? void 0 : cabinetData.visits) || []);
     }
     if (section === "client_personal_link") {
       const referralLink = (cabinetData == null ? void 0 : cabinetData.referral_link) || "";
@@ -1719,10 +1739,15 @@
     }
     const visitsPageButton = event.target.closest("[data-cabinet-visits-page]");
     if (visitsPageButton) {
-      const totalPages = Math.ceil(((cabinetData == null ? void 0 : cabinetData.visits) || []).length / VISITS_PER_PAGE);
-      visitsPage += visitsPageButton.dataset.cabinetVisitsPage === "next" ? 1 : -1;
+      event.preventDefault();
+      event.stopPropagation();
+      const visits = (cabinetData == null ? void 0 : cabinetData.visits) || [];
+      const totalPages = Math.max(1, Math.ceil(visits.length / VISITS_PER_PAGE));
+      const direction = visitsPageButton.dataset.cabinetVisitsPage;
+      if (direction === "next") visitsPage += 1;
+      if (direction === "prev") visitsPage -= 1;
       visitsPage = Math.max(1, Math.min(visitsPage, totalPages));
-      renderHistorySections(currentCardSections);
+      renderVisitsPage();
       return;
     }
     const visitButton = event.target.closest("[data-cabinet-visit]");

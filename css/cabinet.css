@@ -557,6 +557,11 @@
   gap: 8px;
 }
 
+.cabinet-visit-page-content {
+  width: 100%;
+  min-width: 0;
+}
+
 .cabinet-visit-button {
   width: 100%;
   display: flex;
