@@ -10,10 +10,10 @@ const productExcelPreviewState = new WeakMap();
 let selectedEventVisit = null;
 let departmentFilterBranchId = "";
 let workplaceFilterBranchId = "";
-let productFilterCategoryId = "";
 let serviceFilterCategoryId = "";
-let productSearchQuery = "";
 let serviceSearchQuery = "";
+const CATEGORY_PRODUCT_PAGE_SIZE = 5;
+const categoryProductEditorState = new WeakMap();
 let userFilterBranchId = "";
 let userFilterRoleId = "";
 let userFilterDepartmentId = "";
@@ -477,8 +477,8 @@ function productItemDetails(item) {
 
 function catalogItemListMarkup(itemType) {
   const isService = itemType === "service";
-  const selectedCategoryId = isService ? serviceFilterCategoryId : productFilterCategoryId;
-  const searchQuery = (isService ? serviceSearchQuery : productSearchQuery).trim().toLowerCase();
+  const selectedCategoryId = isService ? serviceFilterCategoryId : "";
+  const searchQuery = (isService ? serviceSearchQuery : "").trim().toLowerCase();
   const items = (cache.productItems || [])
     .filter((item) => categoryTypeById(item.category_id) === itemType)
     .filter((item) => !selectedCategoryId || String(item.category_id) === String(selectedCategoryId))
@@ -495,6 +495,44 @@ function productItemCategory(item) {
 
 function categoryTypeById(categoryId) {
   return (cache.categories || []).find((category) => String(category.id) === String(categoryId))?.type;
+}
+
+function categoryProductItems(categoryId, searchQuery = "") {
+  const query = String(searchQuery || "").trim().toLocaleLowerCase("ru-RU");
+  return (cache.productItems || [])
+    .filter((item) => String(item.category_id) === String(categoryId))
+    .filter((item) => !query || `${item.title || ""} ${productItemDetails(item)}`.toLocaleLowerCase("ru-RU").includes(query));
+}
+
+function categoryProductPageData(categoryId, state) {
+  const items = categoryProductItems(categoryId, state.searchQuery);
+  const totalPages = Math.max(1, Math.ceil(items.length / CATEGORY_PRODUCT_PAGE_SIZE));
+  state.page = Math.max(1, Math.min(state.page, totalPages));
+  const start = (state.page - 1) * CATEGORY_PRODUCT_PAGE_SIZE;
+  return { items, totalPages, pageItems: items.slice(start, start + CATEGORY_PRODUCT_PAGE_SIZE) };
+}
+
+function categoryProductListMarkup(categoryId, state) {
+  const { items, totalPages, pageItems } = categoryProductPageData(categoryId, state);
+  if (!items.length) return `<p class="empty">${state.searchQuery ? "Ничего не найдено" : "Товаров в этой категории пока нет"}</p>`;
+  return `<div data-category-product-list>${entityList(pageItems, "Товаров в этой категории пока нет", "productItem", (item) => item.title, productItemDetails, { deleteIcon: true, deleteLabel: "Удалить" })}</div>${totalPages > 1 ? `<div class="category-product-pagination"><button type="button" class="btn btn-outline-secondary" data-category-product-page="prev"${state.page <= 1 ? " disabled" : ""}>Назад</button><span>${state.page} / ${totalPages}</span><button type="button" class="btn btn-outline-secondary" data-category-product-page="next"${state.page >= totalPages ? " disabled" : ""}>Вперёд</button></div>` : ""}`;
+}
+
+function renderCategoryProductList(editor, state) {
+  const target = editor?.querySelector("[data-category-product-list-container]");
+  if (target) target.innerHTML = categoryProductListMarkup(Number(editor.dataset.categoryId), state);
+}
+
+function categoryProductCreateForm(category) {
+  return `<form class="inline-form compact category-product-create-form" data-product-item-create data-category-id="${Number(category.id)}" data-permission="settings.items.create"><input type="hidden" name="category_id" value="${Number(category.id)}"><label><span>Название</span><input name="title" required></label><label><span>Цена</span><input name="price" type="number" step="0.01" min="0"></label><label><span>Активен</span><select name="active"><option value="true">Да</option><option value="false">Нет</option></select></label><label><span>Комментарий</span><input name="comment"></label><button class="primary">Добавить товар</button><p data-message></p></form>`;
+}
+
+function categoryProductExcelActions(category) {
+  return `<div class="catalog-excel-actions"><input type="hidden" data-product-excel-category value="${Number(category.id)}"><label class="btn btn-outline-secondary catalog-excel-upload">Загрузить Excel<input type="file" accept=".xlsx,.xls" data-product-excel-file hidden></label><a class="btn btn-outline-secondary" href="${escapeHtml(api.exportProductItemsUrl(cache.organizationId, "product", category.id))}">Выгрузить Excel</a><p data-product-excel-message></p><div class="catalog-excel-preview" data-product-excel-preview hidden></div></div>`;
+}
+
+function categoryProductsEditor(category) {
+  return `<div class="category-products-editor" data-category-products-editor data-category-id="${Number(category.id)}"><div class="category-products-editor-head"><h4>Товары</h4></div>${categoryProductExcelActions(category)}${categoryProductCreateForm(category)}<form class="inline-form compact category-product-search" data-category-product-search-form><label><span>Поиск товара</span><input type="search" placeholder="Название" data-category-product-search></label></form><div data-category-product-list-container></div></div>`;
 }
 
 function branchWorkScheduleFields(schedule = {}) {
@@ -1800,8 +1838,11 @@ export function renderCatalogTab(tabSlug = "products", data = cache) {
     ? "Услуги привязаны к категориям услуг организации."
     : "Товары привязаны к товарным категориям организации.";
   const scopedCategories = categories.filter((category) => category.type === type);
-  const selectedCategoryId = activeTab === "services" ? serviceFilterCategoryId : productFilterCategoryId;
-  const searchQuery = activeTab === "services" ? serviceSearchQuery : productSearchQuery;
+  const selectedCategoryId = activeTab === "services" ? serviceFilterCategoryId : "";
+  const searchQuery = activeTab === "services" ? serviceSearchQuery : "";
+  if (activeTab === "products") {
+    return `<div id="categories" data-permission="settings.categories.view">${section(categoriesTitle, `<form class="inline-form compact" data-category-create data-permission="settings.categories.create"><input type="hidden" name="type" value="product"><label><span>Название категории</span><input name="name" required></label><button class="primary" disabled>Добавить категорию</button><p data-message></p></form>${entityList(scopedCategories, "Категорий пока нет", "category", (item) => item.name, (item) => categoryTypeLabel(item.type), { deleteIcon: true, deleteLabel: "Удалить" })}`, categoriesHint)}</div>`;
+  }
   const scopedItems = productItems
     .filter((item) => categoryTypeById(item.category_id) === type)
     .filter((item) => !selectedCategoryId || String(item.category_id) === String(selectedCategoryId));
@@ -2564,12 +2605,10 @@ function modalFields(type, item) {
     <label><span>Расчётный счёт</span><input name="settlement_account" value="${escapeHtml(item.bank_details?.settlement_account || "")}"></label>
     <label><span>Корр. счёт</span><input name="correspondent_account" value="${escapeHtml(item.bank_details?.correspondent_account || "")}"></label>
   `;
-  if (type === "category") return `
-    <label><span>Название категории</span><input name="name" value="${escapeHtml(item.name)}" required></label>
-    <label><span>Тип</span><select name="type">
-      ${PRODUCT_CATEGORY_TYPE_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.type === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}
-    </select></label>
-  `;
+  if (type === "category") {
+    if (item.type === "product") return `<label><span>Название категории</span><input name="name" value="${escapeHtml(item.name)}" required></label><input type="hidden" name="type" value="product">`;
+    return `<label><span>Название категории</span><input name="name" value="${escapeHtml(item.name)}" required></label><label><span>Тип</span><select name="type">${PRODUCT_CATEGORY_TYPE_OPTIONS.map((itemOption) => `<option value="${escapeHtml(itemOption.value)}" ${item.type === itemOption.value ? "selected" : ""}>${escapeHtml(itemOption.label)}</option>`).join("")}</select></label>`;
+  }
   if (type === "productItem") return `
     ${selectField(
       "Категория",
@@ -2759,7 +2798,7 @@ async function openEntityModal(type, item) {
 
   document.body.insertAdjacentHTML("beforeend", `
     <div class="modal-backdrop" data-settings-modal>
-      <div class="modal-card${isServiceProfile ? " service-profile-modal" : ""}${type === "org" ? " organization-profile-modal" : ""}">
+      <div class="modal-card${isServiceProfile ? " service-profile-modal" : ""}${type === "org" ? " organization-profile-modal" : ""}${type === "category" && item.type === "product" ? " product-category-modal" : ""}">
         <div class="modal-head">
           <h3>${escapeHtml(modalTitle)}${modalTitleId}</h3>
           <button type="button" class="modal-close-icon" aria-label="Закрыть" title="Закрыть" data-close-modal><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1" aria-hidden="true"> <path d="M18 6l-12 12"></path> <path d="M6 6l12 12"></path> </svg></button>
@@ -2770,9 +2809,18 @@ async function openEntityModal(type, item) {
           <p data-message></p>
           <button class="primary standard-save-button${type === "achievement" ? " settings-achievement-save" : ""}">Сохранить</button>
         </form>
+        ${type === "category" && item.type === "product" ? categoryProductsEditor(item) : ""}
       </div>
     </div>
   `);
+  if (type === "category" && item.type === "product") {
+    const editor = document.querySelector("[data-category-products-editor]");
+    if (editor) {
+      const state = { searchQuery: "", page: 1 };
+      categoryProductEditorState.set(editor, state);
+      renderCategoryProductList(editor, state);
+    }
+  }
 }
 
 async function syncUserBranchAccess(userId, branchIds = [], departmentId = "", workplaceId = "") {
@@ -3380,9 +3428,18 @@ export function bindSettings(root, ctx) {
       updateUserList(true);
       return;
     }
+    const categoryProductSearch = event.target.closest("[data-category-product-search]");
+    if (categoryProductSearch) {
+      const editor = categoryProductSearch.closest("[data-category-products-editor]");
+      const state = editor && categoryProductEditorState.get(editor);
+      if (!editor || !state) return;
+      state.searchQuery = categoryProductSearch.value || "";
+      state.page = 1;
+      renderCategoryProductList(editor, state);
+      return;
+    }
     if (event.target.matches("[data-catalog-item-search]")) {
-      if (event.target.dataset.itemType === "service") serviceSearchQuery = event.target.value || "";
-      else productSearchQuery = event.target.value || "";
+      serviceSearchQuery = event.target.value || "";
       const list = event.target.closest("[data-permission]")?.querySelector("[data-catalog-item-list]");
       if (list) list.innerHTML = catalogItemListMarkup(event.target.dataset.itemType);
       return;
@@ -3390,6 +3447,17 @@ export function bindSettings(root, ctx) {
     if (event.target.closest("[data-settings] form:not([data-entity-edit])")) {
       syncRequiredPanelForms(root);
     }
+  });
+
+  document.addEventListener("input", (event) => {
+    const search = event.target.closest("[data-category-product-search]");
+    if (!search) return;
+    const editor = search.closest("[data-category-products-editor]");
+    const state = editor && categoryProductEditorState.get(editor);
+    if (!editor || !state) return;
+    state.searchQuery = search.value || "";
+    state.page = 1;
+    renderCategoryProductList(editor, state);
   });
 
   root.addEventListener("click", (event) => {
@@ -3422,11 +3490,6 @@ export function bindSettings(root, ctx) {
     }
     if (event.target.matches("[data-workplace-filter-branch]")) {
       workplaceFilterBranchId = event.target.value || "";
-      ctx.reload();
-      return;
-    }
-    if (event.target.matches("[data-product-filter-category]")) {
-      productFilterCategoryId = event.target.value || "";
       ctx.reload();
       return;
     }
@@ -3532,6 +3595,29 @@ export function bindSettings(root, ctx) {
     }
   });
 
+  document.addEventListener("change", (event) => {
+    if (!event.target.matches("[data-product-excel-file]")) return;
+    const actions = event.target.closest(".catalog-excel-actions");
+    const editor = actions?.closest("[data-category-products-editor]");
+    if (!editor) return;
+    const file = event.target.files?.[0];
+    const categoryId = actions.querySelector("[data-product-excel-category]")?.value;
+    if (!file || !categoryId) return;
+    const message = actions.querySelector("[data-product-excel-message]");
+    event.target.disabled = true;
+    message.textContent = "Готовим превью...";
+    api.previewProductItems(ctx.org.id, categoryId, file).then((result) => {
+      productExcelPreviewState.set(actions, { file, rows: result.rows || [], excludedRows: new Set() });
+      renderProductExcelPreview(actions);
+      message.textContent = "";
+    }).catch((error) => {
+      message.textContent = error.message || "Не удалось прочитать Excel";
+    }).finally(() => {
+      event.target.disabled = false;
+      event.target.value = "";
+    });
+  });
+
   root.querySelectorAll("[data-workplace-create]").forEach((form) => syncWorkplaceForm(form));
   root.querySelectorAll("[data-user-create]").forEach((form) => syncUserDepartmentForm(form));
   root.querySelectorAll("[data-user-access-create]").forEach((form) => syncUserDepartmentForm(form));
@@ -3595,7 +3681,7 @@ export function bindSettings(root, ctx) {
         });
       } else if (form.matches("[data-product-item-create]")) {
         if (!api.createProductItem) throw new Error("API товаров и услуг не подключен.");
-        await api.createProductItem({
+        const created = await api.createProductItem({
           organization_id: ctx.org.id,
           category_id: Number(data.category_id),
           title: data.title,
@@ -3603,6 +3689,20 @@ export function bindSettings(root, ctx) {
           comment: optional(data.comment),
           active: data.active === "true",
         });
+        const editor = form.closest("[data-category-products-editor]");
+        if (editor) {
+          cache.productItems = created?.id
+            ? [...(cache.productItems || []), created]
+            : await api.productItems(ctx.org.id);
+          form.reset();
+          form.querySelector('[name="category_id"]').value = String(editor.dataset.categoryId);
+          const state = categoryProductEditorState.get(editor);
+          if (state) {
+            state.page = 1;
+            renderCategoryProductList(editor, state);
+          }
+          return;
+        }
       } else if (form.matches("[data-achievement-create]")) {
         if (!api.createAchievement) throw new Error("API достижений не подключен.");
         await api.createAchievement({
@@ -3848,6 +3948,18 @@ export function bindSettings(root, ctx) {
       return;
     }
 
+    const categoryProductPage = event.target.closest("[data-category-product-page]");
+    if (categoryProductPage) {
+      const editor = categoryProductPage.closest("[data-category-products-editor]");
+      const state = editor && categoryProductEditorState.get(editor);
+      if (!editor || !state) return;
+      const { totalPages } = categoryProductPageData(Number(editor.dataset.categoryId), state);
+      state.page += categoryProductPage.dataset.categoryProductPage === "next" ? 1 : -1;
+      state.page = Math.max(1, Math.min(state.page, totalPages));
+      renderCategoryProductList(editor, state);
+      return;
+    }
+
     const editButton = event.target.closest("[data-edit-entity]");
     if (editButton) {
       const item = findEntity(editButton.dataset.editEntity, editButton.dataset.id);
@@ -3874,7 +3986,13 @@ export function bindSettings(root, ctx) {
     if (!confirm(labels[type] || "Удалить запись?")) return;
     try {
       await deleteEntity(type, deleteButton.dataset.id);
-      ctx.reload();
+      const editor = deleteButton.closest("[data-category-products-editor]");
+      if (type === "productItem" && editor) {
+        cache.productItems = (cache.productItems || []).filter((item) => String(item.id) !== String(deleteButton.dataset.id));
+        renderCategoryProductList(editor, categoryProductEditorState.get(editor));
+      } else {
+        ctx.reload();
+      }
     } catch (error) {
       alert(error.message);
     }
@@ -3883,6 +4001,39 @@ export function bindSettings(root, ctx) {
   document.addEventListener("click", async (event) => {
     if (handleAchievementConditionClick(event)) return;
     if (handleProductAmountClick(event)) return;
+
+    const categoryProductPage = event.target.closest("[data-category-product-page]");
+    if (categoryProductPage) {
+      const editor = categoryProductPage.closest("[data-category-products-editor]");
+      const state = editor && categoryProductEditorState.get(editor);
+      if (!editor || !state) return;
+      const { totalPages } = categoryProductPageData(Number(editor.dataset.categoryId), state);
+      state.page += categoryProductPage.dataset.categoryProductPage === "next" ? 1 : -1;
+      state.page = Math.max(1, Math.min(state.page, totalPages));
+      renderCategoryProductList(editor, state);
+      return;
+    }
+
+    const categoryProductEdit = event.target.closest("[data-category-products-editor] [data-edit-entity]");
+    if (categoryProductEdit) {
+      const item = findEntity(categoryProductEdit.dataset.editEntity, categoryProductEdit.dataset.id);
+      if (item) await openEntityModal(categoryProductEdit.dataset.editEntity, item);
+      return;
+    }
+
+    const categoryProductDelete = event.target.closest("[data-category-products-editor] [data-delete-entity]");
+    if (categoryProductDelete) {
+      if (!confirm("Удалить товар или услугу?")) return;
+      const editor = categoryProductDelete.closest("[data-category-products-editor]");
+      try {
+        await deleteEntity("productItem", categoryProductDelete.dataset.id);
+        cache.productItems = (cache.productItems || []).filter((item) => String(item.id) !== String(categoryProductDelete.dataset.id));
+        renderCategoryProductList(editor, categoryProductEditorState.get(editor));
+      } catch (error) {
+        alert(error.message);
+      }
+      return;
+    }
 
     const workplaceEmployeeButton = event.target.closest("[data-open-workplace-employee]");
     if (workplaceEmployeeButton) {
@@ -3994,6 +4145,33 @@ export function bindSettings(root, ctx) {
   });
 
   document.addEventListener("submit", async (event) => {
+    const productCreateForm = event.target.closest("[data-category-products-editor] [data-product-item-create]");
+    if (productCreateForm) {
+      event.preventDefault();
+      const data = formData(productCreateForm);
+      try {
+        const created = await api.createProductItem({
+          organization_id: ctx.org.id,
+          category_id: Number(data.category_id),
+          title: data.title,
+          price: numberOrNull(data.price),
+          comment: optional(data.comment),
+          active: data.active === "true",
+        });
+        const editor = productCreateForm.closest("[data-category-products-editor]");
+        cache.productItems = created?.id ? [...(cache.productItems || []), created] : await api.productItems(ctx.org.id);
+        productCreateForm.reset();
+        productCreateForm.querySelector('[name="category_id"]').value = String(editor.dataset.categoryId);
+        const state = categoryProductEditorState.get(editor);
+        if (state) {
+          state.page = 1;
+          renderCategoryProductList(editor, state);
+        }
+      } catch (error) {
+        setMessage(productCreateForm, error.message);
+      }
+      return;
+    }
     const form = event.target.closest("[data-entity-edit]");
     if (!form) return;
     event.preventDefault();
