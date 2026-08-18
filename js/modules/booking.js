@@ -26,7 +26,6 @@ const bookingState = {
   publicBookingUrl: "",
   publicBookingOrganizationId: null,
   defaultsOrganizationId: null,
-  defaultBranchInitialized: false,
 };
 let bookingHoverCloseTimer = null;
 
@@ -656,7 +655,6 @@ export async function booking(ctx) {
     bookingState.period = "day";
     bookingState.branchId = "";
     bookingState.employeeId = "";
-    bookingState.defaultBranchInitialized = false;
   }
   bookingState.weekStart ||= new Date();
   const start = bookingState.weekStart;
@@ -677,14 +675,6 @@ export async function booking(ctx) {
     bookingState.employeeId,
   );
   bookingState.calendarData = data;
-  if (!bookingState.defaultBranchInitialized) {
-    bookingState.defaultBranchInitialized = true;
-    const firstBranch = data.branches?.[0];
-    if (firstBranch?.id) {
-      bookingState.branchId = String(firstBranch.id);
-      return booking(ctx);
-    }
-  }
   if (bookingState.publicBookingOrganizationId !== ctx.org.id || !bookingState.publicBookingUrl) {
     const response = await fetch(`/public-api/online-booking-url/${encodeURIComponent(ctx.org.id)}`, {
       credentials: "include",

@@ -71,6 +71,7 @@ const CATALOG_MENU_SECTIONS = [
   { slug: "products", label: "Товары", permissions: ["settings.categories.view", "settings.items.view"] },
   { slug: "services", label: "Услуги", permissions: ["settings.categories.view", "settings.items.view"] },
   { slug: "warehouse", label: "Склад", permissions: ["settings.items.view"] },
+  { slug: "inventory", label: "Инвентаризация", permissions: ["settings.items.view"] },
 ];
 
 const LOYALTY_MENU_SECTIONS = [

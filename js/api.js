@@ -124,7 +124,7 @@ export const api = {
     excludedRows.forEach((rowNumber) => data.append("excluded_rows", rowNumber));
     return upload("/organizations/" + orgId + "/product-items/import", data);
   },
-  exportProductItemsUrl: (orgId, itemType) => `/organizations/${orgId}/product-items/export?item_type=${encodeURIComponent(itemType)}`,
+  exportProductItemsUrl: (orgId, itemType, categoryId = "") => `/organizations/${orgId}/product-items/export?item_type=${encodeURIComponent(itemType)}${categoryId ? `&category_id=${encodeURIComponent(categoryId)}` : ""}`,
   uploadProductItemImages: (id, files) => {
     const data = new FormData();
     [...files].forEach((file) => data.append("files", file));
