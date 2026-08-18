@@ -3,7 +3,9 @@ import { escapeHtml } from "../dom.js";
 import { openExternalClientCard } from "./clients.js";
 
 const SEGMENT_VARIABLES = [
-  { key: "visits_count", label: "Количество визитов", columnLabel: "Количество визитов", type: "number" },
+  { key: "records_count", label: "Количество записей", columnLabel: "Количество записей", type: "number" },
+    { key: "visits_count", label: "Количество визитов", columnLabel: "Количество визитов", type: "number" },
+    { key: "cancel_count", label: "Количество отменённых записей", columnLabel: "Количество отменённых записей", type: "number" },
   { key: "spent_amount", label: "Количество потраченных денег", columnLabel: "Потрачено", type: "number" },
   { key: "has_phone", label: "Наличие телефона", columnLabel: "Телефон", type: "boolean" },
   { key: "app_installed", label: "Установлено приложение", columnLabel: "Приложение", type: "boolean" },
@@ -148,6 +150,14 @@ function firstDefined(...values) {
 
 function getClientValue(client, key) {
   switch (key) {
+    case "records_count":
+      return firstDefined(
+        client.records_count,
+        client.record_count,
+        client.metrics?.records_count,
+        client.metric?.records_count
+      );
+
     case "visits_count":
       return firstDefined(
         client.visits_count,
@@ -155,6 +165,15 @@ function getClientValue(client, key) {
         client.total_visits,
         client.metrics?.visits_count,
         client.metric?.visits_count
+      );
+
+    case "cancel_count":
+      return firstDefined(
+        client.cancel_count,
+        client.cancelled_count,
+        client.cancellations_count,
+        client.metrics?.cancel_count,
+        client.metric?.cancel_count
       );
 
     case "spent_amount":
