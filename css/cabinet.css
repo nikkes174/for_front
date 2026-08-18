@@ -2656,6 +2656,12 @@ body.service-gallery-open { overflow: hidden; }
 .cabinet-bottom-nav-item:focus-visible { outline: 2px solid #111; outline-offset: -3px; }
 @media (prefers-reduced-motion: reduce) { .cabinet-bottom-nav-item { transition: none; } }
 
+.cabinet-registration-mode .cabinet-bottom-nav { display: none !important; }
+.cabinet-registration-mode [data-cabinet-history-section] { display: none !important; }
+.cabinet-registration-mode [data-cabinet-profile-avatar] { display: none !important; }
+.cabinet-registration-mode [data-cabinet-edit] { display: none !important; }
+.cabinet-registration-mode [data-cabinet-view]:not([data-cabinet-view="profile"]) { display: none !important; }
+
 /* Compact notification controls. */
 .cabinet-notifications-modal .modal-head .ghost {
   min-height: 32px;

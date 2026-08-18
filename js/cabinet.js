@@ -31,6 +31,10 @@
   var message = document.querySelector("[data-cabinet-message]");
   var historyList = document.querySelector("[data-cabinet-history]");
   var historySection = document.querySelector("[data-cabinet-history-section]");
+  var bottomNav = document.querySelector("[data-cabinet-bottom-nav]");
+  var profilePanel = document.querySelector('[data-cabinet-view="profile"]');
+  var profileAvatar = document.querySelector("[data-cabinet-profile-avatar]");
+  var profileEditButton = document.querySelector("[data-cabinet-edit]");
   var profileHeading = form == null ? void 0 : form.previousElementSibling;
   var profileMainBlock = document.createElement("div");
   profileMainBlock.className = "cabinet-profile-main-block";
@@ -654,15 +658,25 @@
         `;
   }
   function enabledBonusSections(sections) {
-    if (!cabinetBonusesEnabled(sections)) return [];
-    return sections.filter((section) => String(section).startsWith("bonus_") && section !== "bonus_cashback");
+    if (!cabinetBonusesEnabled(sections)) {
+      return [];
+    }
+    return sections.filter(
+      (section) => String(section).startsWith("bonus_") && section !== "bonus_cashback"
+    );
   }
   function cabinetBonusesEnabled(sections) {
     const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
-    if (!configuredSections.includes(clientBonusesConfiguredSection)) {
-      return configuredSections.some((section) => String(section).startsWith("bonus_") && section !== "bonus_cashback");
+    if (!configuredSections.includes(
+      clientBonusesConfiguredSection
+    )) {
+      return configuredSections.some(
+        (section) => String(section).startsWith("bonus_") && section !== "bonus_cashback"
+      );
     }
-    return configuredSections.includes(clientBonusesSection);
+    return configuredSections.includes(
+      clientBonusesSection
+    );
   }
   function sectionBody(section) {
     var _a3, _b;
@@ -695,22 +709,24 @@
     }
     if (section === clientBonusesSection) {
       const bonusSections = enabledBonusSections(currentCardSections);
-      if (!bonusSections.length) return `<p class="cabinet-history-empty">Бонусов пока нет.</p>`;
+      if (!bonusSections.length) {
+        return `<p class="cabinet-history-empty">\u0411\u043E\u043D\u0443\u0441\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442.</p>`;
+      }
       return `
-        <div class="cabinet-bonus-list">
-          ${bonusSections.map((bonusSection) => {
-            const balance = bonusBalanceForSection(bonusSection);
-            return `
-              <div class="cabinet-bonus-row">
-                <span>${escapeHtml(bonusName(bonusSection))}</span>
-                <b>${escapeHtml(money((balance == null ? void 0 : balance.balance) || 0))}</b>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `;
+            <div class="cabinet-bonus-list">
+              ${bonusSections.map((bonusSection) => {
+        const balance = bonusBalanceForSection(bonusSection);
+        return `
+                  <div class="cabinet-bonus-row">
+                    <span>${escapeHtml(bonusName(bonusSection))}</span>
+                    <b>${escapeHtml(money((balance == null ? void 0 : balance.balance) || 0))}</b>
+                  </div>
+                `;
+      }).join("")}
+            </div>
+          `;
     }
-    if (section === "client_chat") return `<p class="cabinet-history-empty">Чат пока не подключен.</p>`;
+    if (section === "client_chat") return `<p class="cabinet-history-empty">\u0427\u0430\u0442 \u043F\u043E\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D.</p>`;
     return "";
   }
   function cabinetAccessEnabled(sections, section) {
@@ -719,42 +735,66 @@
     return configuredSections.includes(section);
   }
   function cabinetAccessSections(sections) {
+    var _a3;
     const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
     if (configuredSections.includes(clientAccessConfiguredSection)) return configuredSections;
-    const organizationId = (cabinetData && (cabinetData.organization_id || (cabinetData.client && cabinetData.client.organization_id))) || (currentClient && currentClient.organization_id);
+    const organizationId = (cabinetData == null ? void 0 : cabinetData.organization_id) || ((_a3 = cabinetData == null ? void 0 : cabinetData.client) == null ? void 0 : _a3.organization_id) || (currentClient == null ? void 0 : currentClient.organization_id);
     try {
       const saved = JSON.parse(localStorage.getItem(`loyalty.clientCardSections.${organizationId || "default"}`) || "null");
       if (Array.isArray(saved) && saved.includes(clientAccessConfiguredSection)) return saved;
-    } catch (error) {
+    } catch (e) {
     }
     return configuredSections;
   }
   function applyCabinetBottomNavOrder(sections) {
-    const bottomNav = document.querySelector(".cabinet-bottom-nav");
-    if (!bottomNav) return;
+    const bottomNav2 = document.querySelector(
+      ".cabinet-bottom-nav"
+    );
+    if (!bottomNav2) return;
     const configuredSections = cabinetAccessSections(sections);
-    const order = new Map(configuredSections.map((section, index) => [section, index]));
-    const items = [...bottomNav.querySelectorAll("[data-cabinet-bottom-section]")];
+    const order = new Map(
+      configuredSections.map(
+        (section, index) => [section, index]
+      )
+    );
+    const items = [
+      ...bottomNav2.querySelectorAll(
+        "[data-cabinet-bottom-section]"
+      )
+    ];
     items.sort((a, b) => {
+      var _a3, _b;
       const aSection = a.dataset.cabinetBottomSection;
       const bSection = b.dataset.cabinetBottomSection;
-      const aDefault = clientBottomMenuSections.indexOf(aSection);
-      const bDefault = clientBottomMenuSections.indexOf(bSection);
-      return (order.get(aSection) ?? 1000 + aDefault) - (order.get(bSection) ?? 1000 + bDefault);
+      const aDefault = clientBottomMenuSections.indexOf(
+        aSection
+      );
+      const bDefault = clientBottomMenuSections.indexOf(
+        bSection
+      );
+      return ((_a3 = order.get(aSection)) != null ? _a3 : 1e3 + aDefault) - ((_b = order.get(bSection)) != null ? _b : 1e3 + bDefault);
     }).forEach((item) => {
-      bottomNav.append(item);
+      bottomNav2.append(item);
     });
-    const bonusNav = document.querySelector(".cabinet-bonus-nav");
-    if (bonusNav) bonusNav.hidden = !cabinetBonusesEnabled(configuredSections);
+    const bonusNav = document.querySelector(
+      ".cabinet-bonus-nav"
+    );
+    if (bonusNav) {
+      bonusNav.hidden = !cabinetBonusesEnabled(
+        configuredSections
+      );
+    }
   }
   function applyCabinetAccess(sections) {
     const configuredSections = cabinetAccessSections(sections);
-    applyCabinetBottomNavOrder(configuredSections);
+    applyCabinetBottomNavOrder(
+      configuredSections
+    );
     const controls = {
       client_online_booking: '[data-cabinet-tab="client_booking"]',
       client_achievements: '[data-cabinet-tab="achievements"]',
       client_notifications: "[data-cabinet-notifications-open]",
-      client_logout: "[data-cabinet-logout]",
+      client_logout: "[data-cabinet-logout]"
     };
     Object.entries(controls).forEach(([section, selector]) => {
       document.querySelectorAll(selector).forEach((element) => {
@@ -764,8 +804,8 @@
     document.querySelectorAll('[data-cabinet-tab="chat"]').forEach((element) => {
       element.hidden = !configuredSections.includes("client_chat");
     });
-    const bottomNav = document.querySelector(".cabinet-bottom-nav");
-    if (bottomNav) bottomNav.style.setProperty("--cabinet-bottom-nav-items", String(bottomNav.querySelectorAll(".cabinet-bottom-nav-item:not([hidden])").length));
+    const bottomNav2 = document.querySelector(".cabinet-bottom-nav");
+    if (bottomNav2) bottomNav2.style.setProperty("--cabinet-bottom-nav-items", String(bottomNav2.querySelectorAll(".cabinet-bottom-nav-item:not([hidden])").length));
   }
   function renderHistorySections(sections) {
     const configuredSections = Array.isArray(sections) ? sections : defaultCardSections;
@@ -774,7 +814,9 @@
     applyCabinetAccess(currentAccessSections);
     const visitsEnabled = configuredSections.includes("client_visits");
     if (myBookingsSection) myBookingsSection.hidden = !visitsEnabled;
-     const enabled = configuredSections.filter((section) => section !== "client_chat").filter((section) => section !== "client_fields_configured").filter((section) => section !== clientAccessConfiguredSection).filter((section) => section !== clientBonusesConfiguredSection).filter((section) => !clientAccessSections.includes(section)).filter((section) => !String(section).startsWith(clientFieldSectionPrefix)).filter((section) => section === clientBonusesSection ? cabinetBonusesEnabled(configuredSections) : !String(section).startsWith("bonus_"));
+    const enabled = configuredSections.filter((section) => section !== "client_chat").filter((section) => section !== "client_fields_configured").filter((section) => section !== clientAccessConfiguredSection).filter((section) => section !== clientBonusesConfiguredSection).filter((section) => !clientAccessSections.includes(section)).filter((section) => !String(section).startsWith(clientFieldSectionPrefix)).filter(
+      (section) => section === clientBonusesSection ? cabinetBonusesEnabled(configuredSections) : !String(section).startsWith("bonus_")
+    );
     currentCardSections = configuredSections;
     if (historySection) historySection.hidden = enabled.length === 0;
     if (!enabled.length) {
@@ -796,9 +838,13 @@
             <div class="cabinet-history-body">${sectionBody(section)}</div>
           </article>
         `).join("");
-    const profileMainBlockSlot = historyList.querySelector("[data-cabinet-profile-main-block]");
+    const profileMainBlockSlot = historyList.querySelector(
+      "[data-cabinet-profile-main-block]"
+    );
     if (profileMainBlockSlot) {
-      if (profileHeading && !profileMainBlock.contains(profileHeading)) profileMainBlock.append(profileHeading, form);
+      if (profileHeading && !profileMainBlock.contains(profileHeading)) {
+        profileMainBlock.append(profileHeading, form);
+      }
       profileMainBlockSlot.replaceWith(profileMainBlock);
     }
     historyList.insertAdjacentHTML("beforeend", visitModal());
@@ -1311,14 +1357,18 @@
     }
   }
   function cabinetTabAllowed(tab) {
+    var _a3;
     if (tab === "client_booking" && publicBookingOrganizationId) return true;
-    const sections = cabinetAccessSections((cabinetData == null ? void 0 : cabinetData.card_sections) || defaultCardSections);
+    const sections = cabinetAccessSections((_a3 = cabinetData == null ? void 0 : cabinetData.card_sections) != null ? _a3 : defaultCardSections);
     if (tab === "client_booking") return cabinetAccessEnabled(sections, "client_online_booking");
     if (tab === "achievements") return cabinetAccessEnabled(sections, "client_achievements");
     if (tab === "chat") return sections.includes("client_chat");
     return true;
   }
   function setCabinetTab(tab) {
+    if (form.dataset.cabinetRegistration === "true") {
+      tab = "profile";
+    }
     if (!cabinetTabAllowed(tab)) tab = "profile";
     document.querySelectorAll("[data-cabinet-tab]").forEach((link) => link.classList.toggle("active", link.dataset.cabinetTab === tab));
     document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
@@ -1355,8 +1405,16 @@
     window.setTimeout(() => menu.setAttribute("hidden", ""), 230);
   }
   function setRegistrationMode(enabled) {
+    document.body.classList.toggle("cabinet-registration-mode", enabled);
     if (cabinetTitle) cabinetTitle.textContent = enabled ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F \u043A\u043B\u0438\u0435\u043D\u0442\u0430" : "\u041C\u043E\u0438 \u0434\u0430\u043D\u043D\u044B\u0435";
     if (historySection) historySection.hidden = enabled;
+    if (bottomNav) bottomNav.hidden = enabled;
+    if (profileAvatar) profileAvatar.hidden = enabled;
+    if (profileEditButton) profileEditButton.hidden = enabled;
+    document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
+      if (enabled) view.hidden = view.dataset.cabinetView !== "profile";
+    });
+    if (profilePanel) profilePanel.hidden = false;
     submitButton.textContent = enabled ? "\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C\u0441\u044F" : "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0434\u0430\u043D\u043D\u044B\u0435";
     form.dataset.cabinetRegistration = enabled ? "true" : "false";
     setCabinetEditMode(enabled);
@@ -1374,7 +1432,8 @@
     document.querySelector("[data-cabinet-edit]").hidden = registration || editing;
   }
   function applyRegistrationFields(fields, cardSections = []) {
-    const configuredFields = Array.isArray(cardSections) && cardSections.includes("client_fields_configured") ? cardSections.filter((section) => String(section).startsWith(clientFieldSectionPrefix)).map((section) => String(section).slice(clientFieldSectionPrefix.length)).filter((field) => cabinetFieldNames.includes(field)) : null;
+    const registrationMode = form.dataset.cabinetRegistration === "true";
+    const configuredFields = !registrationMode && Array.isArray(cardSections) && cardSections.includes("client_fields_configured") ? cardSections.filter((section) => String(section).startsWith(clientFieldSectionPrefix)).map((section) => String(section).slice(clientFieldSectionPrefix.length)).filter((field) => cabinetFieldNames.includes(field)) : null;
     const enabled = configuredFields != null ? configuredFields : Array.isArray(fields) ? fields : defaultRegistrationFields;
     const fieldsByName = new Map([...form.querySelectorAll("[data-cabinet-field]")].map((field) => [field.dataset.cabinetField, field]));
     const order = [...enabled, ...cabinetFieldNames.filter((name) => !enabled.includes(name))];
@@ -1534,16 +1593,20 @@
       const link = await response.json();
       if (link.session_token) localStorage.setItem(SESSION_TOKEN_KEY, link.session_token);
       cabinetData = link;
+      await loadCabinetOrganizationName(link.organization_id);
       allCabinetSections.forEach((section) => loadedCabinetSections.add(section));
       currentClient = link.client || link.profile || null;
-      setRegistrationMode(!link.client_id);
+      const registrationMode = !link.client_id;
+      setRegistrationMode(registrationMode);
       applyRegistrationFields(link.registration_fields, link.card_sections);
       fillCurrentUserCabinet(currentClient || {});
-      renderHistorySections(link.card_sections);
-      const pushState = await refreshPushState().catch(() => null);
-      await requestPushOnFirstPwaLaunch(pushState);
-      await refreshNotificationsList().catch(() => null);
-      exposeSessionForPwaInstall();
+      if (!registrationMode) {
+        renderHistorySections(link.card_sections);
+        const pushState = await refreshPushState().catch(() => null);
+        await requestPushOnFirstPwaLaunch(pushState);
+        await refreshNotificationsList().catch(() => null);
+        exposeSessionForPwaInstall();
+      }
       submitButton.disabled = false;
       setCabinetTab("profile");
     } catch (e) {
@@ -2025,6 +2088,9 @@
       }
       currentClient = result.client || null;
       if (!currentClient && !token) currentClient = result || null;
+      if (form.dataset.cabinetRegistration === "true" && ((currentClient == null ? void 0 : currentClient.id) || result.client_id)) {
+        setRegistrationMode(false);
+      }
       renderHistorySections(currentCardSections);
       setMessage("\u0414\u0430\u043D\u043D\u044B\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B.", "success");
       if (!token) setCabinetEditMode(false);

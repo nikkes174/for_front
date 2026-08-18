@@ -32,6 +32,10 @@ const form = document.querySelector("[data-cabinet-form]");
       const message = document.querySelector("[data-cabinet-message]");
       const historyList = document.querySelector("[data-cabinet-history]");
       const historySection = document.querySelector("[data-cabinet-history-section]");
+      const bottomNav = document.querySelector("[data-cabinet-bottom-nav]");
+      const profilePanel = document.querySelector('[data-cabinet-view="profile"]');
+      const profileAvatar = document.querySelector("[data-cabinet-profile-avatar]");
+      const profileEditButton = document.querySelector("[data-cabinet-edit]");
       const profileHeading = form?.previousElementSibling;
       const profileMainBlock = document.createElement("div");
       profileMainBlock.className = "cabinet-profile-main-block";
@@ -1540,6 +1544,9 @@ const form = document.querySelector("[data-cabinet-form]");
       }
 
       function setCabinetTab(tab) {
+        if (form.dataset.cabinetRegistration === "true") {
+          tab = "profile";
+        }
         if (!cabinetTabAllowed(tab)) tab = "profile";
         document.querySelectorAll("[data-cabinet-tab]").forEach((link) => link.classList.toggle("active", link.dataset.cabinetTab === tab));
         document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
@@ -1577,8 +1584,16 @@ const form = document.querySelector("[data-cabinet-form]");
       }
 
       function setRegistrationMode(enabled) {
+        document.body.classList.toggle("cabinet-registration-mode", enabled);
         if (cabinetTitle) cabinetTitle.textContent = enabled ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u0430" : "\u041c\u043e\u0438 \u0434\u0430\u043d\u043d\u044b\u0435";
         if (historySection) historySection.hidden = enabled;
+        if (bottomNav) bottomNav.hidden = enabled;
+        if (profileAvatar) profileAvatar.hidden = enabled;
+        if (profileEditButton) profileEditButton.hidden = enabled;
+        document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
+          if (enabled) view.hidden = view.dataset.cabinetView !== "profile";
+        });
+        if (profilePanel) profilePanel.hidden = false;
         submitButton.textContent = enabled ? "\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u0441\u044f" : "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435";
         form.dataset.cabinetRegistration = enabled ? "true" : "false";
         setCabinetEditMode(enabled);
@@ -1598,7 +1613,8 @@ const form = document.querySelector("[data-cabinet-form]");
       }
 
       function applyRegistrationFields(fields, cardSections = []) {
-        const configuredFields = Array.isArray(cardSections) && cardSections.includes("client_fields_configured")
+        const registrationMode = form.dataset.cabinetRegistration === "true";
+        const configuredFields = !registrationMode && Array.isArray(cardSections) && cardSections.includes("client_fields_configured")
           ? cardSections
             .filter((section) => String(section).startsWith(clientFieldSectionPrefix))
             .map((section) => String(section).slice(clientFieldSectionPrefix.length))
@@ -1772,16 +1788,20 @@ const form = document.querySelector("[data-cabinet-form]");
           const link = await response.json();
           if (link.session_token) localStorage.setItem(SESSION_TOKEN_KEY, link.session_token);
           cabinetData = link;
+          await loadCabinetOrganizationName(link.organization_id);
           allCabinetSections.forEach((section) => loadedCabinetSections.add(section));
           currentClient = link.client || link.profile || null;
-          setRegistrationMode(!link.client_id);
+          const registrationMode = !link.client_id;
+          setRegistrationMode(registrationMode);
           applyRegistrationFields(link.registration_fields, link.card_sections);
           fillCurrentUserCabinet(currentClient || {});
-          renderHistorySections(link.card_sections);
-          const pushState = await refreshPushState().catch(() => null);
-          await requestPushOnFirstPwaLaunch(pushState);
-          await refreshNotificationsList().catch(() => null);
-          exposeSessionForPwaInstall();
+          if (!registrationMode) {
+            renderHistorySections(link.card_sections);
+            const pushState = await refreshPushState().catch(() => null);
+            await requestPushOnFirstPwaLaunch(pushState);
+            await refreshNotificationsList().catch(() => null);
+            exposeSessionForPwaInstall();
+          }
           submitButton.disabled = false;
           setCabinetTab("profile");
         } catch {
@@ -2296,6 +2316,9 @@ const form = document.querySelector("[data-cabinet-form]");
           }
           currentClient = result.client || null;
           if (!currentClient && !token) currentClient = result || null;
+          if (form.dataset.cabinetRegistration === "true" && (currentClient?.id || result.client_id)) {
+            setRegistrationMode(false);
+          }
           renderHistorySections(currentCardSections);
           setMessage("\u0414\u0430\u043d\u043d\u044b\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b.", "success");
           if (!token) setCabinetEditMode(false);
