@@ -2934,7 +2934,21 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .schedule-time-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; }
 .schedule-break-row { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 8px; margin: 8px 0; }
 .schedule-modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.modal-card.schedule-week-actions-modal { width: min(420px, calc(100vw - 48px)); }
+.schedule-week-actions-form { display: grid; width: 100%; gap: 12px; }
+.schedule-week-actions-context { display: grid; gap: 2px; }
+.schedule-week-actions-context strong { color: #172033; font-size: 14px; font-weight: 600; }
+.schedule-week-actions-context small { color: #667085; font-size: 12px; }
+.schedule-week-actions-time { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.schedule-week-actions-modal input[type="time"] { min-height: 38px; height: 38px; }
+.schedule-week-actions-modal label { gap: 5px; font-size: 13px; }
+.schedule-week-actions-modal .schedule-break-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 32px; gap: 6px; margin: 6px 0; }
+.schedule-week-actions-modal .schedule-break-row [data-schedule-remove-break] { display: grid; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; place-items: center; }
+.schedule-week-actions-modal [data-schedule-add-break] { min-height: 32px; padding: 4px 0; justify-self: start; color: #4299e1; }
+.schedule-week-actions-footer { display: flex; margin-top: 2px; padding-top: 12px; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid #eaecf0; }
+.schedule-week-actions-message { min-height: 0; margin: 0; color: #b42318; font-size: 12px; }
 @media (max-width: 640px) { .schedule-grid { grid-template-columns: 180px repeat(7, 110px); } .schedule-selection-bar { width: calc(100% - 16px); justify-content: center; } }
+@media (max-width: 480px) { .modal-card.schedule-week-actions-modal { width: calc(100vw - 24px); } }
 .warehouse-product-picker { width: min(700px, 90vw); }
 .warehouse-product-picker-fields { display: grid; gap: 16px; }
 .warehouse-product-picker-category-section, .warehouse-product-picker-product-section { display: grid; min-width: 0; gap: 8px; }
