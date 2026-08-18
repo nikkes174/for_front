@@ -2891,7 +2891,8 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .inventory-list-table tbody tr[data-inventory-open] { cursor: pointer; }
 .inventory-list-table tbody tr[data-inventory-open]:hover { background: #f7f9fc; }
 .inventory-list-sequence { margin-left: 6px; color: #667085; font-size: 12px; font-weight: 500; }
-.inventory-editor-footer { display: flex; margin-top: 18px; padding-top: 14px; justify-content: flex-start; border-top: 1px solid #e3e8f1; }
+.inventory-editor-footer { display: flex; margin-top: 18px; padding-top: 14px; align-items: center; justify-content: flex-start; gap: 8px; border-top: 1px solid #e3e8f1; }
+.inventory-view-footer { display: flex; margin-top: 18px; padding-top: 14px; align-items: center; justify-content: flex-start; border-top: 1px solid #e3e8f1; }
 .inventory-saved-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
 .inventory-saved-filters > div { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid #e3e8f1; border-radius: 8px; background: #fafbfd; }
 .inventory-saved-filters span, .inventory-saved-comment > span { color: #667085; font-size: 12px; }
