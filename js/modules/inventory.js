@@ -2,197 +2,63 @@ import { api } from "../api.js";
 import { escapeHtml } from "../dom.js";
 
 const inventoryState = {
-  organizationId: null,
-  started: false,
-  createdAt: null,
-  subdivisions: [],
-  storages: [],
-  products: [],
-  categories: [],
-  selectedSubdivisionIds: new Set(),
-  selectedStorageIds: new Set(),
-  selectedCategoryIds: new Set(),
-  rows: [],
-  sourceRows: [],
-  factualValues: new Map(),
-  comment: "",
-  loading: false,
+  organizationId: null, mode: "list", currentId: null, name: "", createdAt: null,
+  subdivisions: [], storages: [], products: [], categories: [],
+  selectedSubdivisionIds: new Set(), selectedStorageIds: new Set(), selectedCategoryIds: new Set(),
+  rows: [], sourceRows: [], factualValues: new Map(), comment: "", savedInventories: [], loading: false,
 };
-
 const numberFormat = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 });
 const moneyFormat = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 2 });
+const esc = (value) => escapeHtml(String(value ?? ""));
 
 function resetInventoryState(orgId) {
-  inventoryState.organizationId = orgId;
-  inventoryState.started = false;
-  inventoryState.createdAt = null;
-  inventoryState.subdivisions = [];
-  inventoryState.storages = [];
-  inventoryState.products = [];
-  inventoryState.categories = [];
-  inventoryState.selectedSubdivisionIds = new Set();
-  inventoryState.selectedStorageIds = new Set();
-  inventoryState.selectedCategoryIds = new Set();
-  inventoryState.rows = [];
-  inventoryState.sourceRows = [];
-  inventoryState.factualValues = new Map();
-  inventoryState.comment = "";
-  inventoryState.loading = false;
+  Object.assign(inventoryState, { organizationId: orgId, mode: "list", currentId: null, name: "", createdAt: null, subdivisions: [], storages: [], products: [], categories: [], selectedSubdivisionIds: new Set(), selectedStorageIds: new Set(), selectedCategoryIds: new Set(), rows: [], sourceRows: [], factualValues: new Map(), comment: "", savedInventories: [], loading: false });
 }
-
+function clearDraft() { Object.assign(inventoryState, { currentId: null, name: "", createdAt: null, rows: [], sourceRows: [], factualValues: new Map(), comment: "", loading: false }); }
 function formatQuantity(value) { return numberFormat.format(Number(value) || 0); }
 function formatMoney(value) { return moneyFormat.format(Number(value) || 0); }
+function formatCreatedAt(value) { return new Date(value).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
 function productUnitCost(product) { return Number(product.cost ?? product.actual_cost ?? 0) || 0; }
+function sameCalendarDay(left, right) { return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate(); }
+function documentTitle(item) { return `${item.name} · №${item.day_sequence}`; }
 
-function selectedSummary(items, selectedIds, allLabel) {
-  if (!items.length) return "Нет вариантов";
-  if (selectedIds.size === items.length) return allLabel;
-  if (!selectedIds.size) return "Ничего не выбрано";
-  if (selectedIds.size === 1) return items.find((item) => selectedIds.has(String(item.id)))?.name || "Выбрано: 1";
-  return `Выбрано: ${selectedIds.size}`;
-}
+function selectedSummary(items, selectedIds, allLabel) { if (!items.length) return "Нет вариантов"; if (selectedIds.size === items.length) return allLabel; if (!selectedIds.size) return "Ничего не выбрано"; if (selectedIds.size === 1) return items.find((item) => selectedIds.has(String(item.id)))?.name || "Выбрано: 1"; return `Выбрано: ${selectedIds.size}`; }
+function inventoryFilter(type, items, selectedIds, allLabel) { const allSelected = items.length > 0 && selectedIds.size === items.length; const label = type === "subdivision" ? "Подраздел" : type === "storage" ? "Склад" : "Категория"; return `<label class="inventory-filter"><span>${label}</span><details class="branch-multiselect-dropdown" data-inventory-filter="${type}"><summary><span data-inventory-filter-summary>${esc(selectedSummary(items, selectedIds, allLabel))}</span></summary><div class="branch-multiselect-options"><label class="checkbox"><input type="checkbox" data-inventory-filter-all="${type}"${allSelected ? " checked" : ""}>${esc(allLabel)}</label>${items.map((item) => `<label class="checkbox"><input type="checkbox" value="${Number(item.id)}" data-inventory-filter-option="${type}"${selectedIds.has(String(item.id)) ? " checked" : ""}>${esc(item.name)}</label>`).join("")}</div></details></label>`; }
+function inventoryFilters() { const availableStorages = inventoryState.storages.filter((storage) => inventoryState.selectedSubdivisionIds.has(String(storage.subdivision_id))); return `<div class="inventory-filters">${inventoryFilter("subdivision", inventoryState.subdivisions, inventoryState.selectedSubdivisionIds, "Все подразделы")}${inventoryFilter("storage", availableStorages, inventoryState.selectedStorageIds, "Все склады")}${inventoryFilter("category", inventoryState.categories, inventoryState.selectedCategoryIds, "Все категории")}</div>`; }
 
-function inventoryFilter(type, items, selectedIds, allLabel) {
-  const allSelected = items.length > 0 && selectedIds.size === items.length;
-  return `<label class="inventory-filter"><span>${type === "subdivision" ? "Подраздел" : type === "storage" ? "Склад" : "Категория"}</span><details class="branch-multiselect-dropdown" data-inventory-filter="${type}"><summary><span data-inventory-filter-summary>${escapeHtml(selectedSummary(items, selectedIds, allLabel))}</span></summary><div class="branch-multiselect-options"><label class="checkbox"><input type="checkbox" data-inventory-filter-all="${type}"${allSelected ? " checked" : ""}>${escapeHtml(allLabel)}</label>${items.map((item) => `<label class="checkbox"><input type="checkbox" value="${Number(item.id)}" data-inventory-filter-option="${type}"${selectedIds.has(String(item.id)) ? " checked" : ""}>${escapeHtml(item.name)}</label>`).join("")}</div></details></label>`;
-}
+function differenceMarkup(productId, calculated) { const factual = inventoryState.factualValues.get(String(productId)); if (factual === undefined || factual === "" || factual === null) return `<span class="inventory-difference is-zero" data-inventory-difference="${Number(productId)}">—</span>`; const difference = Number(factual) - Number(calculated); const className = difference < 0 ? "is-negative" : difference > 0 ? "is-positive" : "is-zero"; return `<span class="inventory-difference ${className}" data-inventory-difference="${Number(productId)}">${difference > 0 ? "+" : ""}${formatQuantity(difference)}</span>`; }
+function differenceCostMarkup(productId, calculated, unitCost) { const factual = inventoryState.factualValues.get(String(productId)); if (factual === undefined || factual === "" || factual === null) return `<span class="inventory-difference is-zero" data-inventory-difference-cost="${Number(productId)}">—</span>`; const difference = Number(factual) - Number(calculated); const className = difference < 0 ? "is-negative" : difference > 0 ? "is-positive" : "is-zero"; return `<span class="inventory-difference ${className}" data-inventory-difference-cost="${Number(productId)}">${difference > 0 ? "+" : ""}${formatMoney(difference * Number(unitCost || 0))}</span>`; }
+function inventoryTableMarkup(readonly = inventoryState.mode === "view") { if (inventoryState.loading) return `<p class="empty">Обновляем данные...</p>`; if (!inventoryState.rows.length) return `<p class="empty">Товаров по выбранным фильтрам нет.</p>`; return `<div class="table-wrap"><table class="app-table"><thead><tr><th>Товар</th><th>Значение на складе</th><th>Себестоимость значения на складе</th><th>Фактическое значение</th><th>Разница</th><th>Разница в рублях</th></tr></thead><tbody>${inventoryState.rows.map((row) => { const factual = inventoryState.factualValues.get(String(row.product_item_id)); return `<tr data-inventory-row data-product-id="${Number(row.product_item_id)}"><td>${esc(row.title)}</td><td>${formatQuantity(row.calculated_quantity)}</td><td>${formatMoney(row.calculated_cost)}</td><td>${readonly ? esc(factual === undefined || factual === null || factual === "" ? "—" : formatQuantity(factual)) : `<input class="inventory-actual-input" type="number" min="0" step="0.01" data-inventory-factual data-product-id="${Number(row.product_item_id)}" value="${esc(factual ?? "")}">`}</td><td>${differenceMarkup(row.product_item_id, row.calculated_quantity)}</td><td>${differenceCostMarkup(row.product_item_id, row.calculated_quantity, row.unit_cost)}</td></tr>`; }).join("")}</tbody></table></div>`; }
 
-function inventoryFilters() {
-  const availableStorages = inventoryState.storages.filter((storage) => inventoryState.selectedSubdivisionIds.has(String(storage.subdivision_id)));
-  return `<div class="inventory-filters">${inventoryFilter("subdivision", inventoryState.subdivisions, inventoryState.selectedSubdivisionIds, "Все подразделы")}${inventoryFilter("storage", availableStorages, inventoryState.selectedStorageIds, "Все склады")}${inventoryFilter("category", inventoryState.categories, inventoryState.selectedCategoryIds, "Все категории")}</div>`;
-}
+function namesByIds(items, ids) { const selected = new Set((ids || []).map(String)); return items.filter((item) => selected.has(String(item.id))).map((item) => item.name); }
+function inventoryListMarkup() { const inventories = [...inventoryState.savedInventories].sort((left, right) => new Date(right.created_at) - new Date(left.created_at)); if (!inventories.length) return `<p class="empty">Сохранённых инвентаризаций пока нет.</p>`; return `<div class="table-wrap"><table class="app-table inventory-list-table"><thead><tr><th>Название</th><th>Дата и время создания</th></tr></thead><tbody>${inventories.map((item) => `<tr data-inventory-open="${esc(item.id)}" tabindex="0" role="button"><td><strong>${esc(item.name)}</strong><span class="inventory-list-sequence">№${Number(item.day_sequence)}</span></td><td>${esc(formatCreatedAt(item.created_at))}</td></tr>`).join("")}</tbody></table></div>`; }
+function backButton() { return `<button type="button" class="btn btn-outline-secondary" data-inventory-back>← К списку</button>`; }
+function inventoryCreateMarkup() { return `${backButton()}<label class="inventory-name-field"><span>Название</span><input type="text" maxlength="150" placeholder="Введите название" value="${esc(inventoryState.name)}" data-inventory-name required></label><div class="inventory-created-at">Создана: ${esc(formatCreatedAt(inventoryState.createdAt))}</div>${inventoryFilters()}<div class="inventory-actions"><button type="button" class="btn btn-outline-secondary" data-inventory-zero>Обнулить фактические остатки</button><button type="button" class="btn btn-outline-secondary" data-inventory-calculate>Рассчитать фактические остатки</button></div><label class="inventory-comment"><span>Комментарий</span><textarea rows="3" maxlength="1000" data-inventory-comment placeholder="Комментарий к инвентаризации">${esc(inventoryState.comment)}</textarea></label><div data-inventory-table>${inventoryTableMarkup(false)}</div><p data-inventory-save-message></p><div class="inventory-editor-footer"><button type="button" class="primary standard-save-button" data-inventory-save>Сохранить</button></div>`; }
+function inventoryViewMarkup() { const saved = inventoryState.savedInventories.find((item) => item.id === inventoryState.currentId); if (!saved) return inventoryListMarkup(); const subdivisionNames = namesByIds(inventoryState.subdivisions, saved.subdivision_ids); const storageNames = namesByIds(inventoryState.storages, saved.storage_ids); const categoryNames = namesByIds(inventoryState.categories, saved.category_ids); return `${backButton()}<h3 class="inventory-document-title">${esc(documentTitle(saved))}</h3><div class="inventory-created-at">Создана: ${esc(formatCreatedAt(saved.created_at))}</div><div class="inventory-saved-filters"><div><span>Подразделы</span><strong>${esc(subdivisionNames.join(", ") || "Не указано")}</strong></div><div><span>Склады</span><strong>${esc(storageNames.join(", ") || "Не указано")}</strong></div><div><span>Категории</span><strong>${esc(categoryNames.join(", ") || "Не указано")}</strong></div></div><div class="inventory-saved-comment"><span>Комментарий</span><p>${esc(saved.comment || "Комментарий не указан.")}</p></div>${inventoryTableMarkup(true)}`; }
+function inventoryContentMarkup() { if (inventoryState.mode === "list") return inventoryListMarkup(); if (inventoryState.mode === "view") return inventoryViewMarkup(); return inventoryCreateMarkup(); }
+function inventoryMarkup() { return `<section class="panel inventory-panel" data-inventory><div class="inventory-head"><h2>Инвентаризация</h2>${inventoryState.mode === "list" ? `<button type="button" class="primary" data-inventory-create>Создать</button>` : ""}</div><div data-inventory-content>${inventoryContentMarkup()}</div></section>`; }
+function renderInventory(root) { const target = root.querySelector("[data-inventory]"); if (target) target.outerHTML = inventoryMarkup(); }
+function applyCategoryFilter() { inventoryState.rows = inventoryState.sourceRows.filter((row) => inventoryState.selectedCategoryIds.has(String(row.category_id))); }
 
-function differenceMarkup(productId, calculated) {
-  const factual = inventoryState.factualValues.get(String(productId));
-  if (factual === undefined || factual === "") return `<span class="inventory-difference is-zero" data-inventory-difference="${Number(productId)}">—</span>`;
-  const difference = Number(factual) - Number(calculated);
-  const className = difference < 0 ? "is-negative" : difference > 0 ? "is-positive" : "is-zero";
-  return `<span class="inventory-difference ${className}" data-inventory-difference="${Number(productId)}">${difference > 0 ? "+" : ""}${formatQuantity(difference)}</span>`;
-}
+async function rebuildInventoryRows(root) { if (inventoryState.mode !== "create") return; inventoryState.loading = true; renderInventory(root); const storageResults = await Promise.all([...inventoryState.selectedStorageIds].map((storageId) => api.storageProducts(Number(storageId)))); const quantities = new Map(); storageResults.flat().forEach((item) => quantities.set(String(item.product_item_id), (quantities.get(String(item.product_item_id)) || 0) + (Number(item.amount) || 0))); const productsById = new Map(inventoryState.products.map((product) => [String(product.id), product])); inventoryState.sourceRows = [...quantities.entries()].map(([productId, calculatedQuantity]) => { const product = productsById.get(productId) || {}; const unitCost = productUnitCost(product); return { product_item_id: Number(productId), category_id: Number(product.category_id), title: product.title || "Товар", calculated_quantity: calculatedQuantity, unit_cost: unitCost, calculated_cost: calculatedQuantity * unitCost }; }); applyCategoryFilter(); inventoryState.loading = false; renderInventory(root); }
+async function createInventory(root, ctx) { inventoryState.mode = "create"; inventoryState.currentId = null; inventoryState.name = ""; inventoryState.createdAt = new Date(); inventoryState.factualValues = new Map(); inventoryState.comment = ""; inventoryState.rows = []; inventoryState.sourceRows = []; inventoryState.loading = true; renderInventory(root); try { const [subdivisions, storages, categories, products] = await Promise.all([api.storageSubdivisions(ctx.org.id), api.storages(ctx.org.id), api.productCategories(ctx.org.id), api.productItems(ctx.org.id)]); inventoryState.subdivisions = subdivisions || []; inventoryState.storages = storages || []; inventoryState.categories = (categories || []).filter((category) => category.type === "product"); inventoryState.products = products || []; inventoryState.selectedSubdivisionIds = new Set(inventoryState.subdivisions.map((item) => String(item.id))); inventoryState.selectedStorageIds = new Set(inventoryState.storages.map((item) => String(item.id))); inventoryState.selectedCategoryIds = new Set(inventoryState.categories.map((item) => String(item.id))); await rebuildInventoryRows(root); } catch (error) { inventoryState.loading = false; renderInventory(root); const target = root.querySelector("[data-inventory-table]"); if (target) target.innerHTML = `<p class="empty">${esc(error.message)}</p>`; } }
+function daySequenceFor(item, inventories) { return inventories.filter((candidate) => sameCalendarDay(new Date(candidate.inventory_at || candidate.created_at), new Date(item.inventory_at || item.created_at))).findIndex((candidate) => String(candidate.id) === String(item.id)) + 1; }
+function savedInventoryFromResponse(item, inventories = inventoryState.savedInventories) { const createdAt = item.inventory_at || item.created_at; return { ...item, id: String(item.id), name: item.name || "Инвентаризация", created_at: createdAt, day_sequence: daySequenceFor(item, inventories), rows: (item.items || []).map((row) => ({ product_item_id: Number(row.product_item_id), title: row.product_title || "Товар", calculated_quantity: Number(row.calculated_quantity) || 0, unit_cost: Number(row.unit_cost) || 0, calculated_cost: Number(row.calculated_cost) || 0, factual_quantity: row.factual_quantity === null || row.factual_quantity === undefined ? null : Number(row.factual_quantity) })) }; }
+async function loadSavedInventories(ctx) { const rows = await api.inventories(ctx.org.id); inventoryState.savedInventories = (rows || []).map((item) => savedInventoryFromResponse(item, rows || [])); }
+async function saveInventory(root, ctx) { const name = inventoryState.name.trim(); const message = root.querySelector("[data-inventory-save-message]"); if (!name) { if (message) message.textContent = "Введите название инвентаризации."; return; } const saveButton = root.querySelector("[data-inventory-save]"); if (saveButton) saveButton.disabled = true; try { const saved = await api.createInventory(ctx.org.id, { name, comment: inventoryState.comment, subdivision_ids: [...inventoryState.selectedSubdivisionIds].map(Number), storage_ids: [...inventoryState.selectedStorageIds].map(Number), category_ids: [...inventoryState.selectedCategoryIds].map(Number) }); const items = inventoryState.rows.filter((row) => inventoryState.factualValues.has(String(row.product_item_id))).map((row) => ({ product_item_id: Number(row.product_item_id), factual_quantity: Number(inventoryState.factualValues.get(String(row.product_item_id))) })); const persisted = items.length ? await api.updateInventoryItems(ctx.org.id, saved.id, { items }) : saved; await loadSavedInventories(ctx); const fullSaved = savedInventoryFromResponse(persisted); const index = inventoryState.savedInventories.findIndex((item) => String(item.id) === String(fullSaved.id)); if (index >= 0) inventoryState.savedInventories[index] = fullSaved; inventoryState.mode = "list"; clearDraft(); renderInventory(root); } catch (error) { if (message) message.textContent = error.message; if (saveButton) saveButton.disabled = false; } }
+async function openSavedInventory(root, ctx, id) { try { const response = await api.inventory(ctx.org.id, Number(id)); const saved = savedInventoryFromResponse(response); const index = inventoryState.savedInventories.findIndex((item) => String(item.id) === String(saved.id)); if (index >= 0) inventoryState.savedInventories[index] = saved; else inventoryState.savedInventories.unshift(saved); inventoryState.mode = "view"; inventoryState.currentId = saved.id; inventoryState.name = saved.name; inventoryState.createdAt = new Date(saved.created_at); inventoryState.comment = saved.comment; inventoryState.selectedSubdivisionIds = new Set(saved.subdivision_ids); inventoryState.selectedStorageIds = new Set(saved.storage_ids); inventoryState.selectedCategoryIds = new Set(saved.category_ids); inventoryState.sourceRows = saved.rows.map((row) => ({ ...row })); inventoryState.rows = saved.rows.map((row) => ({ ...row })); inventoryState.factualValues = new Map(saved.rows.filter((row) => row.factual_quantity !== null).map((row) => [String(row.product_item_id), row.factual_quantity])); inventoryState.loading = false; renderInventory(root); } catch (error) { const content = root.querySelector("[data-inventory-content]"); if (content) content.innerHTML = `<p class="empty">${esc(error.message)}</p>`; } }
 
-function inventoryTableMarkup() {
-  if (inventoryState.loading) return `<p class="empty">Обновляем данные...</p>`;
-  if (!inventoryState.rows.length) return `<p class="empty">Товаров по выбранным фильтрам нет.</p>`;
-  return `<div class="table-wrap"><table class="app-table"><thead><tr><th>Товар</th><th>Значение на складе</th><th>Себестоимость значения на складе</th><th>Фактическое значение</th><th>Разница</th></tr></thead><tbody>${inventoryState.rows.map((row) => `<tr data-inventory-row data-product-id="${Number(row.product_item_id)}"><td>${escapeHtml(row.title)}</td><td>${formatQuantity(row.calculated_quantity)}</td><td>${formatMoney(row.calculated_cost)}</td><td><input class="inventory-actual-input" type="number" min="0" step="0.01" data-inventory-factual data-product-id="${Number(row.product_item_id)}" value="${inventoryState.factualValues.get(String(row.product_item_id)) ?? ""}"></td><td>${differenceMarkup(row.product_item_id, row.calculated_quantity)}</td></tr>`).join("")}</tbody></table></div>`;
-}
-
-function inventoryContentMarkup() {
-  if (!inventoryState.started) return `<p class="empty">Инвентаризация ещё не создана.</p>`;
-  return `<div class="inventory-created-at">Создана: ${escapeHtml(inventoryState.createdAt.toLocaleString("ru-RU"))}</div>${inventoryFilters()}<div class="inventory-actions"><button type="button" class="btn btn-outline-secondary" data-inventory-zero>Обнулить фактические остатки</button><button type="button" class="btn btn-outline-secondary" data-inventory-calculate>Рассчитать фактические остатки</button></div><label class="inventory-comment"><span>Комментарий</span><textarea rows="3" maxlength="1000" data-inventory-comment placeholder="Комментарий к инвентаризации">${escapeHtml(inventoryState.comment)}</textarea></label><div data-inventory-table>${inventoryTableMarkup()}</div>`;
-}
-
-function renderInventory(root) {
-  const target = root.querySelector("[data-inventory-content]");
-  if (target) target.innerHTML = inventoryContentMarkup();
-}
-
-function applyCategoryFilter() {
-  inventoryState.rows = inventoryState.sourceRows.filter((row) => inventoryState.selectedCategoryIds.has(String(row.category_id)));
-}
-
-async function rebuildInventoryRows(root) {
-  inventoryState.loading = true;
-  renderInventory(root);
-  const selectedStorageIds = [...inventoryState.selectedStorageIds];
-  const storageResults = await Promise.all(selectedStorageIds.map((storageId) => api.storageProducts(Number(storageId))));
-  const quantities = new Map();
-  storageResults.flat().forEach((item) => {
-    const id = String(item.product_item_id);
-    quantities.set(id, (quantities.get(id) || 0) + (Number(item.amount) || 0));
-  });
-  const productsById = new Map(inventoryState.products.map((product) => [String(product.id), product]));
-  inventoryState.sourceRows = [...quantities.entries()].map(([productId, calculatedQuantity]) => {
-    const product = productsById.get(productId) || {};
-    const unitCost = productUnitCost(product);
-    return { product_item_id: Number(productId), category_id: Number(product.category_id), title: product.title || "Товар", calculated_quantity: calculatedQuantity, unit_cost: unitCost, calculated_cost: calculatedQuantity * unitCost };
-  });
-  applyCategoryFilter();
-  inventoryState.loading = false;
-  renderInventory(root);
-}
-
-async function createInventory(root, ctx) {
-  if (inventoryState.started && !confirm("Создать новую инвентаризацию?\nВведённые фактические значения будут очищены.")) return;
-  inventoryState.loading = true;
-  inventoryState.started = true;
-  inventoryState.createdAt = new Date();
-  inventoryState.factualValues = new Map();
-  inventoryState.comment = "";
-  try {
-    const [subdivisions, storages, categories, products] = await Promise.all([api.storageSubdivisions(ctx.org.id), api.storages(ctx.org.id), api.productCategories(ctx.org.id), api.productItems(ctx.org.id)]);
-    inventoryState.subdivisions = subdivisions || [];
-    inventoryState.storages = storages || [];
-    inventoryState.categories = (categories || []).filter((category) => category.type === "product");
-    inventoryState.products = products || [];
-    inventoryState.selectedSubdivisionIds = new Set(inventoryState.subdivisions.map((item) => String(item.id)));
-    inventoryState.selectedStorageIds = new Set(inventoryState.storages.map((item) => String(item.id)));
-    inventoryState.selectedCategoryIds = new Set(inventoryState.categories.map((item) => String(item.id)));
-    await rebuildInventoryRows(root);
-  } catch (error) {
-    inventoryState.loading = false;
-    renderInventory(root);
-    const target = root.querySelector("[data-inventory-table]");
-    if (target) target.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`;
-  }
-}
-
-export async function inventory(ctx) {
-  if (String(inventoryState.organizationId || "") !== String(ctx.org.id)) resetInventoryState(ctx.org.id);
-  return `<section class="panel inventory-panel"><div class="inventory-head"><div class="inventory-title"><h2>Инвентаризация</h2><div data-inventory-content>${inventoryContentMarkup()}</div></div><button type="button" class="primary" data-inventory-create>Создать</button></div></section>`;
-}
-
+export async function inventory(ctx) { if (String(inventoryState.organizationId || "") !== String(ctx.org.id)) resetInventoryState(ctx.org.id); if (inventoryState.mode === "list") await loadSavedInventories(ctx); return inventoryMarkup(); }
 export function bindInventory(root, ctx) {
   root.addEventListener("click", async (event) => {
-    if (event.target.closest("[data-inventory-create]")) {
-      await createInventory(root, ctx);
-      return;
-    }
-    if (event.target.closest("[data-inventory-zero]")) {
-      inventoryState.rows.forEach((row) => inventoryState.factualValues.set(String(row.product_item_id), 0));
-      renderInventory(root);
-      return;
-    }
-    if (event.target.closest("[data-inventory-calculate]")) {
-      inventoryState.rows.forEach((row) => inventoryState.factualValues.set(String(row.product_item_id), row.calculated_quantity));
-      renderInventory(root);
-    }
+    const create = event.target.closest("[data-inventory-create]"); if (create) { await createInventory(root, ctx); return; }
+    const open = event.target.closest("[data-inventory-open]"); if (open) { await openSavedInventory(root, ctx, open.dataset.inventoryOpen); return; }
+    if (event.target.closest("[data-inventory-back]")) { if (inventoryState.mode === "create" && (inventoryState.rows.length || inventoryState.name || inventoryState.comment || inventoryState.factualValues.size) && !confirm("Выйти без сохранения инвентаризации?")) return; inventoryState.mode = "list"; clearDraft(); renderInventory(root); return; }
+    if (event.target.closest("[data-inventory-save]")) { await saveInventory(root, ctx); return; }
+    if (event.target.closest("[data-inventory-zero]")) { inventoryState.rows.forEach((row) => inventoryState.factualValues.set(String(row.product_item_id), 0)); renderInventory(root); return; }
+    if (event.target.closest("[data-inventory-calculate]")) { inventoryState.rows.forEach((row) => inventoryState.factualValues.set(String(row.product_item_id), row.calculated_quantity)); renderInventory(root); }
   });
-
-  root.addEventListener("input", (event) => {
-    const factual = event.target.closest("[data-inventory-factual]");
-    if (factual) {
-      const productId = String(factual.dataset.productId);
-      inventoryState.factualValues.set(productId, factual.value);
-      const row = inventoryState.rows.find((item) => String(item.product_item_id) === productId);
-      const difference = root.querySelector(`[data-inventory-difference="${Number(productId)}"]`);
-      if (difference && row) difference.outerHTML = differenceMarkup(productId, row.calculated_quantity);
-      return;
-    }
-    const comment = event.target.closest("[data-inventory-comment]");
-    if (comment) inventoryState.comment = comment.value;
-  });
-
-  root.addEventListener("change", async (event) => {
-    const option = event.target.closest("[data-inventory-filter-option]");
-    const allOption = event.target.closest("[data-inventory-filter-all]");
-    if (!option && !allOption) return;
-    const type = (option || allOption).dataset.inventoryFilterOption || (allOption ? allOption.dataset.inventoryFilterAll : "");
-    const items = type === "subdivision" ? inventoryState.subdivisions : type === "storage" ? inventoryState.storages.filter((storage) => inventoryState.selectedSubdivisionIds.has(String(storage.subdivision_id))) : inventoryState.categories;
-    const selectedIds = type === "subdivision" ? inventoryState.selectedSubdivisionIds : type === "storage" ? inventoryState.selectedStorageIds : inventoryState.selectedCategoryIds;
-    if (allOption) {
-      if (allOption.checked) items.forEach((item) => selectedIds.add(String(item.id)));
-      else selectedIds.clear();
-    } else if (option.checked) selectedIds.add(String(option.value));
-    else selectedIds.delete(String(option.value));
-    if (type === "subdivision") {
-      const availableStorageIds = new Set(inventoryState.storages.filter((storage) => selectedIds.has(String(storage.subdivision_id))).map((storage) => String(storage.id)));
-      inventoryState.selectedStorageIds = new Set([...inventoryState.selectedStorageIds].filter((id) => availableStorageIds.has(id)));
-      await rebuildInventoryRows(root);
-    } else if (type === "storage") {
-      await rebuildInventoryRows(root);
-    } else {
-      applyCategoryFilter();
-      renderInventory(root);
-    }
-  });
+  root.addEventListener("keydown", async (event) => { const row = event.target.closest("[data-inventory-open]"); if (row && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); await openSavedInventory(root, ctx, row.dataset.inventoryOpen); } });
+  root.addEventListener("input", (event) => { const name = event.target.closest("[data-inventory-name]"); if (name) { inventoryState.name = name.value; return; } const factual = event.target.closest("[data-inventory-factual]"); if (factual) { const productId = String(factual.dataset.productId); inventoryState.factualValues.set(productId, factual.value); const row = inventoryState.rows.find((item) => String(item.product_item_id) === productId); const difference = root.querySelector(`[data-inventory-difference="${Number(productId)}"]`); const differenceCost = root.querySelector(`[data-inventory-difference-cost="${Number(productId)}"]`); if (difference && row) difference.outerHTML = differenceMarkup(productId, row.calculated_quantity); if (differenceCost && row) differenceCost.outerHTML = differenceCostMarkup(productId, row.calculated_quantity, row.unit_cost); return; } const comment = event.target.closest("[data-inventory-comment]"); if (comment) inventoryState.comment = comment.value; });
+  root.addEventListener("change", async (event) => { if (inventoryState.mode !== "create") return; const option = event.target.closest("[data-inventory-filter-option]"); const allOption = event.target.closest("[data-inventory-filter-all]"); if (!option && !allOption) return; const type = (option || allOption).dataset.inventoryFilterOption || allOption.dataset.inventoryFilterAll; const items = type === "subdivision" ? inventoryState.subdivisions : type === "storage" ? inventoryState.storages.filter((storage) => inventoryState.selectedSubdivisionIds.has(String(storage.subdivision_id))) : inventoryState.categories; const selectedIds = type === "subdivision" ? inventoryState.selectedSubdivisionIds : type === "storage" ? inventoryState.selectedStorageIds : inventoryState.selectedCategoryIds; if (allOption) { if (allOption.checked) items.forEach((item) => selectedIds.add(String(item.id))); else selectedIds.clear(); } else if (option.checked) selectedIds.add(String(option.value)); else selectedIds.delete(String(option.value)); if (type === "subdivision") { const availableStorageIds = new Set(inventoryState.storages.filter((storage) => selectedIds.has(String(storage.subdivision_id))).map((storage) => String(storage.id))); inventoryState.selectedStorageIds = new Set([...inventoryState.selectedStorageIds].filter((id) => availableStorageIds.has(id))); await rebuildInventoryRows(root); } else if (type === "storage") await rebuildInventoryRows(root); else { applyCategoryFilter(); renderInventory(root); } });
 }
