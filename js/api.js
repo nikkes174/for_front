@@ -165,6 +165,7 @@ export const api = {
     const suffix = params.toString() ? `?${params}` : "";
     return request(`/organizations/storages/${storageId}/products${suffix}`, { cache: "no-store" });
   },
+  addStorageProducts: (storageId, body) => request(`/organizations/storages/${storageId}/products`, { method: "POST", body: JSON.stringify(body) }),
   transferStorageProducts: (storageId, body) => request(`/organizations/storages/${storageId}/transfer`, { method: "POST", body: JSON.stringify(body) }),
   writeoffStorageProduct: (storageId, body) => request(`/organizations/storages/${storageId}/writeoff`, { method: "POST", body: JSON.stringify(body) }),
   organizationBots: (orgId) => request(`/bots/organizations/${orgId}`, { cache: "no-store" }),
