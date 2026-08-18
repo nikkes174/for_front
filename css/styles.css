@@ -2897,6 +2897,44 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .product-category-modal { width: min(920px, 92vw); max-height: 90vh; overflow-y: auto; }
 
 .warehouse-storage-products-head { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 14px; }
+.schedule-page { display: grid; min-width: 0; gap: 16px; }
+.schedule-head, .schedule-week-nav, .schedule-toolbar, .schedule-toolbar-left, .schedule-toolbar-right, .schedule-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.schedule-head, .schedule-toolbar { justify-content: space-between; }
+.schedule-head h2 { margin: 0; }
+.schedule-week-title { min-width: 190px; text-align: center; font-weight: 600; }
+.schedule-filter, .schedule-search { display: grid; width: min(260px, 100%); gap: 6px; color: #667085; font-size: 13px; font-weight: 500; }
+.schedule-filter .branch-multiselect-dropdown { width: 100%; }
+.schedule-search input { width: 100%; box-sizing: border-box; }
+.schedule-inactive { color: #667085; font-size: 13px; }
+.schedule-actions { justify-content: space-between; }
+.schedule-grid-viewport { position: relative; max-height: min(72dvh, calc(100dvh - 240px)); overflow: auto; border: 1px solid #d9dee8; border-radius: 10px; background: #fff; scrollbar-gutter: stable; }
+.schedule-grid { display: grid; grid-template-columns: 240px repeat(7, minmax(115px, 1fr)); width: max(100%, 1050px); }
+.schedule-day-head { position: sticky; top: 0; z-index: 4; display: grid; min-height: 58px; place-items: center; border-right: 1px solid #e2e6ee; border-bottom: 1px solid #e2e6ee; background: #fff; }
+.schedule-day-head small { color: #4299e1; font-size: 11px; }
+.schedule-grid-corner { position: sticky; top: 0; left: 0; z-index: 6; }
+.schedule-employee-head { position: sticky; left: 0; z-index: 3; display: flex; min-width: 0; min-height: 76px; padding: 10px; align-items: center; gap: 9px; border-right: 1px solid #e2e6ee; border-bottom: 1px solid #e2e6ee; background: #fff; }
+.schedule-avatar { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; overflow: hidden; border-radius: 50%; background: #eaf2fb; color: #344054; font-size: 12px; font-weight: 600; }
+.schedule-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.schedule-employee-text { display: grid; min-width: 0; gap: 2px; }
+.schedule-employee-text strong, .schedule-employee-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-employee-text small { color: #667085; font-size: 12px; }
+.schedule-week-menu { margin-left: auto; }
+.schedule-cell { position: relative; display: grid; min-height: 76px; padding: 7px; place-items: stretch; border-right: 1px solid #e2e6ee; border-bottom: 1px solid #e2e6ee; background: #fff; cursor: pointer; }
+.schedule-cell.is-empty { place-items: center; color: #98a2b3; }
+.schedule-cell-add { position: absolute; top: 5px; right: 7px; opacity: 0; color: #4299e1; font-size: 13px; transition: opacity .15s ease; }
+.schedule-cell.is-empty:hover .schedule-cell-add { opacity: 1; }
+.schedule-shift-card { display: grid; width: 100%; min-width: 0; padding: 7px 8px; align-content: center; gap: 2px; border: 1px solid #9dc9ed; border-radius: 7px; background: rgb(66 153 225 / 8%); }
+.schedule-shift-time { color: #172033; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.schedule-shift-break { overflow: hidden; color: #667085; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-cell.is-selected { outline: 2px solid #4299e1; outline-offset: -2px; background: rgb(66 153 225 / 7%); }
+.schedule-day-head.is-today, .schedule-cell.is-today { background: rgb(66 153 225 / 4%); }
+.schedule-day-head.is-weekend { background: #fafbfc; }
+.schedule-selection-bar { position: sticky; bottom: 10px; z-index: 20; display: flex; width: fit-content; margin: 0 auto; padding: 8px 10px; align-items: center; gap: 8px; border: 1px solid #d7deea; border-radius: 10px; background: #fff; box-shadow: 0 10px 30px rgb(15 23 42 / 14%); }
+.schedule-shift-form { display: grid; gap: 14px; }
+.schedule-time-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; }
+.schedule-break-row { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 8px; margin: 8px 0; }
+.schedule-modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) { .schedule-grid { grid-template-columns: 180px repeat(7, 110px); } .schedule-selection-bar { width: calc(100% - 16px); justify-content: center; } }
 .warehouse-product-picker { width: min(700px, 90vw); }
 .warehouse-product-picker-fields { display: grid; gap: 16px; }
 .warehouse-product-picker-category-section, .warehouse-product-picker-product-section { display: grid; min-width: 0; gap: 8px; }

@@ -7,6 +7,7 @@ import { catalog, bindCatalog } from "./modules/catalog.js";
 import { loyalty, bindLoyalty } from "./modules/loyalty.js";
 import { bindNotifications } from "./modules/notifications.js";
 import { settings, bindSettings } from "./modules/settings.js";
+import { schedules, bindSchedules } from "./modules/schedules.js";
 import { tasks, bindTasks } from "./modules/tasks.js";
 import { booking, bindBooking } from "./modules/booking.js";
 import { finance, bindFinance } from "./modules/finance.js";
@@ -64,6 +65,7 @@ const SETTINGS_MENU_SECTIONS = [
   { slug: "workplaces", label: "Рабочие места", permissions: ["settings.workplaces.view", "settings.workplaces.create"] },
   { slug: "roles", label: "Роли и права", permissions: ["settings.roles.manage"] },
   { slug: "users", label: "Пользователи", permissions: ["settings.users.view", "settings.users.create", "settings.users.assign_roles"] },
+  { slug: "schedules", label: "Графики", permissions: ["settings.users.view"] },
   { slug: "logs", label: "События", permissions: ["settings.audit.view", "settings.events.view"] },
   { slug: "bots", label: "Боты", permissions: ["settings.bots.view"] },
 ];
@@ -1128,6 +1130,7 @@ async function pageContent(routeInfo, ctx) {
   if (routeInfo.page === "finance") return ["Финансы", await finance(ctx)];
   if (routeInfo.page === "expenses") return ["Расходы", await expenses(ctx)];
   if (routeInfo.page === "breakdown") return ["Детализация", await breakdown(ctx)];
+  if (routeInfo.page === "settings" && routeInfo.extra === "schedules") return ["Настройки организации", await schedules(ctx)];
   if (routeInfo.page === "settings") return ["Настройки организации", await settings(ctx, routeInfo.extra || "")];
   return ["Главная", await dashboard(ctx)];
 }
@@ -1531,6 +1534,7 @@ bindCatalog(root, { get org() { return state.org; }, navigate, reload });
 bindLoyalty(root, { get org() { return state.org; }, navigate, reload });
 bindNotifications(root, { get org() { return state.org; }, navigate, reload });
 bindSettings(root, { get org() { return state.org; }, navigate, reload });
+bindSchedules(root, { get org() { return state.org; }, navigate, reload });
 bindTasks(root, { get org() { return state.org; }, reload });
 bindBooking(root, { get org() { return state.org; }, reload });
 bindFinance(root, { get org() { return state.org; }, reload });
