@@ -181,6 +181,7 @@ function saveClientListFilters(orgId, filters) {
 function filterClientsBySearch(items, search) {
   const query = String(search || "").trim().toLowerCase();
   if (!query) return items;
+  const textQuery = query.replaceAll("ё", "е");
   const messengerMatch = query.match(/^(tg(?:_id)?|telegram(?:_id)?|max(?:_id)?)\s*[:=#]?\s*(\d+)$/i);
   const messengerField = messengerMatch?.[1].startsWith("max") ? "max" : "telegram";
   const messengerId = messengerMatch?.[2] || "";
@@ -198,9 +199,9 @@ function filterClientsBySearch(items, search) {
     client.tg_id,
     client.max_id,
     client.vk_id,
-  ].some((value) => String(value || "").toLowerCase().includes(query)) || (
-    phoneQuery.length === 11 && [client.primary_phone, client.secondary_phone, client.phone]
-      .some((value) => normalizePhone(value) === phoneQuery)
+  ].some((value) => String(value || "").toLowerCase().replaceAll("ё", "е").includes(textQuery)) || (
+    phoneQuery.length >= 4 && [client.primary_phone, client.secondary_phone, client.phone]
+      .some((value) => normalizePhone(value).includes(phoneQuery))
   ) || (messengerId && (
     messengerField === "max"
       ? String(client.max_id || "") === messengerId

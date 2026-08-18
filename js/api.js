@@ -24,12 +24,14 @@ async function errorMessage(response) {
 }
 
 export async function request(path, options = {}) {
-  window.dispatchEvent(new CustomEvent("ajax:start"));
+  const { loader = "default", ...fetchOptions } = options;
+  const loaderEvent = loader === "turbo" ? "turbo" : "ajax";
+  window.dispatchEvent(new CustomEvent(`${loaderEvent}:start`));
   try {
     const response = await fetch(path, {
       credentials: "include",
-      headers: options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers,
-      ...options,
+      headers: fetchOptions.body ? { "Content-Type": "application/json", ...fetchOptions.headers } : fetchOptions.headers,
+      ...fetchOptions,
     });
 
     if (!response.ok) throw new ApiError(await errorMessage(response), response.status);
@@ -40,7 +42,7 @@ export async function request(path, options = {}) {
     }
     return response.json();
   } finally {
-    window.dispatchEvent(new CustomEvent("ajax:end"));
+    window.dispatchEvent(new CustomEvent(`${loaderEvent}:end`));
   }
 }
 
@@ -305,7 +307,7 @@ export const api = {
     [...files].forEach((file) => data.append("files", file));
     return upload("/crm-api/client-communications/push/images", data);
   },
-  pushNotificationJobs: (organizationId) => request(`/crm-api/client-communications/push/send-jobs?organization_id=${organizationId}`, { cache: "no-store" }),
+  pushNotificationJobs: (organizationId, options = {}) => request(`/crm-api/client-communications/push/send-jobs?organization_id=${organizationId}`, { cache: "no-store", ...options }),
   stopPushNotificationJob: (jobId, organizationId) => request(`/crm-api/client-communications/push/send-jobs/${encodeURIComponent(jobId)}/stop?organization_id=${organizationId}`, { method: "POST" }),
   deletePushNotificationJob: (jobId, organizationId) => request(`/crm-api/client-communications/push/send-jobs/${encodeURIComponent(jobId)}?organization_id=${organizationId}`, { method: "DELETE" }),
 
@@ -316,7 +318,7 @@ export const api = {
   applyRule: (ruleId, clientId, organizationId, extra = {}) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply`, { method: "POST", body: JSON.stringify({ client_id: clientId, organization_id: organizationId, ...extra }) }),
   applyRuleToAll: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   startApplyRuleToAllJob: (ruleId, organizationId) => request(`/loyalty-api/client-bonuses/rules/${ruleId}/apply-all-jobs`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
-  workerJobs: (organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`),
+  workerJobs: (organizationId, options = {}) => request(`/loyalty-api/client-bonuses/worker/jobs?organization_id=${organizationId}`, options),
   stopWorkerJob: (jobId, organizationId) => request(`/loyalty-api/client-bonuses/worker/jobs/${encodeURIComponent(jobId)}/stop?organization_id=${organizationId}`, { method: "POST" }),
   applyLevelTransitions: (clientId, organizationId) => request(`/loyalty-api/client-bonuses/clients/${clientId}/apply-level-transitions`, { method: "POST", body: JSON.stringify({ organization_id: organizationId }) }),
   setClientLevel: (clientId, organizationId, clientLevel, autoLevelTransitionDisabled = false) => request(`/loyalty-api/client-bonuses/clients/${clientId}/level`, { method: "PUT", body: JSON.stringify({ organization_id: organizationId, client_level: clientLevel || null, auto_level_transition_disabled: autoLevelTransitionDisabled }) }),

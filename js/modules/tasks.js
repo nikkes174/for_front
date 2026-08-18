@@ -69,10 +69,10 @@ function taskRows(jobs) {
     : `<tr><td colspan="7">Фоновых задач пока нет.</td></tr>`;
 }
 
-async function loadJobs(orgId) {
+async function loadJobs(orgId, options = {}) {
   const [workerJobs, notificationJobs] = await Promise.all([
-    api.workerJobs(orgId).catch(() => []),
-    (api.pushNotificationJobs?.(orgId) || Promise.resolve([])).catch(() => []),
+    api.workerJobs(orgId, options).catch(() => []),
+    (api.pushNotificationJobs?.(orgId, options) || Promise.resolve([])).catch(() => []),
   ]);
   return [...workerJobs, ...notificationJobs].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
 }
@@ -123,7 +123,7 @@ export function bindTasks(root, ctx) {
     if (!location.pathname.includes("/tasks") || !tableBody || isRefreshing) return;
     isRefreshing = true;
     try {
-      tableBody.innerHTML = taskRows(await loadJobs(ctx.org.id));
+      tableBody.innerHTML = taskRows(await loadJobs(ctx.org.id, { loader: "turbo" }));
     } finally {
       isRefreshing = false;
     }

@@ -21,6 +21,7 @@ ensureCss();
 
 let state = { me: null, orgs: [], org: null, permissionsConfigured: false, allowedPermissions: new Set(), hasOrganizationRole: false };
 let ajaxCount = 0;
+let turboProgressCount = 0;
 let turboProgressTimer = null;
 let turboProgressHideTimer = null;
 let turboProgressValue = 0;
@@ -928,6 +929,7 @@ function shell(content, title) {
 
   return `
     <div class="app ${sidebarOpen ? "sidebar-open" : ""}">
+      <div class="ajax-indicator" aria-hidden="true"><span></span></div>
       <div
         class="turbo-progress-bar"
         data-turbo-progress
@@ -1455,7 +1457,7 @@ function showTurboProgress() {
   );
 
   requestAnimationFrame(() => {
-    if (ajaxCount > 0) {
+    if (turboProgressCount > 0) {
       setTurboProgress(72);
     }
   });
@@ -1476,7 +1478,7 @@ function hideTurboProgress() {
       bar.classList.remove("is-visible");
 
       window.setTimeout(() => {
-        if (ajaxCount === 0) {
+        if (turboProgressCount === 0) {
           setTurboProgress(0);
         }
       }, 180);
@@ -1485,26 +1487,31 @@ function hideTurboProgress() {
 
 window.addEventListener("ajax:start", () => {
   ajaxCount += 1;
+  document.body.classList.add("ajax-active");
+});
 
-  if (ajaxCount !== 1) return;
+window.addEventListener("ajax:end", () => {
+  ajaxCount = Math.max(ajaxCount - 1, 0);
+  if (!ajaxCount) document.body.classList.remove("ajax-active");
+});
+
+window.addEventListener("turbo:start", () => {
+  turboProgressCount += 1;
+
+  if (turboProgressCount !== 1) return;
 
   window.clearTimeout(turboProgressTimer);
   window.clearTimeout(turboProgressHideTimer);
 
   turboProgressTimer = window.setTimeout(() => {
-    if (ajaxCount > 0) {
-      showTurboProgress();
-    }
+    if (turboProgressCount > 0) showTurboProgress();
   }, TURBO_PROGRESS_DELAY);
 });
 
-window.addEventListener("ajax:end", () => {
-  ajaxCount = Math.max(
-    ajaxCount - 1,
-    0
-  );
+window.addEventListener("turbo:end", () => {
+  turboProgressCount = Math.max(turboProgressCount - 1, 0);
 
-  if (ajaxCount > 0) return;
+  if (turboProgressCount > 0) return;
 
   window.clearTimeout(turboProgressTimer);
 
