@@ -335,7 +335,7 @@ button:active { transform: translateY(1px); }
 .booking-day.is-today header { background: #f8fbff; }
 .booking-event { --booking-event-gap: 3px; --booking-event-lane: 0; --booking-event-lanes: 1; position: absolute; z-index: 10; left: calc((100% / var(--booking-event-lanes)) * var(--booking-event-lane) + 4px); width: calc(100% / var(--booking-event-lanes) - 7px); min-width: 34px; display: flex; flex-direction: column; gap: 1px; min-height: 0; overflow: hidden; padding: 4px 5px; border-left: 4px solid #4299e1; border-radius: 7px; background: #eef4ff; color: #18312d; font-size: 10px; line-height: 1.15; box-shadow: 0 1px 2px rgb(16 24 40 / 8%); cursor: pointer; transition: box-shadow .14s ease, transform .14s ease, filter .14s ease, opacity .14s ease; }
 .booking-event.has-overlap { border-left-width: 4px; }
-.booking-event:hover, .booking-event:focus-within, .booking-event:focus-visible { z-index: 40; overflow: visible; transform: translateY(-1px) scale(1.015); box-shadow: 0 10px 24px rgb(15 23 42 / 22%); filter: saturate(1.05); }
+.booking-event:hover, .booking-event:focus-within, .booking-event:focus-visible { z-index: 60; min-height: 86px; overflow: visible; padding: 7px 8px; transform: translateY(-2px) scale(1.01); background: #f5f8ff; box-shadow: 0 12px 28px rgb(15 23 42 / 24%); filter: saturate(1.05); }
 .booking-event:active { transform: translateY(0) scale(.995); }
 .booking-event.is-narrow { padding: 3px; border-left-width: 3px; font-size: 9px; }
 .booking-event.is-narrow:hover, .booking-event.is-narrow:focus-within { width: min(230px, calc(100% * 1.8)); min-width: 150px; }
@@ -344,15 +344,15 @@ button:active { transform: translateY(1px); }
 .booking-event-short-summary { display: none; }
 .booking-event.is-short .booking-event-head, .booking-event.is-short .booking-event-client, .booking-event.is-short .booking-event-service, .booking-event.is-short .booking-event-phone { display: none; }
 .booking-event.is-short .booking-event-short-summary { display: block; }
-.booking-event.is-short:hover { min-height: 72px; padding: 6px 8px; }
+.booking-event.is-short:hover { min-height: 86px; padding: 7px 8px; }
 .booking-event.is-short:hover .booking-event-head, .booking-event.is-short:hover .booking-event-client, .booking-event.is-short:hover .booking-event-service, .booking-event.is-short:hover .booking-event-phone { display: initial; }
 .booking-event.is-short:hover .booking-event-head { display: flex; }
 .booking-event.is-short:hover .booking-event-short-summary { display: none; }
 .booking-event.is-very-narrow .booking-event-service, .booking-event.is-very-narrow .booking-event-phone { display: none; }
-.booking-event:hover strong, .booking-event:hover span, .booking-event:hover small, .booking-event:focus-within strong, .booking-event:focus-within span, .booking-event:focus-within small { overflow: visible; white-space: normal; text-overflow: clip; }
+.booking-event:hover .booking-event-client, .booking-event:hover .booking-event-service, .booking-event:hover .booking-event-phone, .booking-event:focus-within .booking-event-client, .booking-event:focus-within .booking-event-service, .booking-event:focus-within .booking-event-phone, .booking-event:focus-visible .booking-event-client, .booking-event:focus-visible .booking-event-service, .booking-event:focus-visible .booking-event-phone { overflow: visible; white-space: normal; text-overflow: clip; }
 .booking-event-head { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 2px; }
 .booking-event-point { position: static; display: grid; flex: 0 0 auto; width: 16px; height: 18px; min-height: 18px; place-items: center; padding: 2px 3px; border: 0; border-radius: 4px; background: transparent; opacity: 0; cursor: pointer; transition: opacity .12s ease, background .12s ease; }
-.booking-event:hover .booking-event-point, .booking-event:focus-within .booking-event-point, .booking-event:focus-visible .booking-event-point { opacity: .8; }
+.booking-event:hover .booking-event-point, .booking-event:focus-within .booking-event-point, .booking-event:focus-visible .booking-event-point { opacity: 1; }
 .booking-event-point:hover { background: rgb(255 255 255 / 62%); opacity: 1; }
 .booking-event-point img { display: block; width: 10px; height: 14px; object-fit: contain; }
 .booking-event-cluster { position: absolute; z-index: 3; left: 10px; transform: translateY(-50%); }
@@ -388,8 +388,9 @@ button:active { transform: translateY(1px); }
 .booking-event-service { color: #475467; }
 .booking-event-phone { color: #667085; }
 .booking-event-completed { border-color: #12b76a; background: #ecfdf3; }
+.booking-event-completed:hover, .booking-event-completed:focus-within, .booking-event-completed:focus-visible { background: #ecfdf3; }
 .booking-event-cancelled, .booking-event-no_show { border-color: #f04438; background: #fff1f0; opacity: .72; }
-.booking-event-cancelled:hover, .booking-event-no_show:hover { opacity: 1; }
+.booking-event-cancelled:hover, .booking-event-no_show:hover, .booking-event-cancelled:focus-within, .booking-event-no_show:focus-within, .booking-event-cancelled:focus-visible, .booking-event-no_show:focus-visible { background: #fff1f0; opacity: 1; }
 .booking-event-time { font-weight: 600; }
 .booking-status { width: 100%; min-height: 18px; margin-top: auto; padding: 1px 3px; border: 0; border-radius: 4px; font-size: 9px; }
 .booking-master-calendar .booking-time-spacer, .booking-master-calendar .booking-master-header { height: 96px; }
@@ -406,7 +407,7 @@ button:active { transform: translateY(1px); }
 .booking-master-free-popover button { display: flex; justify-content: space-between; min-height: 32px; padding: 6px 8px; border: 1px solid #dbe4f4; background: #f7f9fc; color: #344054; font-size: 12px; }
 .booking-master-free-popover button:hover { border-color: #84adff; background: #eef4ff; }
 .booking-master-free-popover button span { color: #2563eb; font-weight: 700; }
-.booking-master-day .booking-day-body { background-color: #eef1f5; }
+.booking-master-day .booking-day-body { background: #f7f8fa; }
 .booking-current-time { position: absolute; z-index: 8; left: 0; right: 0; height: 1px; background: #f04438; pointer-events: none; }
 .booking-current-time::before { content: ""; position: absolute; left: -4px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: #f04438; }
 .booking-current-time span { position: absolute; right: 4px; top: -9px; padding: 1px 4px; border-radius: 4px; background: #fff; color: #d92d20; font-size: 10px; font-weight: 600; }
