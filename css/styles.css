@@ -2964,6 +2964,9 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .schedule-employee-text small { color: #667085; font-size: 12px; }
 .schedule-week-menu { position: absolute; top: 2px; right: 2px; display: grid; width: 26px; min-width: 26px; height: 26px; min-height: 26px; padding: 0; place-items: center; border-radius: 6px; font-size: 13px; line-height: 1; color: #344054; }
 .schedule-week-menu:hover { background: #f1f5f9; }
+.schedule-grid.is-selection-mode .schedule-cell { user-select: none; cursor: crosshair; }
+.schedule-grid.is-selection-mode .schedule-cell:hover { background: rgb(66 153 225 / 5%); }
+.schedule-grid.is-drag-selecting .schedule-cell { cursor: crosshair; }
 .schedule-cell { position: relative; display: grid; min-height: 76px; padding: 7px; place-items: stretch; border-right: 1px solid #e2e6ee; border-bottom: 1px solid #e2e6ee; background: #fff; cursor: pointer; }
 .schedule-cell.is-empty { place-items: center; color: #98a2b3; }
 .schedule-cell-add { position: absolute; top: 5px; right: 7px; opacity: 0; color: #4299e1; font-size: 13px; transition: opacity .15s ease; }
