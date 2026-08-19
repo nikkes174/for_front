@@ -211,6 +211,18 @@
           </span>
         </label>
         <p class="cabinet-message" data-cabinet-push-status></p>
+        <div class="cabinet-contact-preference">
+          <label class="cabinet-contact-preference-field">
+            <span>Предпочитаемое средство связи</span>
+            <select data-cabinet-contact-preference>
+              <option value="">Не выбрано</option>
+              <option value="Telegram" data-cabinet-contact-channel="telegram" hidden disabled>Telegram</option>
+              <option value="MAX" data-cabinet-contact-channel="max" hidden disabled>MAX</option>
+              <option value="VK" data-cabinet-contact-channel="vk" hidden disabled>VK</option>
+              <option value="Приложение" data-cabinet-contact-channel="application">Приложение</option>
+            </select>
+          </label>
+        </div>
         <div class="cabinet-notifications-empty" data-cabinet-notifications-list>Уведомлений пока нет.</div>
       </div>
     </div>

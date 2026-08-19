@@ -310,13 +310,14 @@ export function bindNotifications(root, ctx = {}) {
     const title = String(data.get("title") || "").trim().slice(0, MAX_TITLE_LENGTH);
     const message = String(data.get("message") || "").trim().slice(0, MAX_MESSAGE_LENGTH);
     const channels = data.getAll("channels").map(String);
+    const availableChannels = [...form.querySelectorAll('[name="channels"]')].map((input) => String(input.value));
     const singleDelivery = data.get("single_delivery") === "on";
     const files = notificationFiles.get(form) || [];
     if (!title || !message || !channels.length) return;
     try {
       const uploaded = files.length ? await api.uploadPushNotificationImages(files) : { image_urls: [] };
       const storedUrls = notificationImageUrls.get(form) || [];
-      await api.startPushNotificationJob({ organization_id: Number(orgId), title, message, channels, image_urls: [...storedUrls, ...(uploaded.image_urls || [])], single_delivery: singleDelivery });
+      await api.startPushNotificationJob({ organization_id: Number(orgId), title, message, channels, available_channels: availableChannels, image_urls: [...storedUrls, ...(uploaded.image_urls || [])], single_delivery: singleDelivery });
       form.querySelector("[data-message]").textContent = "";
       form.reset();
       notificationFiles.set(form, []);

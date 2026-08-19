@@ -557,6 +557,38 @@
   gap: 8px;
 }
 
+.cabinet-contact-preference {
+  display: grid;
+  padding: 14px 0;
+  border-top: 1px solid #e3e8f1;
+}
+
+.cabinet-contact-preference-field {
+  display: grid;
+  gap: 7px;
+  color: #172033;
+}
+
+.cabinet-contact-preference-field > span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cabinet-contact-preference-field select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #cfd7e6;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #172033;
+}
+
+.cabinet-contact-preference + .cabinet-notifications-empty,
+.cabinet-contact-preference + [data-cabinet-notifications-list] {
+  margin-top: 4px;
+}
+
 .cabinet-visit-page-content {
   width: 100%;
   min-width: 0;

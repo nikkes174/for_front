@@ -45,6 +45,7 @@ const form = document.querySelector("[data-cabinet-form]");
       const pushToggleControl = document.querySelector(".cabinet-notifications-toggle");
       const pushToggle = document.querySelector("[data-cabinet-push-toggle]");
       const pushStatus = document.querySelector("[data-cabinet-push-status]");
+      const contactPreference = document.querySelector("[data-cabinet-contact-preference]");
       const notificationsList = document.querySelector("[data-cabinet-notifications-list]");
       const achievementsList = document.querySelector("[data-cabinet-achievements]");
       const achievementModal = document.querySelector("[data-cabinet-achievement-modal]");
@@ -75,6 +76,7 @@ const form = document.querySelector("[data-cabinet-form]");
       let currentAccessSections = defaultCardSections;
       let currentClient = null;
       let cabinetData = null;
+      let preferredContactChannel = "";
       const allCabinetSections = ["profile", "visits", "loyalty", "achievements", "referrals"];
       const loadedCabinetSections = new Set();
       let cabinetSectionsPromise = null;
@@ -87,6 +89,26 @@ const form = document.querySelector("[data-cabinet-form]");
       let visitReviewRating = 0;
       const reviewedVisitIds = new Set(JSON.parse(sessionStorage.getItem("cabinet.reviewedVisitIds") || "[]"));
       const VISITS_PER_PAGE = 5;
+
+      function applyAvailableContactChannels(channels) {
+        if (!contactPreference) return;
+        const available = new Set([
+          "application",
+          ...(Array.isArray(channels) ? channels : []).map((channel) => String(channel).toLowerCase()),
+        ]);
+        const preferenceBlock = contactPreference.closest(".cabinet-contact-preference");
+        if (preferenceBlock) preferenceBlock.hidden = available.size <= 1;
+        contactPreference.querySelectorAll("[data-cabinet-contact-channel]").forEach((option) => {
+          const enabled = available.has(option.dataset.cabinetContactChannel);
+          option.hidden = !enabled;
+          option.disabled = !enabled;
+        });
+        const selected = contactPreference.selectedOptions[0];
+        if (selected?.disabled) {
+          contactPreference.value = "";
+          preferredContactChannel = "";
+        }
+      }
       let clientBookingOptions = null;
       let publicBookingAnonymous = false;
       let publicBookingClientId = null;
@@ -330,6 +352,11 @@ const form = document.querySelector("[data-cabinet-form]");
         const subscription = await registration?.pushManager?.getSubscription?.();
         const endpoint = subscription?.endpoint ? `&endpoint=${encodeURIComponent(subscription.endpoint)}` : "";
         const state = await requestJson(`/crm-api/client-communications/push/status?organization_id=${organizationId}&client_id=${clientId}${endpoint}`, { cache: "no-store" });
+        preferredContactChannel = String(state.preferred_contact_channel || "");
+        const preferredOption = [...contactPreference.options].find(
+          (option) => option.dataset.cabinetContactChannel === preferredContactChannel && !option.disabled,
+        );
+        contactPreference.value = preferredOption?.value || "";
         const supportsPush = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
         pushToggle.checked = !!state.enabled && (!supportsPush || (Notification.permission === "granted" && !!subscription));
         pushToggle.disabled = !state.configured;
@@ -1535,7 +1562,7 @@ const form = document.querySelector("[data-cabinet-form]");
             achievements: ["achievements", "organization_achievements"],
             referrals: ["referral_link", "referral_invites_count"],
           };
-          const baseFields = ["client", "organization_id", "registration_fields", "card_sections"];
+          const baseFields = ["client", "organization_id", "registration_fields", "card_sections", "available_contact_channels"];
           cabinetData ||= {};
           baseFields.forEach((field) => {
             if (Object.prototype.hasOwnProperty.call(result, field)) cabinetData[field] = result[field];
@@ -1547,6 +1574,7 @@ const form = document.querySelector("[data-cabinet-form]");
             loadedCabinetSections.add(section);
           });
           currentClient = cabinetData.client || currentClient;
+          applyAvailableContactChannels(cabinetData.available_contact_channels);
           return cabinetData;
         })();
         try {
@@ -1810,6 +1838,7 @@ const form = document.querySelector("[data-cabinet-form]");
           const link = await response.json();
           if (link.session_token) localStorage.setItem(SESSION_TOKEN_KEY, link.session_token);
           cabinetData = link;
+          applyAvailableContactChannels(link.available_contact_channels);
           await loadCabinetOrganizationName(link.organization_id);
           allCabinetSections.forEach((section) => loadedCabinetSections.add(section));
           currentClient = link.client || link.profile || null;
@@ -1982,6 +2011,34 @@ const form = document.querySelector("[data-cabinet-form]");
           await fetch("/auth/logout", { method: "POST" }).catch(() => null);
           localStorage.removeItem(SESSION_TOKEN_KEY);
           location.href = "/auth.html?mode=login";
+        }
+      });
+
+      contactPreference?.addEventListener("change", async () => {
+        const selectedOption = contactPreference.selectedOptions[0];
+        const previousChannel = preferredContactChannel;
+        preferredContactChannel = selectedOption?.dataset.cabinetContactChannel || "";
+        const { organizationId, clientId } = pushContext();
+        if (!organizationId || !clientId) return;
+        contactPreference.disabled = true;
+        try {
+          await requestJson("/crm-api/client-communications/push/preference", {
+            method: "POST",
+            body: JSON.stringify({
+              organization_id: organizationId,
+              client_id: clientId,
+              preferred_contact_channel: preferredContactChannel || null,
+            }),
+          });
+        } catch (error) {
+          preferredContactChannel = previousChannel;
+          const previousOption = [...contactPreference.options].find(
+            (option) => option.dataset.cabinetContactChannel === previousChannel,
+          );
+          contactPreference.value = previousOption?.value || "";
+          pushStatus.textContent = error.message || "Не удалось сохранить средство связи.";
+        } finally {
+          contactPreference.disabled = false;
         }
       });
 
