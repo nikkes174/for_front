@@ -264,10 +264,11 @@ function masterHeader(master, day, data) {
 function masterDayColumn(master, day, data, minHour, maxHour, minuteHeight) {
   const dateKey = localIsoDate(day);
   const events = data.events.filter((item) => item.start.slice(0, 10) === dateKey && String(item.employee_id) === String(master.id));
+  const layouts = eventLayouts(events);
   const intervals = data.working_intervals
     .filter((item) => item.date === dateKey && String(item.employee_id) === String(master.id))
     .filter((item) => !bookingState.branchId || String(item.branch_id) === String(bookingState.branchId));
-  return `<section class="booking-day booking-master-day">
+  return `<section class="booking-day booking-master-day${dateKey === localIsoDate(new Date()) ? " is-today" : ""}">
     ${masterHeader(master, day, data)}
     <div class="booking-day-body" style="height:${(maxHour - minHour) * 60 * minuteHeight}px">
       ${intervals.map((item) => {
@@ -282,7 +283,8 @@ function masterDayColumn(master, day, data, minHour, maxHour, minuteHeight) {
         const height = Math.max(selectedBookingSlotInterval(data) * minuteHeight, 18);
         return `<button type="button" class="booking-grid-create" data-open-booking-create data-master-id="${escapeHtml(master.id)}" data-branch-id="${escapeHtml(slot.branchId)}" data-booking-start="${dateKey}T${minuteClock(slot.from)}" data-booking-available-until="${minuteClock(slot.to)}" style="top:${top}px;height:${height}px" aria-label="Создать запись ${dateKey} в ${minuteClock(slot.from)}"><span>+</span></button>`;
       }).join("")}
-      ${events.map((item) => eventCard(item, minHour, minuteHeight)).join("")}
+      ${currentTimeIndicator(day, minHour, maxHour, minuteHeight)}
+      ${events.map((item) => eventCard(item, minHour, minuteHeight, layouts.get(String(item.id)))).join("")}
     </div>
   </section>`;
 }
@@ -466,18 +468,86 @@ function scheduleBookingHoverClose(root) {
   bookingHoverCloseTimer = setTimeout(() => root.querySelector("[data-booking-hover-card]")?.remove(), 120);
 }
 
-function eventCard(event, minHour, minuteHeight) {
+function layoutBookingEvents(events) {
+  const sorted = [...events].sort((left, right) => {
+    const startDifference = minutesOfDay(left.start, left.branch_id) - minutesOfDay(right.start, right.branch_id);
+    if (startDifference) return startDifference;
+    const endDifference = minutesOfDay(left.end, left.branch_id) - minutesOfDay(right.end, right.branch_id);
+    if (endDifference) return endDifference;
+    return String(left.id).localeCompare(String(right.id), "ru-RU");
+  });
+  const result = [];
+  let group = [];
+  let groupEnd = -Infinity;
+  const flushGroup = () => {
+    if (!group.length) return;
+    const laneEnds = [];
+    const layouts = [];
+    group.forEach((event) => {
+      const start = minutesOfDay(event.start, event.branch_id);
+      const end = Math.max(start + 1, minutesOfDay(event.end, event.branch_id));
+      let lane = laneEnds.findIndex((laneEnd) => laneEnd <= start);
+      if (lane === -1) lane = laneEnds.length;
+      laneEnds[lane] = end;
+      layouts.push({ event, lane });
+    });
+    const laneCount = Math.max(1, laneEnds.length);
+    layouts.forEach((layout) => result.push({ ...layout, laneCount }));
+    group = [];
+    groupEnd = -Infinity;
+  };
+  sorted.forEach((event) => {
+    const start = minutesOfDay(event.start, event.branch_id);
+    const end = Math.max(start + 1, minutesOfDay(event.end, event.branch_id));
+    if (group.length && start >= groupEnd) flushGroup();
+    group.push(event);
+    groupEnd = Math.max(groupEnd, end);
+  });
+  flushGroup();
+  return result;
+}
+
+function eventLayouts(events) {
+  return new Map(
+    layoutBookingEvents(events).map((layout) => [
+      String(layout.event.id),
+      { lane: layout.lane, laneCount: layout.laneCount },
+    ]),
+  );
+}
+
+function currentTimeIndicator(day, minHour, maxHour, minuteHeight) {
+  if (localIsoDate(day) !== localIsoDate(new Date())) return "";
+  const now = new Date();
+  const minute = now.getHours() * 60 + now.getMinutes();
+  if (minute < minHour * 60 || minute > maxHour * 60) return "";
+  return `<div class="booking-current-time" style="top:${(minute - minHour * 60) * minuteHeight}px"><span>${minuteClock(minute)}</span></div>`;
+}
+
+function eventCard(event, minHour, minuteHeight, layout = null) {
   const startMinute = minutesOfDay(event.start, event.branch_id);
   const endMinute = minutesOfDay(event.end, event.branch_id);
-  const top = Math.max(startMinute - minHour * 60, 0) * minuteHeight;
-  const height = Math.max((endMinute - startMinute) * minuteHeight, 1);
-  const breakMinutes = Math.round(Number(event.technical_break_seconds || 0) / 60);
-  return `<article class="booking-event booking-event-${escapeHtml(event.visit_status)}" data-booking-visit-id="${escapeHtml(event.id)}" role="button" tabindex="0" style="top:${top}px;height:${height}px">
-    <button type="button" class="booking-event-point" data-booking-hover-trigger data-hover-visit-id="${escapeHtml(event.id)}" aria-label="Детали визита"><img src="/fronted/icons/point.svg" alt=""></button>
-    <div class="booking-event-time">${clock(event.start, event.branch_id)}–${clock(event.end, event.branch_id)}</div>
-    <strong>${escapeHtml(event.service_names?.join(", ") || "Визит")}</strong>
-    <span>${escapeHtml(event.client_name)}</span>
-    ${event.client_phone ? `<small>${escapeHtml(event.client_phone)}</small>` : ""}
+  const durationMinutes = Math.max(endMinute - startMinute, 1);
+  const top = Math.max(startMinute - minHour * 60, 0) * minuteHeight + 1;
+  const height = Math.max(durationMinutes * minuteHeight - 2, 3);
+  const laneCount = Math.max(1, layout?.laneCount || 1);
+  const lane = Math.max(0, layout?.lane || 0);
+  const classes = [
+    "booking-event",
+    `booking-event-${escapeHtml(event.visit_status)}`,
+    laneCount > 1 ? "has-overlap" : "",
+    laneCount >= 3 ? "is-narrow" : "",
+    laneCount >= 5 ? "is-very-narrow" : "",
+    lane === laneCount - 1 ? "is-last-lane" : "",
+    durationMinutes <= 20 ? "is-short" : "",
+  ].filter(Boolean).join(" ");
+  const time = `${clock(event.start, event.branch_id)}–${clock(event.end, event.branch_id)}`;
+  return `<article class="${classes}" data-booking-visit-id="${escapeHtml(event.id)}" role="button" tabindex="0" style="top:${top}px;height:${height}px;--booking-event-lane:${lane};--booking-event-lanes:${laneCount}">
+    <div class="booking-event-head"><span class="booking-event-time">${time}</span><button type="button" class="booking-event-point" data-booking-hover-trigger data-hover-visit-id="${escapeHtml(event.id)}" aria-label="Детали визита"><img src="/fronted/icons/point.svg" alt=""></button></div>
+    <span class="booking-event-short-summary">${time} · ${escapeHtml(event.client_name || "Клиент")}</span>
+    <strong class="booking-event-client">${escapeHtml(event.client_name || "Клиент")}</strong>
+    <span class="booking-event-service">${escapeHtml(event.service_names?.join(", ") || "Визит")}</span>
+    ${event.client_phone ? `<small class="booking-event-phone">${escapeHtml(event.client_phone)}</small>` : ""}
   </article>`;
 }
 
@@ -579,10 +649,13 @@ function dayColumn(day, data, minHour, maxHour, minuteHeight) {
   const dateKey = localIsoDate(day);
   const events = data.events.filter((event) => event.start.slice(0, 10) === dateKey);
   const compactMode = !bookingState.branchId && !bookingState.employeeId;
-  return `<section class="booking-day">
-    <header><span>${DAY_NAMES[day.getDay()]}</span><strong>${day.getDate()} ${MONTH_NAMES[day.getMonth()]}</strong></header>
+  const layouts = compactMode ? null : eventLayouts(events);
+  const isToday = dateKey === localIsoDate(new Date());
+  return `<section class="booking-day${isToday ? " is-today" : ""}">
+    <header><span>${DAY_NAMES[day.getDay()]}${isToday ? " · Сегодня" : ""}</span><strong>${day.getDate()} ${MONTH_NAMES[day.getMonth()]}</strong></header>
     <div class="booking-day-body" style="height:${(maxHour - minHour) * 60 * minuteHeight}px">
-      ${compactMode ? compactEventClusters(events, minHour, minuteHeight) : events.map((event) => eventCard(event, minHour, minuteHeight)).join("")}
+      ${currentTimeIndicator(day, minHour, maxHour, minuteHeight)}
+      ${compactMode ? compactEventClusters(events, minHour, minuteHeight) : events.map((event) => eventCard(event, minHour, minuteHeight, layouts.get(String(event.id)))).join("")}
     </div>
   </section>`;
 }
