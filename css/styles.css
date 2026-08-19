@@ -319,7 +319,7 @@ button:active { transform: translateY(1px); }
 .booking-calendar-viewport { max-height: min(72dvh, calc(100dvh - 220px)); min-height: 320px; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable both-edges; border: 1px solid #d9dee8; border-radius: 10px; background: #fff; }
 .booking-calendar { display: grid; grid-template-columns: 58px repeat(7, minmax(135px, 1fr)); width: max(100%, 1000px); background: #fff; }
 .booking-time-scale, .booking-day { min-width: 0; border-right: 1px solid #e2e6ee; }
-.booking-time-scale { position: sticky; left: 0; z-index: 5; background: #fff; }
+.booking-time-scale { position: sticky; left: 0; z-index: 70; background: #fff; border-right: 1px solid #d9dee8; box-shadow: 2px 0 4px rgb(15 23 42 / 5%); }
 .booking-day:last-child { border-right: 0; }
 .booking-day header { position: sticky; top: 0; z-index: 80; height: 58px; display: grid; align-content: center; padding: 8px 10px; border-bottom: 1px solid #e2e6ee; background: #fff; }
 .booking-day header span { font-size: 12px; color: #667085; }
