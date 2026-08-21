@@ -290,9 +290,24 @@ function masterDayColumn(master, day, data, minHour, maxHour, minuteHeight) {
 }
 
 function masterDayCalendarMarkup(day, data, minHour, maxHour, minuteHeight, slotInterval, gridOffset) {
+  const dateKey = localIsoDate(day);
   const masters = data.masters
     .filter((master) => !bookingState.branchId || master.branch_ids?.some((id) => String(id) === String(bookingState.branchId)))
-    .filter((master) => !bookingState.employeeId || String(master.id) === String(bookingState.employeeId));
+    .filter((master) => !bookingState.employeeId || String(master.id) === String(bookingState.employeeId))
+    .filter((master) => {
+      const hasShift = data.working_intervals.some((item) => (
+        item.date === dateKey
+        && String(item.employee_id) === String(master.id)
+        && (!bookingState.branchId || String(item.branch_id) === String(bookingState.branchId))
+      ));
+      const hasVisit = data.events.some((item) => (
+        item.start.slice(0, 10) === dateKey
+        && String(item.employee_id) === String(master.id)
+        && ["scheduled", "completed"].includes(eventStatus(item))
+        && (!bookingState.branchId || String(item.branch_id) === String(bookingState.branchId))
+      ));
+      return hasShift || hasVisit;
+    });
   const visibleMasters = masters.length ? masters : [{ id: "", name: "Нет мастеров", branch_ids: [], service_ids: [] }];
   const calendarWidth = 58 + visibleMasters.length * 245;
   return `<div class="booking-calendar-viewport" data-booking-calendar aria-label="Календарь записей по мастерам">
@@ -430,6 +445,10 @@ function paymentLabels(event) {
 
 function paymentOption(event, label) {
   return paymentLabels(event).split(", ").includes(label) ? "checked" : "";
+}
+
+function completedVisitPaidAmount(event) {
+  return Math.max(Number(event.total_cost || 0) - Number(event.discount_amount || 0), 0);
 }
 
 function bookingHoverCard(event) {
@@ -889,10 +908,13 @@ export function bindBooking(root, ctx) {
       const status = card.querySelector("[data-booking-status]")?.value;
       saveHoverButton.disabled = true;
       try {
-        await api.updateClientVisit(visitId, {
+        const visit = bookingState.calendarData?.events?.find((item) => String(item.id) === String(visitId));
+        const payload = {
           visit_status: status,
           yclients_payments: methods.map((title) => ({ title })),
-        });
+        };
+        if (status === "completed" && visit) payload.paid_amount = completedVisitPaidAmount(visit);
+        await api.updateClientVisit(visitId, payload);
         card.remove();
         showBookingToast("\u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b");
         ctx.reload();

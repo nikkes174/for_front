@@ -2820,7 +2820,7 @@ td small { display: block; color: #667085; margin-top: 4px; font-size: 13px; lin
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 250;
   background: rgb(15 23 42 / 45%);
   display: grid;
   place-items: center;

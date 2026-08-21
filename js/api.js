@@ -88,6 +88,11 @@ export const api = {
   },
 
   branches: (orgId) => request(`/organizations/${orgId}/branches`),
+  employeeShifts: (orgId, dateFrom, dateTo) => request(`/organizations/${orgId}/employee-shifts?date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`),
+  createEmployeeShift: (orgId, body) => request(`/organizations/${orgId}/employee-shifts`, { method: "POST", body: JSON.stringify(body) }),
+  updateEmployeeShift: (orgId, shiftId, body) => request(`/organizations/${orgId}/employee-shifts/${shiftId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteEmployeeShift: (orgId, shiftId) => request(`/organizations/${orgId}/employee-shifts/${shiftId}`, { method: "DELETE" }),
+  bulkDeleteEmployeeShifts: (orgId, items) => request(`/organizations/${orgId}/employee-shifts/bulk-delete`, { method: "POST", body: JSON.stringify({ items }) }),
   createBranch: (body) => request("/organizations/branches", { method: "POST", body: JSON.stringify(body) }),
   updateBranch: (id, body) => request(`/organizations/branches/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   uploadBranchPhoto: (id, file) => {
