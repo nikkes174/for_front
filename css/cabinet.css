@@ -2694,6 +2694,8 @@ body.service-gallery-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .cabinet-bottom-nav-item { transition: none; } }
 
 .cabinet-registration-mode .cabinet-bottom-nav { display: none !important; }
+.cabinet-public-booking-anonymous .cabinet-bottom-nav { display: none !important; }
+.cabinet-public-booking-anonymous .cabinet-content { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 .cabinet-registration-mode [data-cabinet-history-section] { display: none !important; }
 .cabinet-registration-mode [data-cabinet-profile-avatar] { display: none !important; }
 .cabinet-registration-mode [data-cabinet-edit] { display: none !important; }

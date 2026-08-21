@@ -971,7 +971,9 @@
   function isSelectedMasterBookingDateBlocked(iso) {
     const masterId = clientBookingForm.elements.master_id.value;
     const master = ((clientBookingOptions == null ? void 0 : clientBookingOptions.masters) || []).find((item) => String(item.id) === String(masterId));
-    return ((master == null ? void 0 : master.booking_blocks) || []).some(
+    if (!master) return false;
+    const unavailableByShift = Array.isArray(master.available_dates) && !master.available_dates.includes(iso);
+    return unavailableByShift || (master.booking_blocks || []).some(
       (block) => !block.time_from && !block.time_to && String(block.date_from || "") <= iso && iso <= String(block.date_to || block.date_from || "")
     );
   }
@@ -1138,7 +1140,7 @@
     renderClientBookingMasters();
     const params = new URLSearchParams({
       service_ids: selectedBookingServiceIds().join(","),
-      days: "14"
+      days: "31"
     });
     if (branchId) params.set("branch_id", String(branchId));
     try {
@@ -1451,11 +1453,23 @@
     menu.classList.remove("is-open");
     window.setTimeout(() => menu.setAttribute("hidden", ""), 230);
   }
+  function syncPublicBookingGuestUi() {
+    const hideBottomNav = Boolean(
+      publicBookingOrganizationId && publicBookingAnonymous
+    );
+    document.body.classList.toggle(
+      "cabinet-public-booking-anonymous",
+      hideBottomNav
+    );
+    if (bottomNav) {
+      bottomNav.hidden = hideBottomNav || document.body.classList.contains("cabinet-registration-mode");
+    }
+  }
   function setRegistrationMode(enabled) {
     document.body.classList.toggle("cabinet-registration-mode", enabled);
     if (cabinetTitle) cabinetTitle.textContent = enabled ? "\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F \u043A\u043B\u0438\u0435\u043D\u0442\u0430" : "\u041C\u043E\u0438 \u0434\u0430\u043D\u043D\u044B\u0435";
     if (historySection) historySection.hidden = enabled;
-    if (bottomNav) bottomNav.hidden = enabled;
+    syncPublicBookingGuestUi();
     if (profileAvatar) profileAvatar.hidden = enabled;
     if (profileEditButton) profileEditButton.hidden = enabled;
     document.querySelectorAll("[data-cabinet-view]").forEach((view) => {
@@ -1603,6 +1617,7 @@
       }
       const sessionOrganizationId = Number((cabinetData == null ? void 0 : cabinetData.organization_id) || (currentClient == null ? void 0 : currentClient.organization_id) || 0);
       publicBookingAnonymous = !result || sessionOrganizationId !== publicBookingOrganizationId;
+      syncPublicBookingGuestUi();
       if (publicBookingAnonymous) {
         cabinetData = null;
         currentClient = null;
