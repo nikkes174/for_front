@@ -1824,6 +1824,21 @@ export async function openProductItemEditor(orgId, productItemId) {
   await openEntityModal("productItem", item);
 }
 
+export async function openUserEditModal(orgId, userId) {
+  let user = String(cache.organizationId || "") === String(orgId)
+    ? findEntity("user", userId)
+    : null;
+
+  if (!user) {
+    const settingsData = await loadSettingsData(orgId);
+    hydrateSettingsCache(orgId, settingsData);
+    user = findEntity("user", userId);
+  }
+
+  if (!user) throw new Error("Пользователь не найден.");
+  await openEntityModal("user", user);
+}
+
 export function renderCatalogTab(tabSlug = "products", data = cache) {
   const categories = data.categories || [];
   const productItems = data.productItems || [];
@@ -4191,7 +4206,19 @@ export function bindSettings(root, ctx) {
       if (form.dataset.type === "department") {
         payload.branch_ids = new FormData(form).getAll("department_branch_ids").map(Number).filter(Boolean);
       }
-      await saveEntity(form.dataset.type, form.dataset.id, payload, form);
+      const saved = await saveEntity(form.dataset.type, form.dataset.id, payload, form);
+      if (form.dataset.type === "user") {
+        const previous = findEntity("user", form.dataset.id) || {};
+        const user = {
+          ...previous,
+          ...payload,
+          ...(saved && typeof saved === "object" ? saved : {}),
+          is_active: payload.is_active === "true",
+          is_blocked: payload.is_blocked === "true",
+        };
+        cache.users = (cache.users || []).map((item) => String(item.id) === String(form.dataset.id) ? user : item);
+        window.dispatchEvent(new CustomEvent("settings:user-saved", { detail: { organizationId: cache.organizationId, user } }));
+      }
       form.closest("[data-settings-modal]")?.remove();
       ctx.reload();
     } catch (error) {
